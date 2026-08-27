@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CourierOS — Deliver Smarter. Deliver Better.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
+</head>
+
+<body class="landing">
+
+    <!-- NAV -->
+    <nav class="l-nav">
+        <div class="logo"><span class="dot"></span>CourierOS</div>
+        <div class="l-nav-center">
+            <a href="#home">Home</a>
+            <a href="#features">Features</a>
+            <a href="#how">How It Works</a>
+            <a href="#contact">Contact</a>
+        </div>
+        <div class="l-nav-right">
+            <a href="{{ url_for('auth.login') }}" class="login">Login</a>
+            <a href="{{ url_for('auth.register') }}" class="signup">Sign Up</a>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero" id="home">
+        <div>
+            <h1>Deliver Smarter.<br><span>Deliver Better.</span></h1>
+            <p class="lead">Manage shipments, delivery executive management, routes, deliveries, and real-time tracking
+                from one centralized
+                platform.</p>
+            <div class="hero-actions">
+                <a href="{{ url_for('auth.register') }}" class="btn-primary">Get Started</a>
+                <a href="#track" class="btn-outline">Track Delivery</a>
+            </div>
+            <div class="trusted-by">Built for teams managing <span class="n">100+ deliveries</span> a day</div>
+        </div>
+
+        <!-- Dashboard preview mock -->
+        <div class="dash-mock">
+            <div class="dash-mock-bar"><span></span><span></span><span></span></div>
+            <div class="dash-body">
+                <div class="dash-side">
+                    <div class="item active">Dashboard</div>
+                    <div class="item">Shipments</div>
+                    <div class="item">Delivery Executive</div>
+                    <div class="item">Warehouses</div>
+                    <div class="item">Live tracking</div>
+                    <div class="item">Notifications</div>
+                    <div class="item">Analytics</div>
+                    <div class="item">Reports</div>
+                    <div class="item">Settings</div>
+                </div>
+                <div class="dash-main">
+                    <div class="dash-stats">
+                        <div class="dash-stat">
+                            <div class="k">Active Shipments</div>
+                            <div class="v">1,842</div>
+                        </div>
+                        <div class="dash-stat">
+                            <div class="k">Drivers Online</div>
+                            <div class="v up">96</div>
+                        </div>
+                        <div class="dash-stat">
+                            <div class="k">On-Time Rate</div>
+                            <div class="v up">98.2%</div>
+                        </div>
+                    </div>
+                    <div class="dash-chart">
+                        <div class="k">Deliveries This Week</div>
+                        <div class="mini-bars">
+                            <div style="height:40%"></div>
+                            <div style="height:55%"></div>
+                            <div style="height:35%"></div>
+                            <div style="height:70%"></div>
+                            <div style="height:60%"></div>
+                            <div style="height:85%"></div>
+                            <div style="height:50%"></div>
+                        </div>
+                    </div>
+                    <div class="dash-row"><span class="id mono">CL20260826X7F2</span><span class="status transit">In
+                            Transit</span></div>
+                    <div class="dash-row"><span class="id mono">CL20260826A19D</span><span
+                            class="status done">Delivered</span></div>
+                    <div class="dash-row"><span class="id mono">CL20260826M4K7</span><span class="status transit">Out
+                            for Delivery</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="track-section" id="track">
+        <div class="track-content">
+            <span class="track-label">SHIPMENT TRACKING</span>
+            <h2>Track Your Shipment</h2>
+            <p>
+                Enter your Tracking ID to check the latest shipment status
+                and delivery progress.
+            </p>
+
+            <form class="tracking-form" action="#" method="GET">
+                <input type="text" name="tracking_id" placeholder="Enter Tracking ID" required>
+                <button type="submit" class="btn-primary">
+                    Track Shipment
+                </button>
+            </form>
+
+            <small>Example: CL20260826X7F2</small>
+        </div>
+    </section>
+
+    <!-- KEY FEATURES -->
+    <section class="features" id="features">
+        <h2>Key Features</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="icon">📦</div>
+                <h4>Shipment Management</h4>
+                <p>Create, edit, and track shipments with sender, receiver, and package details in one place.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">📍</div>
+                <h4>Real-Time Tracking</h4>
+                <p>Customers can check live shipment status and full tracking history using a Tracking ID.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🚚</div>
+                <h4>Delivery Executive Management</h4>
+                <p>Assign, monitor, and manage delivery agents and their availability across warehouses.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🧭</div>
+                <h4>Warehouse Management</h4>
+                <p>Route shipments efficiently between origin and destination warehouses.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">✅</div>
+                <h4>Proof of Delivery</h4>
+                <p>Capture photo or signature confirmation the moment a package is delivered.</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">📊</div>
+                <h4>Delivery Analytics</h4>
+                <p>Reports on shipments, agents, warehouses, and delivery performance.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="how" id="how">
+        <h2>How It Works</h2>
+        <div class="how-track">
+            <div class="how-step">
+                <div class="num">01</div>
+                <div class="lbl">Create Order</div>
+                <div class="desc">Enter shipment &amp; receiver details</div>
+            </div>
+            <div class="how-arrow">&#8594;</div>
+            <div class="how-step alt">
+                <div class="num">02</div>
+                <div class="lbl">Assign Driver</div>
+                <div class="desc">Match to an available agent</div>
+            </div>
+            <div class="how-arrow">&#8594;</div>
+            <div class="how-step alt">
+                <div class="num">03</div>
+                <div class="lbl">Pickup</div>
+                <div class="desc">Agent collects the package</div>
+            </div>
+            <div class="how-arrow">&#8594;</div>
+            <div class="how-step alt">
+                <div class="num">04</div>
+                <div class="lbl">Track Shipment</div>
+                <div class="desc">Live status through transit</div>
+            </div>
+            <div class="how-arrow">&#8594;</div>
+            <div class="how-step alt">
+                <div class="num">05</div>
+                <div class="lbl">Deliver</div>
+                <div class="desc">Out for delivery to receiver</div>
+            </div>
+            <div class="how-arrow">&#8594;</div>
+            <div class="how-step alt">
+                <div class="num">06</div>
+                <div class="lbl">Confirm Delivery</div>
+                <div class="desc">Proof of delivery uploaded</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- WHY CHOOSE US -->
+    <section class="why">
+        <h2>Why Choose Us</h2>
+        <div class="why-grid">
+            <div class="why-item">
+                <div class="icon">⏱</div>
+                <div>
+                    <h5>Real-Time Data</h5>
+                    <p>Live shipment status, no waiting on updates.</p>
+                </div>
+            </div>
+            <div class="why-item">
+                <div class="icon">🔒</div>
+                <div>
+                    <h5>Secure</h5>
+                    <p>Role-based access for customers, agents, and staff.</p>
+                </div>
+            </div>
+            <div class="why-item">
+                <div class="icon">👍</div>
+                <div>
+                    <h5>Easy to Use</h5>
+                    <p>Simple dashboards, no training required.</p>
+                </div>
+            </div>
+            <div class="why-item">
+                <div class="icon">☁</div>
+                <div>
+                    <h5>Scalable</h5>
+                    <p>From a handful of shipments to a full fleet.</p>
+                </div>
+            </div>
+            <div class="why-item">
+                <div class="icon">📄</div>
+                <div>
+                    <h5>Automated Reports</h5>
+                    <p>Shipment and agent performance, generated for you.</p>
+                </div>
+            </div>
+            <div class="why-item">
+                <div class="icon">👥</div>
+                <div>
+                    <h5>Role-Based Access</h5>
+                    <p>Customers, agents, warehouse staff, and admins — each with the right view.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA BAND -->
+    <section class="cta-band" id="track">
+        <div>
+            <h2>Ready to streamline your logistics operations?</h2>
+            <p>Manage every delivery from pickup to completion.</p>
+        </div>
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">Get Started Now</a>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="l-footer" id="contact">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <div class="logo"><span class="dot"></span>CourierOS</div>
+                <p>An all-in-one platform to manage shipments, drivers, warehouses, and deliveries — from pickup to
+                    doorstep.</p>
+                <div class="footer-social">
+                    <span>f</span><span>t</span><span>in</span><span>yt</span>
+                </div>
+            </div>
+            <div class="footer-col">
+                <h5>Quick Links</h5>
+                <a href="#home">Home</a>
+                <a href="#features">Features</a>
+                <a href="#how">How It Works</a>
+                <a href="{{ url_for('auth.register') }}">Sign Up</a>
+            </div>
+            <div class="footer-col">
+                <h5>Features</h5>
+                <a href="#features">Shipment Management</a>
+                <a href="#features">Real-Time Tracking</a>
+                <a href="#features">Delivery Executive Management</a>
+                <a href="#features">Delivery Analytics</a>
+            </div>
+            <div class="footer-col">
+                <h5>Contact Us</h5>
+                <a href="mailto:support@courieros.com">support@courieros.com</a>
+                <a href="tel:+911234567890">+91 123 456 7890</a>
+                <a href="#">America</a>
+            </div>
+        </div>
+        <div class="footer-bottom">© 2026 CourierOS. All rights reserved.</div>
+    </footer>
+
+</body>
+
+</html>
