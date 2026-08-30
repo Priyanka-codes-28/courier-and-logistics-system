@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div class="form-icon">📦</div>
+    <h2>Create Your Account!</h2>
+    <p class="form-subtitle">Sign up to create and track shipments.</p>
+
+    <form method="POST" action="{{ url_for('auth.register') }}">
+        <label>Full Name</label>
+        <input type="text" name="name" placeholder="e.g. Priyanka Reddy" required>
+
+        <label>Email</label>
+        <input type="email" name="email" placeholder="you@example.com" required>
+        <span class="field-hint">We'll send shipment updates to this email.</span>
+
+        <label>Phone</label>
+        <input type="text" name="phone" placeholder="10-digit mobile number">
+
+        <label>Password</label>
+        <div class="password-field">
+            <input type="password" name="password" id="password" placeholder="At least 6 characters" required>
+            <span class="toggle-password" onclick="togglePassword('password', 'toggleIcon1')" id="toggleIcon1">👁</span>
+        </div>
+
+        <label>Confirm Password</label>
+        <div class="password-field">
+            <input type="password" name="confirm_password" id="confirm_password" placeholder="Re-enter your password"
+                required>
+            <span class="toggle-password" onclick="togglePassword('confirm_password', 'toggleIcon2')"
+                id="toggleIcon2">👁</span>
+        </div>
+
+        <button type="submit">Create Account</button>
+    </form>
+
+    <p class="form-footer-link">Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a></p>
+</div>
+
+<script>
+    function togglePassword(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.textContent = '🙈';
+        } else {
+            input.type = 'password';
+            icon.textContent = '👁';
+        }
+    }
+</script>
+{% endblock %}
