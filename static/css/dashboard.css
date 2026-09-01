@@ -1095,6 +1095,8 @@ body {
     font-size: 13px;
     font-family: 'Courier New', monospace;
     width: 220px;
+    margin-top: 0;
+    box-sizing: boarder-box;
 }
 
 .quick-track-form button {

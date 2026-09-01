@@ -7,7 +7,6 @@
 
 <div class="grad-shell">
 
-    <!-- GRADIENT SIDEBAR (unchanged) -->
     <aside class="grad-sidebar">
         <div class="brand"><span class="dot"></span>CourierOS</div>
         <nav class="grad-nav">
@@ -17,16 +16,14 @@
             <a href="#update-location">Update Location</a>
             <a href="#delivery-proof">Upload Delivery Proof</a>
             <a href="#availability">Availability</a>
-            <a href="delivery-history">Delivery History</a>
+            <a href="#delivery-history">Delivery History</a>
             <a href="{{ url_for('auth.profile') }}">Profile</a>
             <a href="{{ url_for('auth.logout') }}">Logout</a>
         </nav>
     </aside>
 
-    <!-- MAIN -->
     <main class="grad-main">
 
-        <!-- SEARCH (functional, frontend only) -->
         <div class="dash-top-row">
             <div></div>
             <input type="text" id="shipSearch" class="agent-search" placeholder="🔍 Search assigned shipments..."
@@ -36,51 +33,44 @@
         <h1>Hello {{ name }}, Good Morning!</h1>
         <p class="page-sub">Here are your assigned deliveries for today.</p>
 
-        <!-- SUMMARY CARDS (static demo values) -->
         <div class="info-row">
             <div class="info-card">
                 <div class="k">Assigned</div>
-                <div class="v">8</div>
+                <div class="v">{{ assigned_count }}</div>
             </div>
             <div class="info-card">
                 <div class="k">Picked Up</div>
-                <div class="v">3</div>
+                <div class="v">{{ picked_up }}</div>
             </div>
             <div class="info-card">
                 <div class="k">Delivered</div>
-                <div class="v">4</div>
+                <div class="v">{{ delivered }}</div>
             </div>
             <div class="info-card">
                 <div class="k">Failed / RTO</div>
-                <div class="v">1</div>
+                <div class="v">{{ failed }}</div>
             </div>
         </div>
 
-        <!-- AVAILABILITY (JS toggle, frontend only) -->
-        <div class="chart-widget">
+        <div class="chart-widget" id="availability">
             <div class="w-title">Availability</div>
-            <span class="avail-toggle" id="availStatus">
-                <span class="dot"></span>
-                Available for new assignments
-            </span>
+            <span class="avail-toggle" id="availStatus"><span class="dot"></span>Available for new assignments</span>
             <div class="avail-btn-row">
                 <button type="button" class="avail-btn on" onclick="setAvailability(true)">Available</button>
                 <button type="button" class="avail-btn off" onclick="setAvailability(false)">Not Available</button>
             </div>
         </div>
 
-        <!-- QUICK ACTIONS -->
         <div class="section-block">
             <div class="section-title">Quick Actions</div>
             <div class="qa-row">
-                <a href="#" class="qa-btn">📦 Assigned Shipments</a>
+                <a href="#assigned-shipments" class="qa-btn">📦 Assigned Shipments</a>
                 <a href="#update-status-card" class="qa-btn">🔄 Update Status</a>
-                <a href="#" class="qa-btn">🕓 Delivery History</a>
+                <a href="#delivery-history" class="qa-btn">🕓 Delivery History</a>
             </div>
         </div>
 
-        <!-- ASSIGNED SHIPMENTS (main table, static demo data, searchable) -->
-        <div class="dash-section">
+        <div class="dash-section" id="assigned-shipments">
             <div class="sec-head">
                 <h3>Assigned Shipments</h3>
             </div>
@@ -88,168 +78,171 @@
                 <table class="dash-table recent-table" id="shipTable">
                     <tr>
                         <th>Tracking ID</th>
-                        <th>Customer</th>
-                        <th>Pickup</th>
-                        <th>Delivery</th>
+                        <th>Receiver</th>
+                        <th>Address</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
+                    {% if assigned %}
+                    {% for s in assigned %}
                     <tr>
-                        <td class="mono">CL2026083188CB</td>
-                        <td>Rahul</td>
-                        <td>Hyderabad</td>
-                        <td>Nellore</td>
-                        <td><span class="pill created">Assigned</span></td>
-                        <td><a href="#" class="link-btn">View</a></td>
+                        <td class="mono">{{ s.tracking_id }}</td>
+                        <td>{{ s.receiver_name }}</td>
+                        <td>{{ s.receiver_address }}</td>
+                        <td>
+                            {% if s.status == 'Delivered' %}<span class="pill delivered">{{ s.status }}</span>
+                            {% elif s.status in ['In Transit','Out for Delivery','Picked Up'] %}<span
+                                class="pill transit">{{ s.status }}</span>
+                            {% elif s.status in ['Failed Delivery','RTO'] %}<span class="pill failed">{{ s.status
+                                }}</span>
+                            {% else %}<span class="pill created">{{ s.status }}</span>{% endif %}
+                        </td>
+                        <td><a href="{{ url_for('shipments.update_status', tracking_id=s.tracking_id) }}"
+                                class="link-btn">Update</a></td>
                     </tr>
+                    {% endfor %}
+                    {% else %}
                     <tr>
-                        <td class="mono">CL2026083189CB</td>
-                        <td>Anjali</td>
-                        <td>Chennai</td>
-                        <td>Bengaluru</td>
-                        <td><span class="pill warehouse">Picked Up</span></td>
-                        <td><a href="#update-status-card" class="link-btn">Update</a></td>
+                        <td colspan="5" class="empty-note">No shipments assigned to you yet. Once a warehouse assigns
+                            one, it'll show up here.</td>
                     </tr>
-                    <tr>
-                        <td class="mono">CL2026083190CB</td>
-                        <td>Kiran</td>
-                        <td>Tirupati</td>
-                        <td>Vijayawada</td>
-                        <td><span class="pill transit">Out for Delivery</span></td>
-                        <td><a href="#update-status-card" class="link-btn">Update</a></td>
-                    </tr>
-                    <tr>
-                        <td class="mono">CL2026083191CB</td>
-                        <td>Priya</td>
-                        <td>Hyderabad</td>
-                        <td>Chennai</td>
-                        <td><span class="pill delivered">Delivered</span></td>
-                        <td><a href="#" class="link-btn">View</a></td>
-                    </tr>
+                    {% endif %}
                 </table>
                 <div id="noResults" class="empty-note" style="display:none;">No shipments match your search.</div>
             </div>
         </div>
 
-        <!-- TODAY'S DELIVERY ROUTE -->
         <div class="section-block">
             <div class="section-title">Today's Delivery Route</div>
+            {% if route_stops %}
             <div class="route-flow">
-                <div class="route-stop">Hyderabad Warehouse</div>
-                <div class="route-arrow">↓</div>
-                <div class="route-stop">Nellore</div>
-                <div class="route-arrow">↓</div>
-                <div class="route-stop">Kavali</div>
-                <div class="route-arrow">↓</div>
-                <div class="route-stop">Ongole</div>
+                {% for stop in route_stops %}
+                <div class="route-stop">{{ stop }}</div>
+                {% if not loop.last %}<div class="route-arrow">↓</div>{% endif %}
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="empty-note">No active deliveries on your route right now.</div>
+            {% endif %}
         </div>
 
-        <!-- UPDATE SHIPMENT STATUS (frontend only, no DB write) -->
         <div class="section-block" id="update-status-card">
             <div class="section-title">Update Shipment Status</div>
             <div class="current-ship-card">
+                {% if current_shipment %}
                 <div class="cs-row">
-                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span
-                            class="cs-v mono">CL2026083188CB</span></div>
-                    <div class="cs-item"><span class="cs-k">Current Status</span><span class="pill created">Picked
-                            Up</span></div>
+                    <div class="cs-item"><span class="cs-k">Current Job</span><span class="cs-v mono">{{
+                            current_shipment.tracking_id }}</span></div>
+                    <div class="cs-item"><span class="cs-k">Status</span><span class="pill transit">{{
+                            current_shipment.status }}</span></div>
                 </div>
-                <label class="form-label">New Status</label>
-                <select class="status-select" id="newStatusSelect">
-                    <option>Assigned</option>
-                    <option>Picked Up</option>
-                    <option>In Transit</option>
-                    <option>Out for Delivery</option>
-                    <option>Delivered</option>
-                    <option>Failed / RTO</option>
-                </select>
-                <button type="button" class="cta-btn" onclick="updateStatusDemo()">Update Status</button>
-                <div id="updateMsg" class="update-msg"></div>
+                {% endif %}
+                <form method="GET" action="{{ url_for('shipments.goto_update_status') }}">
+                    <label class="form-label">Tracking ID</label>
+                    <input type="text" name="tracking_id" class="proof-input"
+                        value="{{ current_shipment.tracking_id if current_shipment else '' }}"
+                        placeholder="e.g. CL20260830X7F2" required>
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Go to Update
+                        Status</button>
+                </form>
             </div>
         </div>
 
-        <!-- DELIVERY PROOF (frontend only, no DB write) -->
-        <div class="section-block">
-            <div class="section-title">Delivery Proof</div>
+        <div class="section-block" id="update-location">
+            <div class="section-title">Update Location</div>
+            {% if current_shipment %}
             <div class="current-ship-card">
-                <label class="form-label">Tracking ID</label>
-                <input type="text" class="proof-input" value="CL2026083190CB" readonly>
-
-                <label class="form-label">Receiver Name</label>
-                <input type="text" class="proof-input" value="Kiran" readonly>
-
-                <label class="form-label">Upload Delivery Photo</label>
-                <input type="file" class="proof-input">
-
-                <label class="form-label">Delivery Note</label>
-                <textarea class="proof-input" rows="3" placeholder="Enter delivery note"></textarea>
-
-                <button type="button" class="cta-btn" onclick="submitProofDemo()">Submit Delivery Proof</button>
-                <div id="proofMsg" class="update-msg"></div>
+                <form method="POST"
+                    action="{{ url_for('shipments.update_location', tracking_id=current_shipment.tracking_id) }}">
+                    <div class="cs-row">
+                        <div class="cs-item"><span class="cs-k">Tracking ID</span><span class="cs-v mono">{{
+                                current_shipment.tracking_id }}</span></div>
+                    </div>
+                    <label class="form-label">Current Location</label>
+                    <input type="text" name="location" class="proof-input" placeholder="e.g. Near HSR Layout, Bengaluru"
+                        required>
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Update Location</button>
+                </form>
             </div>
+            {% else %}
+            <div class="empty-note">No active shipment to update location for.</div>
+            {% endif %}
         </div>
 
-        <!-- RECENT NOTIFICATIONS -->
+        <div class="section-block" id="delivery-proof">
+            <div class="section-title">Delivery Proof</div>
+            {% if current_shipment %}
+            <div class="current-ship-card">
+                <form method="POST"
+                    action="{{ url_for('shipments.submit_proof', tracking_id=current_shipment.tracking_id) }}"
+                    enctype="multipart/form-data">
+                    <label class="form-label">Tracking ID</label>
+                    <input type="text" class="proof-input" value="{{ current_shipment.tracking_id }}" readonly>
+
+                    <label class="form-label">Receiver Name</label>
+                    <input type="text" class="proof-input" value="{{ current_shipment.receiver_name }}" readonly>
+
+                    <label class="form-label">Upload Delivery Photo</label>
+                    <input type="file" name="photo" class="proof-input" accept="image/*">
+
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Submit Delivery
+                        Proof</button>
+                </form>
+            </div>
+            {% else %}
+            <div class="empty-note">No active shipment to submit delivery proof for.</div>
+            {% endif %}
+        </div>
+
+        <div class="dash-section" id="delivery-history">
+            <div class="sec-head">
+                <h3>Delivery History</h3>
+            </div>
+            {% if delivery_history %}
+            <table class="dash-table">
+                <tr>
+                    <th>Tracking ID</th>
+                    <th>Finished</th>
+                    <th>Result</th>
+                </tr>
+                {% for h in delivery_history %}
+                <tr>
+                    <td class="mono">{{ h.tracking_id }}</td>
+                    <td>{{ h.finished_at.strftime('%b %d, %Y %I:%M %p') if h.finished_at else '' }}</td>
+                    <td>
+                        {% if h.status == 'Delivered' %}<span class="pill delivered">Delivered</span>
+                        {% else %}<span class="pill failed">Failed / RTO</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="empty-note">No completed deliveries yet.</div>
+            {% endif %}
+        </div>
+
         <div class="dash-section">
             <div class="sec-head">
                 <h3>Recent Notifications</h3>
-                <a href="#" class="link-btn">View All Notifications →</a>
             </div>
+            {% if notifications %}
             <div class="notif-list">
-                <div class="notif-item"><span class="notif-dot"></span>New shipment <span
-                        class="mono">CL2026083188CB</span> has been assigned to you.</div>
-                <div class="notif-item"><span class="notif-dot"></span>Shipment <span class="mono">CL2026083189CB</span>
-                    is ready for pickup.</div>
-                <div class="notif-item"><span class="notif-dot"></span>Shipment <span class="mono">CL2026083190CB</span>
-                    is out for delivery.</div>
-                <div class="notif-item"><span class="notif-dot"></span>Delivery <span class="mono">CL2026083191CB</span>
-                    was completed successfully.</div>
+                {% for n in notifications %}
+                <div class="notif-item">
+                    <span class="notif-dot"></span>
+                    {{ n.message }}
+                    {% if n.sent_at %}<br><span style="font-size:11px; color:var(--d-text-dim);">{{
+                        n.sent_at.strftime('%b %d, %Y %I:%M %p') }}</span>{% endif %}
+                </div>
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="empty-note">No notifications yet.</div>
+            {% endif %}
         </div>
 
     </main>
 </div>
 
-<script>
-    // Availability toggle (frontend only)
-    function setAvailability(isAvailable) {
-        const el = document.getElementById('availStatus');
-        if (isAvailable) {
-            el.classList.remove('off');
-            el.innerHTML = '<span class="dot"></span>Available for new assignments';
-        } else {
-            el.classList.add('off');
-            el.innerHTML = '<span class="dot"></span>Currently unavailable';
-        }
-    }
-
-    // Update status (frontend demo only, no backend call)
-    function updateStatusDemo() {
-        const status = document.getElementById('newStatusSelect').value;
-        document.getElementById('updateMsg').textContent = 'Status updated to "' + status + '" (demo only — not saved yet).';
-    }
-
-    // Delivery proof submit (frontend demo only)
-    function submitProofDemo() {
-        document.getElementById('proofMsg').textContent = 'Delivery proof submitted (demo only — not saved yet).';
-    }
-
-    // Search filter — filters table rows by any column, no page reload
-    function filterShipments() {
-        const query = document.getElementById('shipSearch').value.toLowerCase();
-        const table = document.getElementById('shipTable');
-        const rows = table.getElementsByTagName('tr');
-        let visibleCount = 0;
-
-        for (let i = 1; i < rows.length; i++) {
-            const rowText = rows[i].textContent.toLowerCase();
-            const match = rowText.includes(query);
-            rows[i].style.display = match ? '' : 'none';
-            if (match) visibleCount++;
-        }
-
-        document.getElementById('noResults').style.display = visibleCount === 0 ? 'block' : 'none';
-    }
-</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

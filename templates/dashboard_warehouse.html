@@ -26,7 +26,7 @@
     <!-- MAIN -->
     <main class="grad-main">
 
-        <!-- SEARCH (functional, frontend only) -->
+        <!-- SEARCH -->
         <div class="dash-top-row">
             <div></div>
             <input type="text" id="whSearch" class="agent-search" placeholder="🔍 Search shipments..."
@@ -36,28 +36,27 @@
         <h1>Hello {{ name }}, Good Morning!</h1>
         <p class="page-sub">Here's today's warehouse activity.</p>
 
-        <!-- SUMMARY CARDS (static demo values) -->
+        <!-- SUMMARY CARDS (real data) -->
         <div class="info-row">
             <div class="info-card">
                 <div class="k">Incoming (In Transit)</div>
-                <div class="v">12</div>
+                <div class="v">{{ incoming|length }}</div>
             </div>
             <div class="info-card">
                 <div class="k">Needs Agent</div>
-                <div class="v">5</div>
+                <div class="v">{{ outgoing_unassigned|length }}</div>
             </div>
             <div class="info-card">
                 <div class="k">At Warehouse Now</div>
-                <div class="v">8</div>
+                <div class="v">{{ at_warehouse_now|length }}</div>
             </div>
             <div class="info-card">
                 <div class="k">Agents Available</div>
-                <div class="v">4</div>
+                <div class="v">{{ agents_available }}</div>
             </div>
         </div>
 
         <!-- QUICK ACTIONS -->
-
         <div class="section-block">
             <div class="section-title">Quick Actions</div>
             <div class="qa-row">
@@ -68,7 +67,7 @@
             </div>
         </div>
 
-        <!-- INCOMING SHIPMENTS (static demo table, searchable) -->
+        <!-- INCOMING SHIPMENTS (real data) -->
         <div class="dash-section" id="incoming-table">
             <div class="sec-head">
                 <h3>Incoming Shipments — In Transit</h3>
@@ -77,42 +76,33 @@
                 <table class="dash-table recent-table" id="incomingTable">
                     <tr>
                         <th>Tracking ID</th>
-                        <th>From</th>
-                        <th>Destination</th>
-                        <th>ETA</th>
+                        <th>Sender</th>
+                        <th>Receiver</th>
                         <th>Status</th>
                         <th>Action</th>
                     </tr>
+                    {% if incoming %}
+                    {% for s in incoming %}
                     <tr>
-                        <td class="mono">CL2026083188CB</td>
-                        <td>Chennai</td>
-                        <td>Nellore</td>
-                        <td>Today, 3:30 PM</td>
-                        <td><span class="pill transit">In Transit</span></td>
-                        <td><a href="#" class="link-btn">View</a></td>
+                        <td class="mono">{{ s.tracking_id }}</td>
+                        <td>{{ s.sender_name or '—' }}</td>
+                        <td>{{ s.receiver_name }}</td>
+                        <td><span class="pill transit">{{ s.status }}</span></td>
+                        <td><a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}"
+                                class="link-btn">View</a></td>
                     </tr>
+                    {% endfor %}
+                    {% else %}
                     <tr>
-                        <td class="mono">CL2026083189CB</td>
-                        <td>Hyderabad</td>
-                        <td>Nellore</td>
-                        <td>Today, 5:00 PM</td>
-                        <td><span class="pill transit">In Transit</span></td>
-                        <td><a href="#" class="link-btn">View</a></td>
+                        <td colspan="5" class="empty-note">No shipments currently in transit to this warehouse.</td>
                     </tr>
-                    <tr>
-                        <td class="mono">CL2026083190CB</td>
-                        <td>Tirupati</td>
-                        <td>Nellore</td>
-                        <td>Tomorrow</td>
-                        <td><span class="pill transit">In Transit</span></td>
-                        <td><a href="#" class="link-btn">View</a></td>
-                    </tr>
+                    {% endif %}
                 </table>
                 <div id="incomingNoResults" class="empty-note" style="display:none;">No matching shipments.</div>
             </div>
         </div>
 
-        <!-- OUTGOING SHIPMENTS (static demo table, searchable) -->
+        <!-- OUTGOING SHIPMENTS (real data) -->
         <div class="dash-section" id="outgoing-table">
             <div class="sec-head">
                 <h3>Outgoing Shipments — Needs Agent Assignment</h3>
@@ -121,180 +111,178 @@
                 <table class="dash-table recent-table" id="outgoingTable">
                     <tr>
                         <th>Tracking ID</th>
-                        <th>Destination</th>
+                        <th>Receiver</th>
                         <th>Package</th>
                         <th>Status</th>
-                        <th>Agent</th>
                         <th>Action</th>
                     </tr>
+                    {% if outgoing_unassigned %}
+                    {% for s in outgoing_unassigned %}
                     <tr>
-                        <td class="mono">CL2026083191CB</td>
-                        <td>Hyderabad</td>
-                        <td>Electronics</td>
+                        <td class="mono">{{ s.tracking_id }}</td>
+                        <td>{{ s.receiver_name }}</td>
+                        <td>{{ s.package_type or '—' }}</td>
                         <td><span class="pill created">Ready</span></td>
-                        <td>Not Assigned</td>
-                        <td><a href="#assign-agent-card" class="link-btn">Assign</a></td>
+                        <td><a href="{{ url_for('auth.dashboard') }}?tracking_id={{ s.tracking_id }}#assign-agent-card"
+                                class="link-btn">Assign</a></td>
                     </tr>
+                    {% endfor %}
+                    {% else %}
                     <tr>
-                        <td class="mono">CL2026083192CB</td>
-                        <td>Chennai</td>
-                        <td>Documents</td>
-                        <td><span class="pill created">Ready</span></td>
-                        <td>Not Assigned</td>
-                        <td><a href="#assign-agent-card" class="link-btn">Assign</a></td>
+                        <td colspan="5" class="empty-note">No shipments currently waiting for an agent.</td>
                     </tr>
-                    <tr>
-                        <td class="mono">CL2026083193CB</td>
-                        <td>Bengaluru</td>
-                        <td>Clothing</td>
-                        <td><span class="pill created">Ready</span></td>
-                        <td>Assigned</td>
-                        <td><a href="#" class="link-btn">View</a></td>
-                    </tr>
+                    {% endif %}
                 </table>
                 <div id="outgoingNoResults" class="empty-note" style="display:none;">No matching shipments.</div>
             </div>
         </div>
 
-        <!-- WAREHOUSE ACTIVITY -->
+        <!-- WAREHOUSE ACTIVITY (real data) -->
         <div class="section-block">
             <div class="section-title">Warehouse Activity</div>
             <div class="info-row">
                 <div class="info-card">
                     <div class="k">Received Today</div>
-                    <div class="v">15</div>
+                    <div class="v">{{ received_today }}</div>
                 </div>
                 <div class="info-card">
                     <div class="k">Dispatched Today</div>
-                    <div class="v">10</div>
+                    <div class="v">{{ dispatched_today }}</div>
                 </div>
                 <div class="info-card">
                     <div class="k">Currently Stored</div>
-                    <div class="v">8</div>
+                    <div class="v">{{ at_warehouse_now|length }}</div>
                 </div>
                 <div class="info-card">
                     <div class="k">Pending Processing</div>
-                    <div class="v">5</div>
+                    <div class="v">{{ outgoing_unassigned|length }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- ASSIGN DELIVERY AGENT (frontend only, no DB write) -->
+        <!-- ASSIGN DELIVERY AGENT (real form) -->
         <div class="section-block" id="assign-agent-card">
             <div class="section-title">Assign Delivery Agent</div>
             <div class="current-ship-card">
-                <div class="cs-row">
-                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span
-                            class="cs-v mono">CL2026083191CB</span></div>
-                    <div class="cs-item"><span class="cs-k">Destination</span><span class="cs-v">Hyderabad</span></div>
-                </div>
-                <label class="form-label">Available Agent</label>
-                <select class="status-select" id="agentSelect">
-                    <option>Select Delivery Agent</option>
-                    <option>Rahul Kumar</option>
-                    <option>Anjali Reddy</option>
-                    <option>Kiran Kumar</option>
-                    <option>Priya Sharma</option>
-                </select>
-                <button type="button" class="cta-btn" onclick="assignAgentDemo()">Assign Agent</button>
-                <div id="assignMsg" class="update-msg"></div>
+                <form method="POST" action="{{ url_for('shipments.assign_agent') }}">
+                    <label class="form-label">Tracking ID</label>
+                    <input type="text" name="tracking_id" class="proof-input"
+                        value="{{ request.args.get('tracking_id', '') }}" placeholder="e.g. CL20260830X7F2" required>
+
+                    <label class="form-label">Available Agent</label>
+                    <select class="status-select" name="agent_id" required>
+                        <option value="">Select Delivery Agent</option>
+                        {% for a in agents %}
+                        <option value="{{ a.id }}">{{ a.name }}{{ ' (Available)' if a.is_available else ' (Unavailable)'
+                            }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Assign Agent</button>
+                </form>
+                {% if not agents %}
+                <div class="update-msg" style="color:#B23A3A;">No delivery agents exist yet — an agent needs to register
+                    and be assigned the delivery_agent role first.</div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- UPDATE SHIPMENT STATUS (frontend only, no DB write) -->
+        <!-- UPDATE SHIPMENT STATUS (real redirect) -->
         <div class="section-block" id="update-shipment-card">
             <div class="section-title">Update Shipment</div>
             <div class="current-ship-card">
-                <div class="cs-row">
-                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span
-                            class="cs-v mono">CL2026083188CB</span></div>
-                    <div class="cs-item"><span class="cs-k">Current Status</span><span class="pill transit">In
-                            Transit</span></div>
-                </div>
-                <label class="form-label">Update Status</label>
-                <select class="status-select" id="whStatusSelect">
-                    <option>In Transit</option>
-                    <option>Arrived at Warehouse</option>
-                    <option>Processing</option>
-                    <option>Ready for Dispatch</option>
-                    <option>Assigned to Agent</option>
-                    <option>Dispatched</option>
-                </select>
-                <button type="button" class="cta-btn" onclick="updateShipmentDemo()">Update Status</button>
-                <div id="whUpdateMsg" class="update-msg"></div>
+                <form method="GET" action="{{ url_for('shipments.goto_update_status') }}">
+                    <label class="form-label">Tracking ID</label>
+                    <input type="text" name="tracking_id" class="proof-input" placeholder="e.g. CL20260830X7F2"
+                        required>
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Go to Update
+                        Status</button>
+                </form>
             </div>
         </div>
 
-        <!-- DELIVERY AGENT AVAILABILITY -->
+        <!-- WAREHOUSE INVENTORY VIEW (real data) -->
+        <div class="dash-section" id="warehouse-inventory">
+            <div class="sec-head">
+                <h3>Warehouse Inventory View</h3>
+            </div>
+            <table class="dash-table">
+                <tr>
+                    <th>Tracking ID</th>
+                    <th>Status</th>
+                    <th>Received</th>
+                </tr>
+                {% if at_warehouse_now %}
+                {% for s in at_warehouse_now %}
+                <tr>
+                    <td class="mono">{{ s.tracking_id }}</td>
+                    <td><span class="pill warehouse">{{ s.status }}</span></td>
+                    <td>{{ s.created_at.strftime('%b %d, %Y') if s.created_at else '' }}</td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="3" class="empty-note">No shipments currently stored at this warehouse.</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <!-- WAREHOUSE DETAILS (real data) -->
+        <div class="section-block" id="warehouse-details">
+            <div class="section-title">Warehouse Details</div>
+            {% if warehouse %}
+            <div class="current-ship-card">
+                <div class="cs-row">
+                    <div class="cs-item"><span class="cs-k">Warehouse Name</span><span class="cs-v">{{ warehouse.name
+                            }}</span></div>
+                    <div class="cs-item"><span class="cs-k">Address</span><span class="cs-v">{{ warehouse.address }}, {{
+                            warehouse.city }}, {{ warehouse.state }} {{ warehouse.pincode }}</span></div>
+                    <div class="cs-item"><span class="cs-k">Contact Number</span><span class="cs-v">{{
+                            warehouse.contact_number or 'Not set' }}</span></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-note">No warehouse is set up in the system yet.</div>
+            {% endif %}
+        </div>
+
+        <!-- DELIVERY AGENT AVAILABILITY (real data) -->
         <div class="dash-section">
             <div class="sec-head">
                 <h3>Delivery Agents</h3>
-                <a href="#" class="link-btn">View Agents →</a>
             </div>
             <div class="agent-avail-row">
-                <div class="agent-avail-item"><span class="agent-avail-dot available"></span>Available <b>4</b></div>
-                <div class="agent-avail-item"><span class="agent-avail-dot busy"></span>Busy <b>6</b></div>
-                <div class="agent-avail-item"><span class="agent-avail-dot offline"></span>Offline <b>2</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot available"></span>Available <b>{{
+                        agents_available }}</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot busy"></span>Busy <b>{{ agents_busy }}</b>
+                </div>
+                <div class="agent-avail-item"><span class="agent-avail-dot offline"></span>Offline <b>{{ agents_offline
+                        }}</b></div>
             </div>
         </div>
 
-        <!-- RECENT WAREHOUSE ACTIVITY -->
+        <!-- RECENT WAREHOUSE ACTIVITY (real data) -->
         <div class="dash-section">
             <div class="sec-head">
                 <h3>Recent Warehouse Activity</h3>
             </div>
+            {% if recent_activity %}
             <div class="notif-list">
-                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
-                        class="mono">CL2026083188CB</span> received at warehouse</div>
-                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
-                        class="mono">CL2026083189CB</span> moved to processing</div>
-                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
-                        class="mono">CL2026083190CB</span> assigned to delivery agent</div>
-                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
-                        class="mono">CL2026083191CB</span> dispatched from warehouse</div>
+                {% for a in recent_activity %}
+                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span class="mono">{{ a.tracking_id
+                        }}</span> — {{ a.status }}
+                    {% if a.timestamp %}<br><span style="font-size:11px; color:var(--d-text-dim);">{{
+                        a.timestamp.strftime('%b %d, %Y %I:%M %p') }}</span>{% endif %}
+                </div>
+                {% endfor %}
             </div>
+            {% else %}
+            <div class="empty-note">No recent activity recorded for this warehouse yet.</div>
+            {% endif %}
         </div>
 
     </main>
 </div>
 
-<script>
-    // Assign agent (frontend demo only, no backend call)
-    function assignAgentDemo() {
-        const agent = document.getElementById('agentSelect').value;
-        if (agent === 'Select Delivery Agent') {
-            document.getElementById('assignMsg').textContent = 'Please select an agent first.';
-            return;
-        }
-        document.getElementById('assignMsg').textContent = 'Assigned to ' + agent + ' (demo only — not saved yet).';
-    }
-
-    // Update shipment status (frontend demo only, no backend call)
-    function updateShipmentDemo() {
-        const status = document.getElementById('whStatusSelect').value;
-        document.getElementById('whUpdateMsg').textContent = 'Status updated to "' + status + '" (demo only — not saved yet).';
-    }
-
-    // Search filter — filters BOTH incoming and outgoing tables, no page reload
-    function filterWarehouseTables() {
-        const query = document.getElementById('whSearch').value.toLowerCase();
-        filterTable('incomingTable', 'incomingNoResults', query);
-        filterTable('outgoingTable', 'outgoingNoResults', query);
-    }
-
-    function filterTable(tableId, noResultsId, query) {
-        const table = document.getElementById(tableId);
-        const rows = table.getElementsByTagName('tr');
-        let visibleCount = 0;
-
-        for (let i = 1; i < rows.length; i++) {
-            const rowText = rows[i].textContent.toLowerCase();
-            const match = rowText.includes(query);
-            rows[i].style.display = match ? '' : 'none';
-            if (match) visibleCount++;
-        }
-
-        document.getElementById(noResultsId).style.display = visibleCount === 0 ? 'block' : 'none';
-    }
-</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

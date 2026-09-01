@@ -1,6 +1,6 @@
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from models import User, Shipment, DeliveryAgent, Warehouse
+from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -48,13 +48,38 @@ def role_required(*allowed_roles):
 def _customer_dashboard_context():
     shipments = Shipment.list_by_sender(session["user_id"])
     total = len(shipments)
-    in_transit = sum(1 for s in shipments if s["status"] in ("Picked Up", "At Warehouse", "In Transit", "Out for Delivery"))
+    in_transit = sum(1 for s in shipments if s["status"] in ("Picked Up", "In Transit", "Arrived at Warehouse", "Processing", "Ready for Dispatch", "Agent Assigned", "Out for Delivery"))
     delivered = sum(1 for s in shipments if s["status"] == "Delivered")
     pending = sum(1 for s in shipments if s["status"] == "Created")
+
+    current_shipment = Shipment.get_current_for_sender(session["user_id"])
+    current_location = None
+    current_agent = None
+    progress_steps = []
+    if current_shipment:
+        current_location = Shipment.get_latest_location(current_shipment["id"])
+        current_agent = Shipment.get_assigned_agent_name(current_shipment["id"])
+        try:
+            current_idx = STATUS_FLOW.index(current_shipment["status"])
+        except ValueError:
+            current_idx = -1  # status is an exception status (Failed/RTO), not in the normal flow
+        for i, stage in enumerate(STATUS_FLOW):
+            progress_steps.append({
+                "label": stage,
+                "done": i < current_idx,
+                "active": i == current_idx,
+            })
+
+    notifications = Notification.list_for_user(session["user_id"], limit=4)
+    delivery_proof = DeliveryProof.find_latest_for_sender(session["user_id"])
+
     return dict(
         name=session.get("user_name"), role="customer",
         shipments=shipments[:3], total=total, in_transit=in_transit,
         delivered=delivered, pending=pending,
+        current_shipment=current_shipment, current_location=current_location,
+        current_agent=current_agent, progress_steps=progress_steps,
+        notifications=notifications, delivery_proof=delivery_proof,
     )
 
 
@@ -64,11 +89,22 @@ def _agent_dashboard_context():
     picked_up = sum(1 for s in assigned if s["status"] == "Picked Up")
     delivered = sum(1 for s in assigned if s["status"] == "Delivered")
     failed = sum(1 for s in assigned if s["status"] in ("Failed Delivery", "RTO"))
+
+    current_shipment = Shipment.get_current_for_agent(agent["id"])
+    delivery_history = Shipment.list_delivery_history_for_agent(agent["id"], limit=5)
+    notifications = Notification.list_for_user(session["user_id"], limit=4)
+
+    # Today's route: real addresses of this agent's currently active
+    # (non-final) assigned shipments, in assignment order.
+    route_stops = [s["receiver_address"] for s in assigned if s["status"] not in ("Delivered", "Failed Delivery", "RTO")]
+
     return dict(
         name=session.get("user_name"), role="delivery_agent",
         assigned=assigned, assigned_count=len(assigned),
         picked_up=picked_up, delivered=delivered, failed=failed,
         is_available=agent["is_available"],
+        current_shipment=current_shipment, delivery_history=delivery_history,
+        notifications=notifications, route_stops=route_stops,
     )
 
 
@@ -78,30 +114,63 @@ def _warehouse_dashboard_context():
     warehouse = Warehouse.get_first()
     if warehouse:
         incoming = Shipment.list_at_warehouse(warehouse["id"], status="In Transit")
-        at_warehouse_now = Shipment.list_at_warehouse(warehouse["id"], status="At Warehouse")
+        at_warehouse_now = Shipment.list_at_warehouse(warehouse["id"], status=" Arrived At Warehouse")
         outgoing_unassigned = Shipment.unassigned_at_warehouse(warehouse["id"])
         agents_available = DeliveryAgent.count_available(warehouse["id"])
+        received_today = WarehouseActivity.count_received_today(warehouse["id"])
+        dispatched_today = WarehouseActivity.count_dispatched_today(warehouse["id"])
+        recent_activity = WarehouseActivity.list_recent(warehouse["id"], limit=4)
     else:
         incoming, at_warehouse_now, outgoing_unassigned, agents_available = [], [], [], 0
+        received_today, dispatched_today, recent_activity = 0, 0, []
+    agents = DeliveryAgent.list_all_with_names()
+    agents_busy = DeliveryAgent.count_busy()
+    agents_offline = DeliveryAgent.count_offline()
     return dict(
         name=session.get("user_name"), role="warehouse_staff",
         warehouse=warehouse, incoming=incoming, at_warehouse_now=at_warehouse_now,
         outgoing_unassigned=outgoing_unassigned, agents_available=agents_available,
+        agents=agents, agents_busy=agents_busy, agents_offline=agents_offline,
+        received_today=received_today, dispatched_today=dispatched_today,
+        recent_activity=recent_activity,
     )
 
 
 def _admin_dashboard_context():
-    all_shipments = Shipment.list_all(limit=10)
+    all_shipments = Shipment.list_all_with_sender(limit=5)
     total_shipments = Shipment.count_all()
     delivered_count = Shipment.count_delivered()
     active_agents = DeliveryAgent.count_available()
     warehouse_count = Warehouse.count_all()
     delivered_rate = round((delivered_count / total_shipments) * 100, 1) if total_shipments else 0
+
+    breakdown = Shipment.status_breakdown()
+    weekly = Shipment.deliveries_this_week()
+    warehouses_overview = Warehouse.list_all_with_counts()
+    users_list = User.list_all(limit=10)
+    notifications_log = Notification.list_all_recent(limit=5)
+
+    agents_busy = DeliveryAgent.count_busy()
+    agents_offline = DeliveryAgent.count_offline()
+    delivery_executives = DeliveryAgent.count_all()
+
+    active_shipments = total_shipments - delivered_count - breakdown["failed"]
+    failed_rate = round((breakdown["failed"] / total_shipments) * 100, 1) if total_shipments else 0
+    unassigned_count = Shipment.count_unassigned_system_wide()
+
     return dict(
         name=session.get("user_name"), role="admin",
         all_shipments=all_shipments, total_shipments=total_shipments,
         active_agents=active_agents, warehouse_count=warehouse_count,
         delivered_rate=delivered_rate,
+        breakdown=breakdown, weekly=weekly,
+        warehouses_overview=warehouses_overview, users_list=users_list,
+        notifications_log=notifications_log,
+        agents_busy=agents_busy, agents_offline=agents_offline,
+        delivery_executives=delivery_executives,
+        active_shipments=active_shipments, pending=breakdown["pending"],
+        failed_count=breakdown["failed"], failed_rate=failed_rate,
+        unassigned_count=unassigned_count,
     )
 
 
@@ -178,9 +247,13 @@ def forgot_password():
         email = request.form.get("email", "").strip().lower()
         user = User.find_by_email(email)
 
+        # Always show the same message whether or not the email exists —
+        # prevents leaking which emails are registered.
         if user:
             token = User.set_reset_token(email)
             reset_link = url_for("auth.reset_password", token=token, _external=True)
+            # No email service is configured yet, so the link is shown directly here
+            # for testing. Once you add Flask-Mail, replace this with an actual email send.
             flash(f"Reset link (for testing, since email isn't configured yet): {reset_link}", "success")
         else:
             flash("If an account exists with that email, a reset link has been generated.", "success")
@@ -210,6 +283,8 @@ def reset_password(token):
         return redirect(url_for("auth.login"))
 
     return render_template("reset_password.html", token=token)
+
+
 @auth_bp.route("/profile", methods=["GET", "POST"])
 def profile():
     """Profile & Account page — shared across all 4 roles, since the
@@ -244,7 +319,8 @@ def profile():
 def dashboard():
     """Smart entry point — always shows YOUR OWN role's dashboard.
     This is what login() redirects to, and what all existing
-    templates link to via url_for('auth.dashboard')."""
+    templates link to via url_for('auth.dashboard'). Unchanged
+    behavior from before this refactor."""
     if "user_id" not in session:
         flash("Please log in to continue.", "danger")
         return redirect(url_for("auth.login"))
@@ -257,6 +333,14 @@ def dashboard():
 
 # ============================================================
 # SPECIFIC ROLE-PROTECTED ROUTES (requirement #5)
+#
+# Direct URLs per role, each guarded by role_required(). If a
+# customer tries to visit /admin/dashboard directly, they are
+# redirected to their own dashboard with an Access Denied
+# message instead of ever seeing admin content.
+#
+# These reuse the exact same context builders and templates as
+# the smart /dashboard route above — no duplicated logic.
 # ============================================================
 
 @auth_bp.route("/customer/dashboard")
@@ -284,8 +368,15 @@ def admin_dashboard():
 
 
 # ============================================================
-# DEMO ROLE SWITCHER — testing/demonstration only. Never writes
-# to the database — session-only role override.
+# DEMO ROLE SWITCHER — for testing/demonstration purposes only.
+#
+# Changes ONLY the current session's role, in memory. Nothing is
+# written to the database — the user's real role in the `users`
+# table is completely untouched. This lets you preview all 4
+# dashboards instantly without ever running an SQL UPDATE.
+#
+# Log out (or close the browser) and log back in normally, and
+# your account reverts to its real, database-stored role.
 # ============================================================
 
 DEMO_ROLES = ["customer", "delivery_agent", "warehouse_staff", "admin"]
@@ -293,12 +384,19 @@ DEMO_ROLES = ["customer", "delivery_agent", "warehouse_staff", "admin"]
 
 @auth_bp.route("/demo/login-as/<role_name>")
 def demo_login_as(role_name):
+    """Quick demo login — signs in directly as the given role with no
+    password. Uses a real existing user account under the hood (so
+    session['user_id'] is always valid for foreign keys), but overrides
+    the displayed name/role for the session only. Nothing about the
+    account's real database role is changed."""
     if role_name not in DEMO_ROLES:
         flash("Unknown role.", "danger")
         return redirect(url_for("auth.login"))
 
     user = User.find_first_by_role(role_name)
     if not user:
+        # No account with this role exists yet — fall back to any user,
+        # but still show the requested role's dashboard for the demo.
         user = User.find_any()
 
     if not user:

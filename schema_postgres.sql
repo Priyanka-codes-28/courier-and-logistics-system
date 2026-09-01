@@ -40,6 +40,7 @@ CREATE TABLE shipments (
     receiver_address VARCHAR(255) NOT NULL,
     receiver_phone VARCHAR(15) NOT NULL,
     package_type VARCHAR(50),
+    package_description varchar(255),
     weight DECIMAL(6,2),
     origin_warehouse_id INTEGER REFERENCES warehouses(id),
     destination_warehouse_id INTEGER REFERENCES warehouses(id),

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Update Shipment Status{% endblock %}
+{% block container_class %}auth-narrow{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div class="form-icon">🔄</div>
+    <h2>Update Shipment Status</h2>
+    <p class="form-subtitle">
+        <span class="mono" style="font-family:'Courier New',monospace;">{{ shipment.tracking_id }}</span><br>
+        Current status: <strong>{{ shipment.status }}</strong>
+    </p>
+
+    {% if next_status %}
+    <form method="POST" action="{{ url_for('shipments.update_status', tracking_id=shipment.tracking_id) }}">
+        <input type="hidden" name="status" value="{{ next_status }}">
+
+        <label>Location</label>
+        <input type="text" name="location" placeholder="e.g. Hyderabad Hub">
+
+        <label>Remarks (optional)</label>
+        <input type="text" name="remarks" placeholder="Any notes about this update">
+
+        <button type="submit">Move to "{{ next_status }}"</button>
+    </form>
+    {% else %}
+    <p style="text-align:center; color:#5C6B7A;">This shipment has reached its final status.</p>
+    {% endif %}
+
+    <p class="form-footer-link"><a href="{{ url_for('shipments.track', tracking_id=shipment.tracking_id) }}">View
+            Tracking Page →</a></p>
+</div>
+{% endblock %}
