@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Profile & Account{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="grad-shell">
+
+    <!-- GRADIENT SIDEBAR — same nav as the role's dashboard, with Profile marked active -->
+    <aside class="grad-sidebar">
+        <div class="brand"><span class="dot"></span>CourierOS</div>
+        <nav class="grad-nav">
+            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
+
+            {% if role == 'customer' %}
+            <a href="{{ url_for('shipments.my_shipments') }}">My Shipments</a>
+            <a href="{{ url_for('shipments.create_shipment') }}">Create Shipment</a>
+            <a href="{{ url_for('shipments.track') }}">Track Shipment</a>
+            <a href="{{ url_for('auth.dashboard') }}#notifications">Delivery Notifications</a>
+            <a href="{{ url_for('auth.dashboard') }}#delivery-proof">Delivery Proof</a>
+            <div class="item active">Profile &amp; Account</div>
+
+            {% elif role == 'delivery_agent' %}
+            <a href="{{ url_for('auth.dashboard') }}#assigned-shipments">Assigned Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#update-status-card">Update Shipment Status</a>
+            <a href="{{ url_for('auth.dashboard') }}#update-location">Update Location</a>
+            <a href="{{ url_for('auth.dashboard') }}#delivery-proof">Upload Delivery Proof</a>
+            <a href="{{ url_for('auth.dashboard') }}#availability">Availability</a>
+            <a href="{{ url_for('auth.dashboard') }}#delivery-history">Delivery History</a>
+            <div class="item active">Profile</div>
+
+            {% elif role == 'warehouse_staff' %}
+            <a href="{{ url_for('auth.dashboard') }}#incoming-table">Incoming Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#outgoing-table">Outgoing Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#assign-agent-card">Assign Delivery Agent</a>
+            <a href="{{ url_for('auth.dashboard') }}#warehouse-inventory">Warehouse Inventory</a>
+            <a href="{{ url_for('auth.dashboard') }}#update-shipment-card">Update Shipment Status</a>
+            <a href="{{ url_for('auth.dashboard') }}#warehouse-details">Warehouse Details</a>
+            <div class="item active">Profile</div>
+
+            {% elif role == 'admin' %}
+            <a href="{{ url_for('auth.dashboard') }}#recent-shipments-table">All Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#warehouse-overview">Manage Warehouses</a>
+            <a href="{{ url_for('auth.dashboard') }}#delivery-exec-overview">Manage Delivery Agents</a>
+            <a href="{{ url_for('auth.dashboard') }}#manage-users">Manage Users</a>
+            <a href="{{ url_for('auth.dashboard') }}#reports-analytics">Reports &amp; Analytics</a>
+            <a href="{{ url_for('auth.dashboard') }}#notifications-log">Notifications Log</a>
+            <a href="{{ url_for('auth.dashboard') }}#system-settings">System Settings</a>
+            {% endif %}
+
+            <a href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="grad-main">
+        <h1>Profile &amp; Account</h1>
+        <p class="page-sub">Update your name, phone, and email.</p>
+
+        <div class="section-block">
+            <div class="current-ship-card">
+                <form method="POST" action="{{ url_for('auth.profile') }}">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="name" class="proof-input" value="{{ user.name if user else '' }}" required>
+
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="proof-input" value="{{ user.email if user else '' }}"
+                        required>
+
+                    <label class="form-label">Phone</label>
+                    <input type="text" name="phone" class="proof-input" value="{{ user.phone if user else '' }}">
+
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer; margin-top:16px;">Save
+                        Changes</button>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}

@@ -1,0 +1,1745 @@
+/* ===== Dashboard shared tokens ===== */
+:root {
+    --d-ink: #0B1F3A;
+    --d-amber: #F5A623;
+    --d-amber-dark: #C9820A;
+    --d-teal: #1B6B6B;
+    --d-bg: #F1EFE6;
+    --d-card: #FFFFFF;
+    --d-line: #E2DFD3;
+    --d-text-dim: #5C6B7A;
+}
+
+.dash-page {
+    background: var(--d-bg);
+    min-height: calc(100vh - 60px);
+    padding: 40px 5%;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.dash-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 16px;
+    box-shadow: 0 20px 45px -15px rgba(11, 31, 58, 0.2), 0 4px 12px rgba(0, 0, 0, 0.04);
+    padding: 34px 36px;
+}
+
+.dash-header {
+    margin-bottom: 24px;
+}
+
+.dash-header h1 {
+    font-size: 24px;
+    color: var(--d-ink);
+    margin: 0 0 4px;
+}
+
+.dash-header .role-tag {
+    display: inline-block;
+    background: var(--d-ink);
+    color: white;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.dash-header p.sub {
+    color: var(--d-text-dim);
+    font-size: 14px;
+    margin-top: 6px;
+}
+
+/* Stat cards row */
+.stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.stat-card {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.stat-card .k {
+    font-size: 12px;
+    color: var(--d-text-dim);
+    margin-bottom: 6px;
+}
+
+.stat-card .v {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--d-ink);
+}
+
+.stat-card .v.amber {
+    color: var(--d-amber-dark);
+}
+
+.stat-card .v.teal {
+    color: var(--d-teal);
+}
+
+/* Section card */
+.dash-section {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    margin-bottom: 22px;
+    overflow: hidden;
+}
+
+.dash-section .sec-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--d-line);
+}
+
+.dash-section .sec-head h3 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--d-ink);
+}
+
+.dash-section .sec-head a.link-btn {
+    font-size: 13px;
+    color: var(--d-teal);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Data table */
+table.dash-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table.dash-table th {
+    text-align: left;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--d-text-dim);
+    padding: 10px 20px;
+    background: var(--d-bg);
+}
+
+table.dash-table td {
+    padding: 12px 20px;
+    font-size: 13.5px;
+    border-top: 1px solid var(--d-line);
+    color: var(--d-ink);
+}
+
+table.dash-table td.mono {
+    font-family: 'Courier New', monospace;
+}
+
+/* Status pills */
+.pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.pill.created {
+    background: #EDEBE3;
+    color: #5C6B7A;
+}
+
+.pill.transit {
+    background: rgba(245, 166, 35, 0.15);
+    color: var(--d-amber-dark);
+}
+
+.pill.delivered {
+    background: rgba(27, 107, 107, 0.15);
+    color: var(--d-teal);
+}
+
+.pill.failed {
+    background: #FBE2E2;
+    color: #B23A3A;
+}
+
+.pill.warehouse {
+    background: #E4E9F5;
+    color: #33508C;
+}
+
+/* Quick action buttons */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.action-card {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--d-ink);
+    transition: border-color 0.15s;
+}
+
+.action-card:hover {
+    border-color: var(--d-amber);
+}
+
+.action-card .icon {
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+
+.action-card .lbl {
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+/* Toggle / availability */
+.avail-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.avail-toggle .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--d-teal);
+}
+
+.avail-toggle.off .dot {
+    background: #B23A3A;
+}
+
+.empty-note {
+    padding: 24px 20px;
+    color: var(--d-text-dim);
+    font-size: 13.5px;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .stat-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .action-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Admin Panel Layout (sidebar shell) ===== */
+.panel-shell {
+    display: flex;
+    min-height: 100vh;
+    background: var(--d-bg);
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.panel-sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: var(--d-ink);
+    padding: 22px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.panel-sidebar .brand {
+    color: white;
+    font-weight: 700;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 30px;
+    padding-left: 6px;
+}
+
+.panel-sidebar .brand .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--d-amber);
+    border-radius: 50%;
+}
+
+.panel-nav a,
+.panel-nav .item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #A9B6C6;
+    text-decoration: none;
+    font-size: 13.5px;
+    padding: 10px 12px;
+    border-radius: 7px;
+    margin-bottom: 2px;
+    cursor: pointer;
+}
+
+.panel-nav a:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: white;
+}
+
+.panel-nav .item.active {
+    background: rgba(245, 166, 35, 0.15);
+    color: var(--d-amber);
+    font-weight: 600;
+}
+
+.panel-nav .icon {
+    width: 16px;
+    text-align: center;
+}
+
+.panel-nav .divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 12px 6px;
+}
+
+.panel-main {
+    flex: 1;
+    padding: 26px 34px;
+    min-width: 0;
+}
+
+/* Topbar */
+.panel-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.panel-search {
+    flex: 1;
+    max-width: 340px;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 13px;
+    color: var(--d-text-dim);
+}
+
+.panel-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.panel-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    position: relative;
+}
+
+.panel-icon-btn .badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: var(--d-amber);
+    border-radius: 50%;
+    border: 2px solid var(--d-bg);
+}
+
+.panel-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-profile .avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--d-ink);
+    color: var(--d-amber);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.panel-profile .name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--d-ink);
+}
+
+.panel-greet {
+    margin-bottom: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.panel-greet h1 {
+    font-size: 21px;
+    color: var(--d-ink);
+    margin: 0 0 4px;
+}
+
+.panel-greet p {
+    color: var(--d-text-dim);
+    font-size: 13.5px;
+    margin: 0;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-outline-sm {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    color: var(--d-ink);
+    padding: 9px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-solid-sm {
+    background: var(--d-ink);
+    border: none;
+    color: white;
+    padding: 9px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Trend stat cards */
+.trend-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.trend-card {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 10px;
+    padding: 20px;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.trend-card .k {
+    font-size: 12.5px;
+    color: var(--d-text-dim);
+    margin-bottom: 10px;
+}
+
+.trend-card .v-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.trend-card .v {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--d-ink);
+    line-height: 1;
+}
+
+.trend-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 10px;
+}
+
+.trend-badge.up {
+    background: rgba(27, 107, 107, 0.12);
+    color: var(--d-teal);
+}
+
+.trend-badge.down {
+    background: #FBE2E2;
+    color: #B23A3A;
+}
+
+/* Widgets row: chart + live tracking + performance */
+.widgets-row {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.widget-card {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 10px;
+    padding: 16px 18px;
+}
+
+.widget-card .w-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.widget-card .w-head h4 {
+    font-size: 13.5px;
+    color: var(--d-ink);
+    margin: 0;
+}
+
+.widget-card .w-head .more {
+    font-size: 11px;
+    color: var(--d-text-dim);
+}
+
+.chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 90px;
+    margin-bottom: 6px;
+}
+
+.chart-bars div {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    background: var(--d-line);
+}
+
+.chart-bars div.peak {
+    background: var(--d-amber);
+}
+
+.chart-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--d-text-dim);
+}
+
+.mini-map-widget {
+    background: var(--d-bg);
+    border-radius: 8px;
+    height: 70px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.mini-map-widget svg {
+    width: 100%;
+    height: 100%;
+}
+
+.tiny-detail {
+    font-size: 11px;
+    color: var(--d-text-dim);
+    line-height: 1.7;
+}
+
+.tiny-detail b {
+    color: var(--d-ink);
+}
+
+.perf-ring {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.perf-ring .num {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--d-ink);
+}
+
+.perf-ring .lbl {
+    font-size: 11.5px;
+    color: var(--d-text-dim);
+}
+
+.perf-bar-track {
+    background: var(--d-bg);
+    border-radius: 6px;
+    height: 6px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.perf-bar-fill {
+    background: var(--d-teal);
+    height: 100%;
+    border-radius: 6px;
+}
+
+@media (max-width: 1000px) {
+    .panel-sidebar {
+        display: none;
+    }
+
+    .trend-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .widgets-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Customer Dashboard - Top Nav Layout ===== */
+.cust-shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 28px 5% 60px;
+}
+
+.cust-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--d-ink);
+    border-radius: 12px;
+    padding: 14px 22px;
+    margin-bottom: 24px;
+}
+
+.cust-nav .brand {
+    color: white;
+    font-weight: 700;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cust-nav .brand .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--d-amber);
+    border-radius: 50%;
+}
+
+.cust-nav-links {
+    display: flex;
+    gap: 22px;
+}
+
+.cust-nav-links a {
+    color: #A9B6C6;
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.cust-nav-links a.active {
+    color: var(--d-amber);
+    font-weight: 700;
+}
+
+.cust-nav-links a:hover {
+    color: white;
+}
+
+.cust-greet {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.cust-greet h1 {
+    font-size: 22px;
+    color: var(--d-ink);
+    margin: 0 0 4px;
+}
+
+.cust-greet p {
+    color: var(--d-text-dim);
+    font-size: 13.5px;
+    margin: 0;
+}
+
+.cust-track-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 10px 16px;
+    min-width: 240px;
+}
+
+.cust-track-search input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    width: 100%;
+    color: var(--d-ink);
+}
+
+/* Two-column row: recent shipments + quick actions */
+.quick-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 18px;
+    margin-bottom: 20px;
+}
+
+.quick-row .dash-section {
+    margin-bottom: 0;
+}
+
+.sec-foot {
+    padding: 12px 20px;
+    text-align: center;
+    border-top: 1px solid var(--d-line);
+}
+
+.sec-foot a {
+    color: var(--d-teal);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.qa-list {
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.qa-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--d-bg);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-decoration: none;
+    color: var(--d-ink);
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.qa-btn:hover {
+    border-color: var(--d-amber);
+}
+
+/* Bottom shipment status flow bar */
+.flow-bar {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 10px;
+    padding: 18px 22px;
+}
+
+.flow-bar .flow-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--d-ink);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.flow-steps {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.flow-step {
+    font-size: 13px;
+    color: var(--d-text-dim);
+    padding: 6px 14px;
+    background: var(--d-bg);
+    border-radius: 20px;
+}
+
+.flow-step.done {
+    background: rgba(27, 107, 107, 0.12);
+    color: var(--d-teal);
+    font-weight: 600;
+}
+
+.flow-arrow {
+    color: var(--d-line);
+    font-size: 14px;
+}
+
+@media (max-width: 800px) {
+    .quick-row {
+        grid-template-columns: 1fr;
+    }
+
+    .cust-nav-links {
+        display: none;
+    }
+}
+
+/* ===== Gradient Sidebar Dashboard (matches landing page hero mockup style) ===== */
+.grad-shell {
+    display: flex;
+    min-height: 100vh;
+    background: #F4F2EC;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.grad-sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, #0B1F3A 0%, #1B4B91 100%);
+    padding: 24px 18px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.grad-sidebar .brand {
+    color: white;
+    font-weight: 700;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 34px;
+    padding-left: 4px;
+}
+
+.grad-sidebar .brand .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--d-amber);
+    border-radius: 50%;
+}
+
+.grad-nav a,
+.grad-nav .item {
+    display: block;
+    color: #C9D6EA;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 11px 12px;
+    border-radius: 7px;
+    margin-bottom: 4px;
+}
+
+.grad-nav a:hover {
+    color: white;
+}
+
+.grad-nav .item.active {
+    color: var(--d-amber);
+    font-weight: 700;
+}
+
+.grad-main {
+    flex: 1;
+    padding: 20px 28px;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.grad-main h1 {
+    font-size: 19px;
+    color: var(--d-ink);
+    margin: 0 0 14px;
+    width: 100%;
+}
+
+.info-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+    width: 100%;
+}
+
+.info-card {
+    background: var(--d-card);
+    border: 2px solid var(--d-ink);
+    border-radius: 4px;
+    aspect-ratio: 1 / 1;
+    max-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 8px;
+    box-shadow: none;
+    box-sizing: border-box;
+}
+
+.info-card .k {
+    font-size: 10.5px;
+    color: var(--d-ink);
+    margin-bottom: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.info-card .v {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--d-ink);
+}
+
+.chart-widget {
+    background: var(--d-card);
+    border: 2px solid var(--d-ink);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    box-shadow: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.chart-widget .w-title {
+    font-size: 12.5px;
+    color: var(--d-text-dim);
+    margin-bottom: 10px;
+}
+
+.chart-widget .chart-bars {
+    height: 60px;
+    gap: 10px;
+}
+
+.chart-widget .chart-bars div {
+    border-radius: 4px 4px 0 0;
+}
+
+.shiplist-widget {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 10px;
+    padding: 4px 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.shiplist-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--d-line);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--d-ink);
+}
+
+.shiplist-row:last-child {
+    border-bottom: none;
+}
+
+.shiplist-row .status {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.shiplist-row .status.transit {
+    color: var(--d-amber-dark);
+}
+
+.shiplist-row .status.delivered {
+    color: var(--d-teal);
+}
+
+.shiplist-row .status.other {
+    color: var(--d-text-dim);
+}
+
+/* Desktop layout is forced at all times below — no collapsing to mobile view.
+   A horizontal scrollbar will appear instead if the window is narrower than
+   the content, keeping the sidebar and 4-column grid always visible. */
+
+/* CTA box for empty states (matches "Create Your First Shipment" sketch box) */
+.cta-box {
+    background: var(--d-card);
+    border: 2px dashed var(--d-ink);
+    border-radius: 4px;
+    padding: 18px 20px;
+    text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cta-box p {
+    color: var(--d-text-dim);
+    font-size: 13.5px;
+    margin: 0 0 14px;
+}
+
+.cta-box a.cta-btn {
+    display: inline-block;
+    background: var(--d-ink);
+    color: white;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 24px;
+    border-radius: 7px;
+}
+
+.cta-box a.cta-btn:hover {
+    background: #16305A;
+}
+
+/* (2-column mobile fallback removed — desktop layout is now forced) */
+
+/* Root-cause fix applied in style.css instead: .container is full-width by
+   default now, and only auth pages (login/register/etc.) opt into a narrow
+   centered box via .auth-narrow. No fragile override needed here anymore. */
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+/* Quick track search on dashboard top (real, working form) */
+.dash-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.dash-top-row h1 {
+    margin: 0;
+}
+
+.quick-track-form {
+    display: flex;
+    gap: 8px;
+}
+
+.quick-track-form input {
+    border: 1px solid var(--d-line);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    width: 220px;
+}
+
+.quick-track-form button {
+    background: var(--d-ink);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.quick-track-form button:hover {
+    background: #16305A;
+}
+
+/* ===== Section block wrapper (Quick Actions, Current Shipment) ===== */
+.section-block {
+    margin-bottom: 18px;
+}
+
+.section-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--d-ink);
+    margin-bottom: 10px;
+}
+
+/* ===== Quick Actions ===== */
+.qa-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.qa-row .qa-btn {
+    flex: 1;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 13px 16px;
+    text-decoration: none;
+    color: var(--d-ink);
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.qa-row .qa-btn:hover {
+    border-color: var(--d-amber);
+}
+
+/* ===== Shipment Progress Tracker ===== */
+.progress-tracker {
+    padding: 10px 4px 4px;
+}
+
+.ptrack-line {
+    position: relative;
+    height: 4px;
+    background: var(--d-line);
+    border-radius: 3px;
+    margin: 0 40px 0;
+}
+
+.ptrack-line-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: var(--d-teal);
+    border-radius: 3px;
+}
+
+.ptrack-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-top: -14px;
+}
+
+.pstep {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.pstep-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--d-card);
+    border: 2px solid var(--d-line);
+    color: var(--d-text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.pstep.done .pstep-dot {
+    background: var(--d-teal);
+    border-color: var(--d-teal);
+    color: white;
+}
+
+.pstep.active .pstep-dot {
+    background: var(--d-amber);
+    border-color: var(--d-amber-dark);
+    color: white;
+}
+
+.pstep-label {
+    font-size: 11.5px;
+    color: var(--d-text-dim);
+    font-weight: 500;
+}
+
+.pstep.done .pstep-label,
+.pstep.active .pstep-label {
+    color: var(--d-ink);
+    font-weight: 700;
+}
+
+/* ===== Current Shipment card ===== */
+.current-ship-card {
+    background: var(--d-card);
+    border: 2px solid var(--d-ink);
+    border-radius: 6px;
+    padding: 18px 20px;
+}
+
+.cs-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.cs-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 140px;
+    margin-right: 20px;
+    margin-bottom: 10px;
+}
+
+.cs-k {
+    font-size: 11px;
+    color: var(--d-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+}
+
+.cs-v {
+    font-size: 14px;
+    color: var(--d-ink);
+    font-weight: 600;
+}
+
+.current-ship-card .cta-btn {
+    display: inline-block;
+    background: var(--d-ink);
+    color: white;
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 6px;
+}
+
+.current-ship-card .cta-btn:hover {
+    background: #16305A;
+}
+
+/* Pending pill (distinct gray, so it doesn't look identical to In Transit's amber) */
+.pill.pending {
+    background: #EDEBE3;
+    color: #5C6B7A;
+}
+
+/* ===== Recent Shipments table scroll wrapper ===== */
+.table-scroll {
+    overflow-x: auto;
+}
+
+.recent-table {
+    min-width: 640px;
+}
+
+/* ===== Recent Notifications ===== */
+.notif-list {
+    padding: 6px 20px 14px;
+}
+
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--d-line);
+    font-size: 13px;
+    color: var(--d-ink);
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--d-amber);
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+/* ============================================================
+   RESPONSIVE — desktop / laptop / tablet / mobile.
+   Sidebar and all nav links stay present at every size; they
+   reflow to a horizontal top bar on narrower screens instead
+   of disappearing, so navigation is never lost.
+   ============================================================ */
+
+@media (max-width: 900px) {
+    .grad-shell {
+        flex-direction: column;
+    }
+
+    .grad-sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+        padding: 14px 16px;
+    }
+
+    .grad-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .grad-nav a,
+    .grad-nav .item {
+        margin-bottom: 0;
+    }
+
+    .grad-main {
+        padding: 18px 20px;
+    }
+
+    .info-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .cs-row {
+        gap: 14px;
+    }
+}
+
+@media (max-width: 560px) {
+    .info-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .info-card .v {
+        font-size: 18px;
+    }
+
+    .qa-row {
+        flex-direction: column;
+    }
+
+    .qa-row .qa-btn {
+        min-width: 0;
+    }
+
+    .dash-top-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .quick-track-form {
+        flex-direction: column;
+    }
+
+    .quick-track-form input {
+        width: 100%;
+    }
+
+    .ptrack-line {
+        margin: 0 16px;
+    }
+
+    .pstep-label {
+        font-size: 10px;
+    }
+
+    .pstep-dot {
+        width: 22px;
+        height: 22px;
+        font-size: 10px;
+    }
+}
+
+/* ===== Agent dashboard additions ===== */
+.page-sub {
+    color: var(--d-text-dim);
+    font-size: 13.5px;
+    margin: 0 0 18px;
+}
+
+.agent-search {
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 13px;
+    width: 280px;
+    max-width: 100%;
+}
+
+/* Availability Available/Not Available buttons */
+.avail-btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.avail-btn {
+    border: 1px solid var(--d-line);
+    background: var(--d-card);
+    color: var(--d-ink);
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.avail-btn.on:hover {
+    border-color: var(--d-teal);
+    color: var(--d-teal);
+}
+
+.avail-btn.off:hover {
+    border-color: #B23A3A;
+    color: #B23A3A;
+}
+
+/* Today's Delivery Route */
+.route-flow {
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.route-stop {
+    background: var(--d-bg);
+    border: 1px solid var(--d-line);
+    border-radius: 6px;
+    padding: 9px 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--d-ink);
+    min-width: 220px;
+    text-align: center;
+}
+
+.route-arrow {
+    color: var(--d-text-dim);
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* Update Status / Delivery Proof form controls */
+.form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--d-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 14px 0 6px;
+}
+
+.status-select,
+.proof-input {
+    width: 100%;
+    border: 1px solid var(--d-line);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 13.5px;
+    color: var(--d-ink);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    box-sizing: border-box;
+}
+
+.proof-input[readonly] {
+    background: var(--d-bg);
+    color: var(--d-text-dim);
+}
+
+.current-ship-card .cta-btn {
+    margin-top: 16px;
+    border: none;
+    cursor: pointer;
+}
+
+.update-msg {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--d-teal);
+    font-weight: 600;
+}
+
+@media (max-width: 560px) {
+    .agent-search {
+        width: 100%;
+    }
+
+    .route-stop {
+        min-width: 0;
+        width: 100%;
+    }
+}
+
+/* ===== Warehouse dashboard additions ===== */
+.agent-avail-row {
+    display: flex;
+    gap: 24px;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+}
+
+.agent-avail-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    color: var(--d-text-dim);
+}
+
+.agent-avail-item b {
+    color: var(--d-ink);
+    font-size: 15px;
+}
+
+.agent-avail-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.agent-avail-dot.available {
+    background: var(--d-teal);
+}
+
+.agent-avail-dot.busy {
+    background: var(--d-amber);
+}
+
+.agent-avail-dot.offline {
+    background: #B23A3A;
+}
+
+.notif-check {
+    color: var(--d-teal);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* ===== Admin dashboard additions ===== */
+
+/* 6-card summary row (wraps to fewer columns on narrow screens automatically) */
+.admin-6col {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+@media (max-width: 1100px) {
+    .admin-6col {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 560px) {
+    .admin-6col {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Shipment Status Overview — horizontal progress bars */
+.status-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.status-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sb-label {
+    width: 130px;
+    flex-shrink: 0;
+    font-size: 12.5px;
+    color: var(--d-text-dim);
+    font-weight: 600;
+}
+
+.sb-track {
+    flex: 1;
+    height: 10px;
+    background: var(--d-bg);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.sb-fill {
+    height: 100%;
+    border-radius: 6px;
+}
+
+.sb-fill.delivered {
+    background: var(--d-teal);
+}
+
+.sb-fill.transit {
+    background: var(--d-amber);
+}
+
+.sb-fill.pending {
+    background: #9AA6B5;
+}
+
+.sb-fill.failed {
+    background: #B23A3A;
+}
+
+.sb-num {
+    width: 34px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--d-ink);
+    flex-shrink: 0;
+}
+
+/* System Performance row */
+.perf-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    background: var(--d-card);
+    border: 1px solid var(--d-line);
+    border-radius: 8px;
+    padding: 16px 20px;
+}
+
+.perf-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 150px;
+}
+
+.perf-label {
+    font-size: 11.5px;
+    color: var(--d-text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.perf-val {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--d-ink);
+}
+
+.perf-val.good {
+    color: var(--d-teal);
+}
+
+.perf-val.bad {
+    color: #B23A3A;
+}
+
+/* System Alerts icon variants (reuses .notif-item / .notif-list layout) */
+.alert-icon {
+    flex-shrink: 0;
+}
+
+.alert-icon.warn {
+    color: var(--d-amber-dark);
+}
+
+.alert-icon.info {
+    color: #33508C;
+}
+
+.alert-icon.ok {
+    color: var(--d-teal);
+    font-weight: 700;
+}
+
+/* Delivery Proof View row (Customer dashboard) */
+.proof-view-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+}
+
+.proof-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: var(--d-bg);
+    border: 1px solid var(--d-line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.proof-view-row>div:nth-child(2) {
+    flex: 1;
+}

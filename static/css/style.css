@@ -37,6 +37,12 @@ body {
 }
 
 .container {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.container.auth-narrow {
     max-width: 480px;
     margin: 50px auto;
     padding: 0 20px;
@@ -45,8 +51,10 @@ body {
 .form-card {
     background: white;
     padding: 34px 30px;
-    border-radius: 14px;
-    box-shadow: 0 20px 45px -15px rgba(31, 78, 121, 0.25), 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0, 08);
+    max-width: 400px;
+    margin: 50px auto;
 }
 
 .form-card h2 {
@@ -103,11 +111,7 @@ button:hover {
     color: #721c24;
 }
 
-.container.dash-wide {
-    max-width: 100%;
-    margin: 0;
-    padding: 0;
-}
+/* dash-wide no longer needed — .container is full-width by default now */
 
 .form-icon {
     font-size: 34px;
@@ -174,7 +178,7 @@ input::placeholder {
     margin-top: 6px;
 }
 
-.forgot-link {
+.forgot-link a {
     font-size: 12.5px;
     color: #1f4e79;
     text-decoration: none;
@@ -182,4 +186,36 @@ input::placeholder {
 
 .forgot-link a:hover {
     text-decoration: underline;
+}
+
+.form-headline {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1f4e79;
+    margin: 0 0 8px;
+}
+
+.benefit-list {
+    background: #f4f6f9;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 22px;
+}
+
+.benefit-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #556;
+    margin-bottom: 8px;
+}
+
+.benefit-item {
+    font-size: 13px;
+    color: #444;
+    padding: 3px 0;
+}
+
+.benefit-icon {
+    margin-right: 6px;
 }

@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="grad-shell">
+
+    <!-- GRADIENT SIDEBAR (unchanged) -->
+    <aside class="grad-sidebar">
+        <div class="brand"><span class="dot"></span>CourierOS</div>
+        <nav class="grad-nav">
+            <div class="item active">Dashboard</div>
+            <a href="#recent-shipment-table">All Shipments</a>
+            <a href="#delivery-exec-overview"> Manage Delivery Agent</a>
+            <a href="#warehouse-overview">Manage Warehouses</a>
+            <a href="#manage-users">Manage Users</a>
+            <a href="#reports-analytics">Reports &amp; Analytics</a>
+            <a href="#notification-log">Notifications-Log</a>
+            <a href="#"> system Settings</a>
+        </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="grad-main">
+
+        <!-- SEARCH (functional, frontend only) -->
+        <div class="dash-top-row">
+            <div></div>
+            <input type="text" id="adminSearch" class="agent-search" placeholder="🔍 Search shipments..."
+                onkeyup="filterAdminShipments()">
+        </div>
+
+        <h1>Hello {{ name }}, here's today's overview</h1>
+
+        <!-- SUMMARY CARDS (static demo values, 6 cards) -->
+        <div class="info-row admin-6col">
+            <div class="info-card">
+                <div class="k">Total Shipments</div>
+                <div class="v">156</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Active Shipments</div>
+                <div class="v">24</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Delivered</div>
+                <div class="v">118</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Pending</div>
+                <div class="v">9</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Delivery Executives</div>
+                <div class="v">18</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Warehouses</div>
+                <div class="v">4</div>
+            </div>
+        </div>
+
+        <!-- QUICK ACTIONS -->
+        <div class="section-block">
+            <div class="section-title">Quick Actions</div>
+            <div class="qa-row">
+                <a href="#recent-shipments-table" class="qa-btn">📦 Manage Shipments</a>
+                <a href="#delivery-exec-overview" class="qa-btn">🚚 Delivery Executives</a>
+                <a href="#warehouse-overview" class="qa-btn">🏢 Warehouses</a>
+                <a href="#" class="qa-btn">📊 View Reports</a>
+            </div>
+        </div>
+
+        <!-- SHIPMENT STATUS OVERVIEW (progress bars) -->
+        <div class="chart-widget" id="reports-analytics">
+            <div class="w-title">Shipment Status Overview</div>
+            <div class="status-bars">
+                <div class="status-bar-row">
+                    <span class="sb-label">Delivered</span>
+                    <div class="sb-track">
+                        <div class="sb-fill delivered" style="width: 76%;"></div>
+                    </div>
+                    <span class="sb-num">118</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">In Transit</span>
+                    <div class="sb-track">
+                        <div class="sb-fill transit" style="width: 13%;"></div>
+                    </div>
+                    <span class="sb-num">20</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">Out for Delivery</span>
+                    <div class="sb-track">
+                        <div class="sb-fill transit" style="width: 5%;"></div>
+                    </div>
+                    <span class="sb-num">8</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">Pending</span>
+                    <div class="sb-track">
+                        <div class="sb-fill pending" style="width: 6%;"></div>
+                    </div>
+                    <span class="sb-num">9</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">Failed / RTO</span>
+                    <div class="sb-track">
+                        <div class="sb-fill failed" style="width: 1%;"></div>
+                    </div>
+                    <span class="sb-num">1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- DELIVERIES THIS WEEK (bar chart with day labels) -->
+        <div class="chart-widget">
+            <div class="w-title">Deliveries This Week</div>
+            <div class="chart-bars">
+                <div style="height:60%"></div>
+                <div style="height:80%"></div>
+                <div style="height:50%"></div>
+                <div style="height:100%" class="peak"></div>
+                <div style="height:90%"></div>
+                <div style="height:73%"></div>
+                <div style="height:40%"></div>
+            </div>
+            <div class="chart-labels">
+                <span>Mon 18</span><span>Tue 24</span><span>Wed 15</span><span>Thu 30</span>
+                <span>Fri 27</span><span>Sat 22</span><span>Sun 12</span>
+            </div>
+        </div>
+
+        <!-- DELIVERY EXECUTIVE OVERVIEW -->
+        <div class="dash-section" id="delivery-exec-overview">
+            <div class="sec-head">
+                <h3>Delivery Executive Overview</h3>
+                <a href="#" class="link-btn">View Delivery Executives →</a>
+            </div>
+            <div class="agent-avail-row">
+                <div class="agent-avail-item"><span class="agent-avail-dot available"></span>Online <b>8</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot busy"></span>On Delivery <b>6</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot available"></span>Available <b>4</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot offline"></span>Offline <b>2</b></div>
+            </div>
+        </div>
+
+        <!-- WAREHOUSE OVERVIEW -->
+        <div class="dash-section" id="warehouse-overview">
+            <div class="sec-head">
+                <h3>Warehouse Overview</h3>
+                <a href="#" class="link-btn">View Warehouses →</a>
+            </div>
+            <table class="dash-table">
+                <tr>
+                    <th>Warehouse</th>
+                    <th>Shipments</th>
+                </tr>
+                <tr>
+                    <td>Nellore Warehouse</td>
+                    <td>18</td>
+                </tr>
+                <tr>
+                    <td>Hyderabad Warehouse</td>
+                    <td>25</td>
+                </tr>
+                <tr>
+                    <td>Chennai Warehouse</td>
+                    <td>31</td>
+                </tr>
+                <tr>
+                    <td>Bengaluru Warehouse</td>
+                    <td>20</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- RECENT SHIPMENTS (improved table, searchable) -->
+        <div class="dash-section" id="recent-shipments-table">
+            <div class="sec-head">
+                <h3>Recent Shipments</h3>
+                <a href="#" class="link-btn">View All Shipments →</a>
+            </div>
+            <div class="table-scroll">
+                <table class="dash-table recent-table" id="adminShipTable">
+                    <tr>
+                        <th>Tracking ID</th>
+                        <th>Customer</th>
+                        <th>Route</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083188CB</td>
+                        <td>Rahul</td>
+                        <td>Chennai → Nellore</td>
+                        <td><span class="pill transit">In Transit</span></td>
+                        <td>Today</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083189CB</td>
+                        <td>Anjali</td>
+                        <td>Hyderabad → Nellore</td>
+                        <td><span class="pill delivered">Delivered</span></td>
+                        <td>Today</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083190CB</td>
+                        <td>Kiran</td>
+                        <td>Tirupati → Chennai</td>
+                        <td><span class="pill pending">Pending</span></td>
+                        <td>Yesterday</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083191CB</td>
+                        <td>Priya</td>
+                        <td>Hyderabad → Bengaluru</td>
+                        <td><span class="pill transit">Out for Delivery</span></td>
+                        <td>Yesterday</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083192CB</td>
+                        <td>Arjun</td>
+                        <td>Chennai → Hyderabad</td>
+                        <td><span class="pill delivered">Delivered</span></td>
+                        <td>Yesterday</td>
+                    </tr>
+                </table>
+                <div id="adminNoResults" class="empty-note" style="display:none;">No matching shipments.</div>
+            </div>
+        </div>
+
+        <!-- SYSTEM PERFORMANCE -->
+        <div class="section-block">
+            <div class="section-title">System Performance</div>
+            <div class="perf-row">
+                <div class="perf-item"><span class="perf-label">Delivery Success Rate</span><span
+                        class="perf-val good">92%</span></div>
+                <div class="perf-item"><span class="perf-label">On-Time Delivery Rate</span><span
+                        class="perf-val good">87%</span></div>
+                <div class="perf-item"><span class="perf-label">Failed Deliveries</span><span
+                        class="perf-val bad">3%</span></div>
+                <div class="perf-item"><span class="perf-label">Active Shipments</span><span class="perf-val">24</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SYSTEM ALERTS -->
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>System Alerts</h3>
+            </div>
+            <div class="notif-list">
+                <div class="notif-item"><span class="alert-icon warn">⚠</span>3 shipments require attention</div>
+                <div class="notif-item"><span class="alert-icon warn">⚠</span>2 delivery attempts failed</div>
+                <div class="notif-item"><span class="alert-icon info">🔔</span>5 shipments waiting for agent assignment
+                </div>
+                <div class="notif-item"><span class="alert-icon ok">✓</span>Warehouse processing is normal</div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    // Search filter — filters the Recent Shipments table, no page reload
+    function filterAdminShipments() {
+        const query = document.getElementById('adminSearch').value.toLowerCase();
+        const table = document.getElementById('adminShipTable');
+        const rows = table.getElementsByTagName('tr');
+        let visibleCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+            const rowText = rows[i].textContent.toLowerCase();
+            const match = rowText.includes(query);
+            rows[i].style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        }
+
+        document.getElementById('adminNoResults').style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+</script>
+{% endblock %}

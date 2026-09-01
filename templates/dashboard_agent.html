@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Delivery Agent Dashboard{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="grad-shell">
+
+    <!-- GRADIENT SIDEBAR (unchanged) -->
+    <aside class="grad-sidebar">
+        <div class="brand"><span class="dot"></span>CourierOS</div>
+        <nav class="grad-nav">
+            <div class="item active">Dashboard</div>
+            <a href="#assigned-shipments">Assigned Shipments</a>
+            <a href="#update-status-card">Update Shipment Status</a>
+            <a href="#update-location">Update Location</a>
+            <a href="#delivery-proof">Upload Delivery Proof</a>
+            <a href="#availability">Availability</a>
+            <a href="delivery-history">Delivery History</a>
+            <a href="{{ url_for('auth.profile') }}">Profile</a>
+            <a href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="grad-main">
+
+        <!-- SEARCH (functional, frontend only) -->
+        <div class="dash-top-row">
+            <div></div>
+            <input type="text" id="shipSearch" class="agent-search" placeholder="🔍 Search assigned shipments..."
+                onkeyup="filterShipments()">
+        </div>
+
+        <h1>Hello {{ name }}, Good Morning!</h1>
+        <p class="page-sub">Here are your assigned deliveries for today.</p>
+
+        <!-- SUMMARY CARDS (static demo values) -->
+        <div class="info-row">
+            <div class="info-card">
+                <div class="k">Assigned</div>
+                <div class="v">8</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Picked Up</div>
+                <div class="v">3</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Delivered</div>
+                <div class="v">4</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Failed / RTO</div>
+                <div class="v">1</div>
+            </div>
+        </div>
+
+        <!-- AVAILABILITY (JS toggle, frontend only) -->
+        <div class="chart-widget">
+            <div class="w-title">Availability</div>
+            <span class="avail-toggle" id="availStatus">
+                <span class="dot"></span>
+                Available for new assignments
+            </span>
+            <div class="avail-btn-row">
+                <button type="button" class="avail-btn on" onclick="setAvailability(true)">Available</button>
+                <button type="button" class="avail-btn off" onclick="setAvailability(false)">Not Available</button>
+            </div>
+        </div>
+
+        <!-- QUICK ACTIONS -->
+        <div class="section-block">
+            <div class="section-title">Quick Actions</div>
+            <div class="qa-row">
+                <a href="#" class="qa-btn">📦 Assigned Shipments</a>
+                <a href="#update-status-card" class="qa-btn">🔄 Update Status</a>
+                <a href="#" class="qa-btn">🕓 Delivery History</a>
+            </div>
+        </div>
+
+        <!-- ASSIGNED SHIPMENTS (main table, static demo data, searchable) -->
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Assigned Shipments</h3>
+            </div>
+            <div class="table-scroll">
+                <table class="dash-table recent-table" id="shipTable">
+                    <tr>
+                        <th>Tracking ID</th>
+                        <th>Customer</th>
+                        <th>Pickup</th>
+                        <th>Delivery</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083188CB</td>
+                        <td>Rahul</td>
+                        <td>Hyderabad</td>
+                        <td>Nellore</td>
+                        <td><span class="pill created">Assigned</span></td>
+                        <td><a href="#" class="link-btn">View</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083189CB</td>
+                        <td>Anjali</td>
+                        <td>Chennai</td>
+                        <td>Bengaluru</td>
+                        <td><span class="pill warehouse">Picked Up</span></td>
+                        <td><a href="#update-status-card" class="link-btn">Update</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083190CB</td>
+                        <td>Kiran</td>
+                        <td>Tirupati</td>
+                        <td>Vijayawada</td>
+                        <td><span class="pill transit">Out for Delivery</span></td>
+                        <td><a href="#update-status-card" class="link-btn">Update</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083191CB</td>
+                        <td>Priya</td>
+                        <td>Hyderabad</td>
+                        <td>Chennai</td>
+                        <td><span class="pill delivered">Delivered</span></td>
+                        <td><a href="#" class="link-btn">View</a></td>
+                    </tr>
+                </table>
+                <div id="noResults" class="empty-note" style="display:none;">No shipments match your search.</div>
+            </div>
+        </div>
+
+        <!-- TODAY'S DELIVERY ROUTE -->
+        <div class="section-block">
+            <div class="section-title">Today's Delivery Route</div>
+            <div class="route-flow">
+                <div class="route-stop">Hyderabad Warehouse</div>
+                <div class="route-arrow">↓</div>
+                <div class="route-stop">Nellore</div>
+                <div class="route-arrow">↓</div>
+                <div class="route-stop">Kavali</div>
+                <div class="route-arrow">↓</div>
+                <div class="route-stop">Ongole</div>
+            </div>
+        </div>
+
+        <!-- UPDATE SHIPMENT STATUS (frontend only, no DB write) -->
+        <div class="section-block" id="update-status-card">
+            <div class="section-title">Update Shipment Status</div>
+            <div class="current-ship-card">
+                <div class="cs-row">
+                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span
+                            class="cs-v mono">CL2026083188CB</span></div>
+                    <div class="cs-item"><span class="cs-k">Current Status</span><span class="pill created">Picked
+                            Up</span></div>
+                </div>
+                <label class="form-label">New Status</label>
+                <select class="status-select" id="newStatusSelect">
+                    <option>Assigned</option>
+                    <option>Picked Up</option>
+                    <option>In Transit</option>
+                    <option>Out for Delivery</option>
+                    <option>Delivered</option>
+                    <option>Failed / RTO</option>
+                </select>
+                <button type="button" class="cta-btn" onclick="updateStatusDemo()">Update Status</button>
+                <div id="updateMsg" class="update-msg"></div>
+            </div>
+        </div>
+
+        <!-- DELIVERY PROOF (frontend only, no DB write) -->
+        <div class="section-block">
+            <div class="section-title">Delivery Proof</div>
+            <div class="current-ship-card">
+                <label class="form-label">Tracking ID</label>
+                <input type="text" class="proof-input" value="CL2026083190CB" readonly>
+
+                <label class="form-label">Receiver Name</label>
+                <input type="text" class="proof-input" value="Kiran" readonly>
+
+                <label class="form-label">Upload Delivery Photo</label>
+                <input type="file" class="proof-input">
+
+                <label class="form-label">Delivery Note</label>
+                <textarea class="proof-input" rows="3" placeholder="Enter delivery note"></textarea>
+
+                <button type="button" class="cta-btn" onclick="submitProofDemo()">Submit Delivery Proof</button>
+                <div id="proofMsg" class="update-msg"></div>
+            </div>
+        </div>
+
+        <!-- RECENT NOTIFICATIONS -->
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Recent Notifications</h3>
+                <a href="#" class="link-btn">View All Notifications →</a>
+            </div>
+            <div class="notif-list">
+                <div class="notif-item"><span class="notif-dot"></span>New shipment <span
+                        class="mono">CL2026083188CB</span> has been assigned to you.</div>
+                <div class="notif-item"><span class="notif-dot"></span>Shipment <span class="mono">CL2026083189CB</span>
+                    is ready for pickup.</div>
+                <div class="notif-item"><span class="notif-dot"></span>Shipment <span class="mono">CL2026083190CB</span>
+                    is out for delivery.</div>
+                <div class="notif-item"><span class="notif-dot"></span>Delivery <span class="mono">CL2026083191CB</span>
+                    was completed successfully.</div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    // Availability toggle (frontend only)
+    function setAvailability(isAvailable) {
+        const el = document.getElementById('availStatus');
+        if (isAvailable) {
+            el.classList.remove('off');
+            el.innerHTML = '<span class="dot"></span>Available for new assignments';
+        } else {
+            el.classList.add('off');
+            el.innerHTML = '<span class="dot"></span>Currently unavailable';
+        }
+    }
+
+    // Update status (frontend demo only, no backend call)
+    function updateStatusDemo() {
+        const status = document.getElementById('newStatusSelect').value;
+        document.getElementById('updateMsg').textContent = 'Status updated to "' + status + '" (demo only — not saved yet).';
+    }
+
+    // Delivery proof submit (frontend demo only)
+    function submitProofDemo() {
+        document.getElementById('proofMsg').textContent = 'Delivery proof submitted (demo only — not saved yet).';
+    }
+
+    // Search filter — filters table rows by any column, no page reload
+    function filterShipments() {
+        const query = document.getElementById('shipSearch').value.toLowerCase();
+        const table = document.getElementById('shipTable');
+        const rows = table.getElementsByTagName('tr');
+        let visibleCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+            const rowText = rows[i].textContent.toLowerCase();
+            const match = rowText.includes(query);
+            rows[i].style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        }
+
+        document.getElementById('noResults').style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+</script>
+{% endblock %}

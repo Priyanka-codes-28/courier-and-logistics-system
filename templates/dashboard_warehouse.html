@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Warehouse Dashboard{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="grad-shell">
+
+    <!-- GRADIENT SIDEBAR (unchanged) -->
+    <aside class="grad-sidebar">
+        <div class="brand"><span class="dot"></span>CourierOS</div>
+        <nav class="grad-nav">
+            <div class="item active">Dashboard</div>
+            <a href="#incoming-table">Incoming Shipments</a>
+            <a href="#outgoing-table">Outgoing Shipments</a>
+            <a href="#assign-agent-card">Assign Delivery Agent</a>
+            <a href="#warehouse-inventory">Warehouse Inventory</a>
+            <a href="#update-shipment-card">Update Shipment Status</a>
+            <a href="#warehouse-details">Warehouse Details</a>
+            <a href="{{ url_for('auth.profile') }}">Profile</a>
+            <a href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="grad-main">
+
+        <!-- SEARCH (functional, frontend only) -->
+        <div class="dash-top-row">
+            <div></div>
+            <input type="text" id="whSearch" class="agent-search" placeholder="🔍 Search shipments..."
+                onkeyup="filterWarehouseTables()">
+        </div>
+
+        <h1>Hello {{ name }}, Good Morning!</h1>
+        <p class="page-sub">Here's today's warehouse activity.</p>
+
+        <!-- SUMMARY CARDS (static demo values) -->
+        <div class="info-row">
+            <div class="info-card">
+                <div class="k">Incoming (In Transit)</div>
+                <div class="v">12</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Needs Agent</div>
+                <div class="v">5</div>
+            </div>
+            <div class="info-card">
+                <div class="k">At Warehouse Now</div>
+                <div class="v">8</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Agents Available</div>
+                <div class="v">4</div>
+            </div>
+        </div>
+
+        <!-- QUICK ACTIONS -->
+
+        <div class="section-block">
+            <div class="section-title">Quick Actions</div>
+            <div class="qa-row">
+                <a href="#incoming-table" class="qa-btn">📥 Incoming Shipments</a>
+                <a href="#outgoing-table" class="qa-btn">📤 Outgoing Shipments</a>
+                <a href="#assign-agent-card" class="qa-btn">🚚 Assign Agent</a>
+                <a href="#update-shipment-card" class="qa-btn">🔄 Update Shipment</a>
+            </div>
+        </div>
+
+        <!-- INCOMING SHIPMENTS (static demo table, searchable) -->
+        <div class="dash-section" id="incoming-table">
+            <div class="sec-head">
+                <h3>Incoming Shipments — In Transit</h3>
+            </div>
+            <div class="table-scroll">
+                <table class="dash-table recent-table" id="incomingTable">
+                    <tr>
+                        <th>Tracking ID</th>
+                        <th>From</th>
+                        <th>Destination</th>
+                        <th>ETA</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083188CB</td>
+                        <td>Chennai</td>
+                        <td>Nellore</td>
+                        <td>Today, 3:30 PM</td>
+                        <td><span class="pill transit">In Transit</span></td>
+                        <td><a href="#" class="link-btn">View</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083189CB</td>
+                        <td>Hyderabad</td>
+                        <td>Nellore</td>
+                        <td>Today, 5:00 PM</td>
+                        <td><span class="pill transit">In Transit</span></td>
+                        <td><a href="#" class="link-btn">View</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083190CB</td>
+                        <td>Tirupati</td>
+                        <td>Nellore</td>
+                        <td>Tomorrow</td>
+                        <td><span class="pill transit">In Transit</span></td>
+                        <td><a href="#" class="link-btn">View</a></td>
+                    </tr>
+                </table>
+                <div id="incomingNoResults" class="empty-note" style="display:none;">No matching shipments.</div>
+            </div>
+        </div>
+
+        <!-- OUTGOING SHIPMENTS (static demo table, searchable) -->
+        <div class="dash-section" id="outgoing-table">
+            <div class="sec-head">
+                <h3>Outgoing Shipments — Needs Agent Assignment</h3>
+            </div>
+            <div class="table-scroll">
+                <table class="dash-table recent-table" id="outgoingTable">
+                    <tr>
+                        <th>Tracking ID</th>
+                        <th>Destination</th>
+                        <th>Package</th>
+                        <th>Status</th>
+                        <th>Agent</th>
+                        <th>Action</th>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083191CB</td>
+                        <td>Hyderabad</td>
+                        <td>Electronics</td>
+                        <td><span class="pill created">Ready</span></td>
+                        <td>Not Assigned</td>
+                        <td><a href="#assign-agent-card" class="link-btn">Assign</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083192CB</td>
+                        <td>Chennai</td>
+                        <td>Documents</td>
+                        <td><span class="pill created">Ready</span></td>
+                        <td>Not Assigned</td>
+                        <td><a href="#assign-agent-card" class="link-btn">Assign</a></td>
+                    </tr>
+                    <tr>
+                        <td class="mono">CL2026083193CB</td>
+                        <td>Bengaluru</td>
+                        <td>Clothing</td>
+                        <td><span class="pill created">Ready</span></td>
+                        <td>Assigned</td>
+                        <td><a href="#" class="link-btn">View</a></td>
+                    </tr>
+                </table>
+                <div id="outgoingNoResults" class="empty-note" style="display:none;">No matching shipments.</div>
+            </div>
+        </div>
+
+        <!-- WAREHOUSE ACTIVITY -->
+        <div class="section-block">
+            <div class="section-title">Warehouse Activity</div>
+            <div class="info-row">
+                <div class="info-card">
+                    <div class="k">Received Today</div>
+                    <div class="v">15</div>
+                </div>
+                <div class="info-card">
+                    <div class="k">Dispatched Today</div>
+                    <div class="v">10</div>
+                </div>
+                <div class="info-card">
+                    <div class="k">Currently Stored</div>
+                    <div class="v">8</div>
+                </div>
+                <div class="info-card">
+                    <div class="k">Pending Processing</div>
+                    <div class="v">5</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ASSIGN DELIVERY AGENT (frontend only, no DB write) -->
+        <div class="section-block" id="assign-agent-card">
+            <div class="section-title">Assign Delivery Agent</div>
+            <div class="current-ship-card">
+                <div class="cs-row">
+                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span
+                            class="cs-v mono">CL2026083191CB</span></div>
+                    <div class="cs-item"><span class="cs-k">Destination</span><span class="cs-v">Hyderabad</span></div>
+                </div>
+                <label class="form-label">Available Agent</label>
+                <select class="status-select" id="agentSelect">
+                    <option>Select Delivery Agent</option>
+                    <option>Rahul Kumar</option>
+                    <option>Anjali Reddy</option>
+                    <option>Kiran Kumar</option>
+                    <option>Priya Sharma</option>
+                </select>
+                <button type="button" class="cta-btn" onclick="assignAgentDemo()">Assign Agent</button>
+                <div id="assignMsg" class="update-msg"></div>
+            </div>
+        </div>
+
+        <!-- UPDATE SHIPMENT STATUS (frontend only, no DB write) -->
+        <div class="section-block" id="update-shipment-card">
+            <div class="section-title">Update Shipment</div>
+            <div class="current-ship-card">
+                <div class="cs-row">
+                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span
+                            class="cs-v mono">CL2026083188CB</span></div>
+                    <div class="cs-item"><span class="cs-k">Current Status</span><span class="pill transit">In
+                            Transit</span></div>
+                </div>
+                <label class="form-label">Update Status</label>
+                <select class="status-select" id="whStatusSelect">
+                    <option>In Transit</option>
+                    <option>Arrived at Warehouse</option>
+                    <option>Processing</option>
+                    <option>Ready for Dispatch</option>
+                    <option>Assigned to Agent</option>
+                    <option>Dispatched</option>
+                </select>
+                <button type="button" class="cta-btn" onclick="updateShipmentDemo()">Update Status</button>
+                <div id="whUpdateMsg" class="update-msg"></div>
+            </div>
+        </div>
+
+        <!-- DELIVERY AGENT AVAILABILITY -->
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Delivery Agents</h3>
+                <a href="#" class="link-btn">View Agents →</a>
+            </div>
+            <div class="agent-avail-row">
+                <div class="agent-avail-item"><span class="agent-avail-dot available"></span>Available <b>4</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot busy"></span>Busy <b>6</b></div>
+                <div class="agent-avail-item"><span class="agent-avail-dot offline"></span>Offline <b>2</b></div>
+            </div>
+        </div>
+
+        <!-- RECENT WAREHOUSE ACTIVITY -->
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Recent Warehouse Activity</h3>
+            </div>
+            <div class="notif-list">
+                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
+                        class="mono">CL2026083188CB</span> received at warehouse</div>
+                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
+                        class="mono">CL2026083189CB</span> moved to processing</div>
+                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
+                        class="mono">CL2026083190CB</span> assigned to delivery agent</div>
+                <div class="notif-item"><span class="notif-check">✓</span>Shipment <span
+                        class="mono">CL2026083191CB</span> dispatched from warehouse</div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    // Assign agent (frontend demo only, no backend call)
+    function assignAgentDemo() {
+        const agent = document.getElementById('agentSelect').value;
+        if (agent === 'Select Delivery Agent') {
+            document.getElementById('assignMsg').textContent = 'Please select an agent first.';
+            return;
+        }
+        document.getElementById('assignMsg').textContent = 'Assigned to ' + agent + ' (demo only — not saved yet).';
+    }
+
+    // Update shipment status (frontend demo only, no backend call)
+    function updateShipmentDemo() {
+        const status = document.getElementById('whStatusSelect').value;
+        document.getElementById('whUpdateMsg').textContent = 'Status updated to "' + status + '" (demo only — not saved yet).';
+    }
+
+    // Search filter — filters BOTH incoming and outgoing tables, no page reload
+    function filterWarehouseTables() {
+        const query = document.getElementById('whSearch').value.toLowerCase();
+        filterTable('incomingTable', 'incomingNoResults', query);
+        filterTable('outgoingTable', 'outgoingNoResults', query);
+    }
+
+    function filterTable(tableId, noResultsId, query) {
+        const table = document.getElementById(tableId);
+        const rows = table.getElementsByTagName('tr');
+        let visibleCount = 0;
+
+        for (let i = 1; i < rows.length; i++) {
+            const rowText = rows[i].textContent.toLowerCase();
+            const match = rowText.includes(query);
+            rows[i].style.display = match ? '' : 'none';
+            if (match) visibleCount++;
+        }
+
+        document.getElementById(noResultsId).style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+</script>
+{% endblock %}

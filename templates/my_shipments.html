@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}My Shipments{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<div class="dash-page">
+    <div class="dash-wrapper">
+
+        <div class="dash-header">
+            <h1>My Shipments</h1>
+            <p class="sub">All shipments you've created.</p>
+        </div>
+
+        <div class="action-grid" style="margin-bottom:24px; grid-template-columns: repeat(2, 1fr);">
+            <a href="{{ url_for('shipments.create_shipment') }}" class="action-card">
+                <div class="icon">➕</div>
+                <div class="lbl">Create New Shipment</div>
+            </a>
+            <a href="{{ url_for('shipments.track') }}" class="action-card">
+                <div class="icon">📍</div>
+                <div class="lbl">Track a Shipment</div>
+            </a>
+        </div>
+
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Shipment History</h3>
+            </div>
+            {% if shipments %}
+            <table class="dash-table">
+                <tr>
+                    <th>Tracking ID</th>
+                    <th>Receiver</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+                {% for s in shipments %}
+                <tr>
+                    <td class="mono">{{ s.tracking_id }}</td>
+                    <td>{{ s.receiver_name }}</td>
+                    <td>
+                        {% if s.status == 'Delivered' %}
+                        <span class="pill delivered">{{ s.status }}</span>
+                        {% elif s.status in ['In Transit', 'Out for Delivery', 'Picked Up'] %}
+                        <span class="pill transit">{{ s.status }}</span>
+                        {% elif s.status == 'At Warehouse' %}
+                        <span class="pill warehouse">{{ s.status }}</span>
+                        {% elif s.status in ['Failed Delivery', 'RTO'] %}
+                        <span class="pill failed">{{ s.status }}</span>
+                        {% else %}
+                        <span class="pill created">{{ s.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ s.created_at.strftime('%b %d, %Y') if s.created_at else '' }}</td>
+                    <td><a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}" class="link-btn">Track
+                            →</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <div class="empty-note">You haven't created any shipments yet. <a
+                    href="{{ url_for('shipments.create_shipment') }}">Create your first one →</a></div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}
