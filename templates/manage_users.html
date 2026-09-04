@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Manage Users{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="grad-shell">
+
+    <aside class="grad-sidebar">
+        <div class="brand"><span class="dot"></span>CourierOS</div>
+        <nav class="grad-nav">
+            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('auth.dashboard') }}#recent-shipments-table">All Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#warehouse-overview">Manage Warehouses</a>
+            <a href="{{ url_for('auth.dashboard') }}#delivery-exec-overview">Manage Delivery Agents</a>
+            <div class="item active">Manage Users</div>
+            <a href="{{ url_for('auth.dashboard') }}#reports-analytics">Reports &amp; Analytics</a>
+            <a href="{{ url_for('auth.dashboard') }}#notifications-log">Notifications Log</a>
+            <a href="{{ url_for('auth.dashboard') }}#system-settings">System Settings</a>
+            <a href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <main class="grad-main">
+        <h1>Manage Users</h1>
+        <p class="page-sub">All registered accounts — search, filter, edit, or manage status.</p>
+
+        <!-- SEARCH + FILTERS -->
+        <div class="section-block">
+            <form method="GET" action="{{ url_for('auth.manage_users') }}"
+                style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+                <div style="flex:2; min-width:180px;">
+                    <label class="form-label">Search (name or email)</label>
+                    <input type="text" name="search" class="proof-input" value="{{ search }}"
+                        placeholder="e.g. Priyanka or agent1@...">
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label class="form-label">Role</label>
+                    <select name="role" class="status-select">
+                        <option value="">All Roles</option>
+                        <option value="customer" {{ 'selected' if role_filter=='customer' }}>Customer</option>
+                        <option value="delivery_agent" {{ 'selected' if role_filter=='delivery_agent' }}>Delivery Agent
+                        </option>
+                        <option value="warehouse_staff" {{ 'selected' if role_filter=='warehouse_staff' }}>Warehouse
+                            Staff</option>
+                        <option value="admin" {{ 'selected' if role_filter=='admin' }}>Admin</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:140px;">
+                    <label class="form-label">Status</label>
+                    <select name="status" class="status-select">
+                        <option value="">All Statuses</option>
+                        <option value="active" {{ 'selected' if status_filter=='active' }}>Active</option>
+                        <option value="inactive" {{ 'selected' if status_filter=='inactive' }}>Inactive</option>
+                    </select>
+                </div>
+                <button type="submit" class="cta-btn"
+                    style="border:none; cursor:pointer; margin-bottom:2px;">Search</button>
+                {% if search or role_filter or status_filter %}
+                <a href="{{ url_for('auth.manage_users') }}" class="link-btn" style="margin-bottom:10px;">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- USERS TABLE -->
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>{{ users_list|length }} user{{ 's' if users_list|length != 1 }} found</h3>
+            </div>
+            {% if users_list %}
+            <div class="table-scroll">
+                <table class="dash-table recent-table">
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Availability</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                    {% for u in users_list %}
+                    <tr>
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>{{ u.phone or '—' }}</td>
+                        <td>
+                            {% if u.role == 'customer' %}<span class="pill created">Customer</span>
+                            {% elif u.role == 'delivery_agent' %}<span class="pill transit">Delivery Agent</span>
+                            {% elif u.role == 'warehouse_staff' %}<span class="pill warehouse">Warehouse Staff</span>
+                            {% else %}<span class="pill delivered">Admin</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if u.status == 'active' %}<span class="pill delivered">Active</span>
+                            {% else %}<span class="pill failed">Inactive</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if u.role == 'delivery_agent' %}
+                            {% set label = availability_map.get(u.id) %}
+                            {% if label == 'Available' %}<span class="pill delivered">Available</span>
+                            {% elif label == 'Busy' %}<span class="pill transit">Busy</span>
+                            {% elif label == 'Offline' %}<span class="pill failed">Offline</span>
+                            {% else %}<span class="empty-note">—</span>{% endif %}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>{{ u.created_at.strftime('%b %d, %Y') if u.created_at else '' }}</td>
+                        <td style="white-space:nowrap;">
+                            <a href="{{ url_for('auth.edit_user', user_id=u.id) }}" class="link-btn">Edit</a>
+                            {% if u.id != session.get('user_id') %}
+                            {% if u.status == 'active' %}
+                            <form method="POST" action="{{ url_for('auth.set_user_status', user_id=u.id) }}"
+                                style="display:inline;">
+                                <input type="hidden" name="status" value="inactive">
+                                <button type="submit" class="link-btn"
+                                    style="background:none; border:none; cursor:pointer; color:#B23A3A;">Deactivate</button>
+                            </form>
+                            {% else %}
+                            <form method="POST" action="{{ url_for('auth.set_user_status', user_id=u.id) }}"
+                                style="display:inline;">
+                                <input type="hidden" name="status" value="active">
+                                <button type="submit" class="link-btn"
+                                    style="background:none; border:none; cursor:pointer;">Activate</button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('auth.delete_user', user_id=u.id) }}"
+                                style="display:inline;"
+                                onsubmit="return confirm('Permanently delete {{ u.name }}? This cannot be undone. Users with shipment history will be safely rejected instead.');">
+                                <button type="submit" class="link-btn"
+                                    style="background:none; border:none; cursor:pointer; color:#B23A3A;">Delete</button>
+                            </form>
+                            {% else %}
+                            <span class="empty-note" style="font-size:11px;">(you)</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-note">No users match your search/filters.</div>
+            {% endif %}
+        </div>
+
+    </main>
+</div>
+{% endblock %}

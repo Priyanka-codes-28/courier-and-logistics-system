@@ -7,6 +7,7 @@
 
 <div class="grad-shell">
 
+    <!-- GRADIENT SIDEBAR (unchanged) -->
     <aside class="grad-sidebar">
         <div class="brand"><span class="dot"></span>CourierOS</div>
         <nav class="grad-nav">
@@ -22,8 +23,10 @@
         </nav>
     </aside>
 
+    <!-- MAIN -->
     <main class="grad-main">
 
+        <!-- 9. SEARCH (functional, frontend only) -->
         <div class="dash-top-row">
             <div></div>
             <input type="text" id="shipSearch" class="agent-search" placeholder="🔍 Search assigned shipments..."
@@ -33,6 +36,7 @@
         <h1>Hello {{ name }}, Good Morning!</h1>
         <p class="page-sub">Here are your assigned deliveries for today.</p>
 
+        <!-- SUMMARY CARDS (real data) -->
         <div class="info-row">
             <div class="info-card">
                 <div class="k">Assigned</div>
@@ -52,15 +56,26 @@
             </div>
         </div>
 
+        <!-- AVAILABILITY (real — writes to delivery_agents.is_available) -->
         <div class="chart-widget" id="availability">
             <div class="w-title">Availability</div>
-            <span class="avail-toggle" id="availStatus"><span class="dot"></span>Available for new assignments</span>
+            <span class="avail-toggle {{ '' if is_available else 'off' }}">
+                <span class="dot"></span>
+                {{ 'Available for new assignments' if is_available else 'Currently unavailable' }}
+            </span>
             <div class="avail-btn-row">
-                <button type="button" class="avail-btn on" onclick="setAvailability(true)">Available</button>
-                <button type="button" class="avail-btn off" onclick="setAvailability(false)">Not Available</button>
+                <form method="POST" action="{{ url_for('shipments.set_availability') }}" style="display:contents;">
+                    <input type="hidden" name="is_available" value="true">
+                    <button type="submit" class="avail-btn on">Available</button>
+                </form>
+                <form method="POST" action="{{ url_for('shipments.set_availability') }}" style="display:contents;">
+                    <input type="hidden" name="is_available" value="false">
+                    <button type="submit" class="avail-btn off">Not Available</button>
+                </form>
             </div>
         </div>
 
+        <!-- 2. QUICK ACTIONS -->
         <div class="section-block">
             <div class="section-title">Quick Actions</div>
             <div class="qa-row">
@@ -70,6 +85,7 @@
             </div>
         </div>
 
+        <!-- 3. ASSIGNED SHIPMENTS (main table, static demo data, searchable) -->
         <div class="dash-section" id="assigned-shipments">
             <div class="sec-head">
                 <h3>Assigned Shipments</h3>
@@ -78,6 +94,7 @@
                 <table class="dash-table recent-table" id="shipTable">
                     <tr>
                         <th>Tracking ID</th>
+                        <th>Role</th>
                         <th>Receiver</th>
                         <th>Address</th>
                         <th>Status</th>
@@ -87,11 +104,13 @@
                     {% for s in assigned %}
                     <tr>
                         <td class="mono">{{ s.tracking_id }}</td>
+                        <td>{% if s.agent_role == 'pickup' %}<span class="pill created">Pickup</span>{% else %}<span
+                                class="pill transit">Delivery</span>{% endif %}</td>
                         <td>{{ s.receiver_name }}</td>
                         <td>{{ s.receiver_address }}</td>
                         <td>
                             {% if s.status == 'Delivered' %}<span class="pill delivered">{{ s.status }}</span>
-                            {% elif s.status in ['In Transit','Out for Delivery','Picked Up'] %}<span
+                            {% elif s.status in ['In Transit','Out for Delivery','Picked Up','Awaiting Pickup'] %}<span
                                 class="pill transit">{{ s.status }}</span>
                             {% elif s.status in ['Failed Delivery','RTO'] %}<span class="pill failed">{{ s.status
                                 }}</span>
@@ -103,15 +122,17 @@
                     {% endfor %}
                     {% else %}
                     <tr>
-                        <td colspan="5" class="empty-note">No shipments assigned to you yet. Once a warehouse assigns
+                        <td colspan="6" class="empty-note">No shipments assigned to you yet. Once a warehouse assigns
                             one, it'll show up here.</td>
                     </tr>
                     {% endif %}
                 </table>
                 <div id="noResults" class="empty-note" style="display:none;">No shipments match your search.</div>
+
             </div>
         </div>
 
+        <!-- TODAY'S DELIVERY ROUTE (real data) -->
         <div class="section-block">
             <div class="section-title">Today's Delivery Route</div>
             {% if route_stops %}
@@ -126,6 +147,7 @@
             {% endif %}
         </div>
 
+        <!-- UPDATE SHIPMENT STATUS (real — takes you to the actual working update page) -->
         <div class="section-block" id="update-status-card">
             <div class="section-title">Update Shipment Status</div>
             <div class="current-ship-card">
@@ -148,6 +170,7 @@
             </div>
         </div>
 
+        <!-- UPDATE LOCATION (real — writes to shipment_status_history) -->
         <div class="section-block" id="update-location">
             <div class="section-title">Update Location</div>
             {% if current_shipment %}
@@ -169,6 +192,7 @@
             {% endif %}
         </div>
 
+        <!-- DELIVERY PROOF (real — writes to delivery_proof table, real file upload) -->
         <div class="section-block" id="delivery-proof">
             <div class="section-title">Delivery Proof</div>
             {% if current_shipment %}
@@ -194,6 +218,7 @@
             {% endif %}
         </div>
 
+        <!-- DELIVERY HISTORY (real data) -->
         <div class="dash-section" id="delivery-history">
             <div class="sec-head">
                 <h3>Delivery History</h3>
@@ -221,6 +246,7 @@
             {% endif %}
         </div>
 
+        <!-- RECENT NOTIFICATIONS (real data) -->
         <div class="dash-section">
             <div class="sec-head">
                 <h3>Recent Notifications</h3>

@@ -14,7 +14,7 @@
             <a href="#recent-shipments-table">All Shipments</a>
             <a href="#warehouse-overview">Manage Warehouses</a>
             <a href="#delivery-exec-overview">Manage Delivery Agents</a>
-            <a href="#manage-users">Manage Users</a>
+            <a href="{{ url_for('auth.manage_users') }}">Manage Users</a>
             <a href="#reports-analytics">Reports &amp; Analytics</a>
             <a href="#notifications-log">Notifications Log</a>
             <a href="#system-settings">System Settings</a>
@@ -56,6 +56,10 @@
             <div class="info-card">
                 <div class="k">Warehouses</div>
                 <div class="v">{{ warehouse_count }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Total Revenue</div>
+                <div class="v">₹{{ total_revenue }}</div>
             </div>
         </div>
 
@@ -213,6 +217,7 @@
         <div class="dash-section" id="manage-users">
             <div class="sec-head">
                 <h3>Manage Users</h3>
+                <a href="{{ url_for('auth.manage_users') }}" class="link-btn">Open Full User Management →</a>
             </div>
             {% if users_list %}
             <table class="dash-table">

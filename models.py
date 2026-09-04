@@ -74,11 +74,88 @@ class User:
 
     @staticmethod
     def list_all(limit=20):
-        """Used by the Admin dashboard's Manage Users table."""
+        """Used by the Admin dashboard's small Manage Users widget."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT id, name, email, role FROM users ORDER BY created_at DESC LIMIT %s", (limit,))
             return cur.fetchall()
+
+    @staticmethod
+    def list_for_management(search=None, role=None, status=None):
+        """Full-featured version for the dedicated Manage Users page —
+        search by name/email, filter by role, filter by status. All
+        filters are optional and combine with AND when present."""
+        db = get_db()
+        query = "SELECT id, name, email, phone, role, status, created_at FROM users WHERE 1=1"
+        params = []
+
+        if search:
+            query += " AND (name ILIKE %s OR email ILIKE %s)"
+            like = f"%{search}%"
+            params.extend([like, like])
+        if role:
+            query += " AND role = %s"
+            params.append(role)
+        if status:
+            query += " AND status = %s"
+            params.append(status)
+
+        query += " ORDER BY created_at DESC"
+        with db.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+    @staticmethod
+    def update_details(user_id, name, email, phone, role):
+        """Admin-side edit — distinct from update_profile() (which is the
+        self-service version on the Profile & Account page). Checks the
+        new email isn't already used by someone else first."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE email = %s AND id != %s", (email, user_id))
+            if cur.fetchone():
+                return False, "That email is already used by another account."
+            cur.execute(
+                "UPDATE users SET name = %s, email = %s, phone = %s, role = %s WHERE id = %s",
+                (name, email, phone, role, user_id),
+            )
+            return True, "User updated successfully."
+
+    @staticmethod
+    def set_status(user_id, status):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("UPDATE users SET status = %s WHERE id = %s", (status, user_id))
+
+    @staticmethod
+    def has_shipment_history(user_id):
+        """Safety check before allowing a real delete — true if this user
+        has ever sent a shipment or been assigned to one as an agent."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT 1 FROM shipments WHERE sender_id = %s LIMIT 1", (user_id,))
+            if cur.fetchone():
+                return True
+            cur.execute(
+                """SELECT 1 FROM shipment_assignments sa
+                   JOIN delivery_agents da ON da.id = sa.agent_id
+                   WHERE da.user_id = %s LIMIT 1""",
+                (user_id,),
+            )
+            return cur.fetchone() is not None
+
+    @staticmethod
+    def delete(user_id):
+        """Only call this after has_shipment_history() confirms it's safe
+        — this is a real, permanent delete. ON DELETE CASCADE on other
+        tables referencing users would otherwise silently wipe related
+        rows, which is exactly what has_shipment_history() exists to
+        prevent callers from doing by accident."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+
+    # ---------- Password reset ----------
 
     # ---------- Password reset ----------
 
@@ -125,6 +202,7 @@ class User:
 # shipment to.
 STATUS_FLOW = [
     "Created",
+    "Awaiting Pickup",
     "Picked Up",
     "In Transit",
     "Arrived at Warehouse",
@@ -240,7 +318,6 @@ class Shipment:
             return int((idx / (len(STATUS_FLOW) - 1)) * 100)
         except ValueError:
             return 0
-
     @staticmethod
     def next_status(current_status):
         """Returns the next status in the flow, or None if already at the end
@@ -274,14 +351,23 @@ class Shipment:
 
     @staticmethod
     def list_assigned_to_agent(agent_id):
+        """An agent could end up as BOTH the pickup and delivery agent on
+        the same shipment (2 separate rows in shipment_assignments) — this
+        dedupes to one row per shipment (their most recent assignment on
+        it), and exposes agent_role so the dashboard can label which job
+        this actually is."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
-                """SELECT s.*, sa.status AS assignment_status, sa.assigned_at
-                   FROM shipments s
-                   JOIN shipment_assignments sa ON sa.shipment_id = s.id
-                   WHERE sa.agent_id = %s
-                   ORDER BY sa.assigned_at DESC""",
+                """SELECT * FROM (
+                       SELECT DISTINCT ON (s.id) s.*, sa.status AS assignment_status,
+                              sa.assigned_at, sa.agent_role
+                       FROM shipments s
+                       JOIN shipment_assignments sa ON sa.shipment_id = s.id
+                       WHERE sa.agent_id = %s
+                       ORDER BY s.id, sa.assigned_at DESC
+                   ) sub
+                   ORDER BY assigned_at DESC""",
                 (agent_id,),
             )
             return cur.fetchall()
@@ -308,14 +394,19 @@ class Shipment:
 
     @staticmethod
     def unassigned_at_warehouse(warehouse_id):
-        """Shipments sitting at this warehouse, ready to go out, with no agent yet."""
+        """Shipments ready for the final-mile leg, with no DELIVERY agent
+        yet. A pickup agent assignment already exists by this point (from
+        creation) — that's expected and doesn't count here. This now
+        triggers at 'Ready for Dispatch', matching the new workflow where
+        the delivery agent is assigned only after warehouse processing."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT s.* FROM shipments s
-                   WHERE s.origin_warehouse_id = %s AND s.status = 'Arrived At Warehouse'
+                   WHERE s.origin_warehouse_id = %s AND s.status = 'Ready for Dispatch'
                    AND NOT EXISTS (
-                       SELECT 1 FROM shipment_assignments sa WHERE sa.shipment_id = s.id
+                       SELECT 1 FROM shipment_assignments sa
+                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
                    )
                    ORDER BY s.created_at ASC""",
                 (warehouse_id,),
@@ -323,21 +414,144 @@ class Shipment:
             return cur.fetchall()
 
     @staticmethod
-    def create_assignment(shipment_id, agent_id):
-        """Assigns a delivery agent to a shipment. This is the real write
-        that was previously just a frontend demo message. Once this runs,
-        the shipment shows up in that agent's 'Assigned Shipments' list via
-        list_assigned_to_agent(), and disappears from the warehouse's
-        'needs agent' list via unassigned_at_warehouse() (which checks for
-        an existing row here). Shipment.status is left unchanged — the
-        agent still needs to physically pick it up and update status
-        themselves through the existing Update Status flow."""
+    def create_assignment(shipment_id, agent_id, agent_role="pickup"):
+        """Assigns an agent to a shipment for a specific role — 'pickup'
+        (auto-assigned at creation, handles Created → In Transit) or
+        'delivery' (manually assigned by warehouse once Ready for
+        Dispatch, handles the final-mile Out for Delivery → Delivered).
+        A shipment can have up to 2 rows here, one per role."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO shipment_assignments (shipment_id, agent_id) VALUES (%s, %s)",
-                (shipment_id, agent_id),
+                "INSERT INTO shipment_assignments (shipment_id, agent_id, agent_role) VALUES (%s, %s, %s)",
+                (shipment_id, agent_id, agent_role),
             )
+
+    @staticmethod
+    def get_agent_name_by_role(shipment_id, agent_role):
+        """Real agent name for a specific role on this shipment, or None
+        if that role hasn't been assigned yet."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT u.name FROM shipment_assignments sa
+                   JOIN delivery_agents da ON da.id = sa.agent_id
+                   JOIN users u ON u.id = da.user_id
+                   WHERE sa.shipment_id = %s AND sa.agent_role = %s
+                   ORDER BY sa.assigned_at DESC LIMIT 1""",
+                (shipment_id, agent_role),
+            )
+            row = cur.fetchone()
+            return row["name"] if row else None
+
+    @staticmethod
+    def sync_assignment_status(shipment_id, new_shipment_status):
+        """Keeps shipment_assignments.status in sync with the shipment's
+        real lifecycle — this was previously never updated after the
+        initial 'assigned' value, which meant count_busy() would count
+        an agent as busy forever, even for shipments delivered long ago."""
+        db = get_db()
+        with db.cursor() as cur:
+            if new_shipment_status == "Picked Up":
+                cur.execute(
+                    """UPDATE shipment_assignments SET status = 'picked_up'
+                       WHERE shipment_id = %s AND agent_role = 'pickup' AND status = 'assigned'""",
+                    (shipment_id,),
+                )
+            elif new_shipment_status == "Delivered":
+                cur.execute(
+                    "UPDATE shipment_assignments SET status = 'delivered' WHERE shipment_id = %s",
+                    (shipment_id,),
+                )
+            elif new_shipment_status in ("Failed Delivery", "RTO"):
+                cur.execute(
+                    """UPDATE shipment_assignments SET status = 'failed'
+                       WHERE shipment_id = %s AND agent_role = 'delivery'""",
+                    (shipment_id,),
+                )
+
+    @staticmethod
+    def get_agent_id_by_role(shipment_id, agent_role):
+        """Returns the delivery_agents.id (not the name) holding a given
+        role on this shipment — used internally to know WHO to free up
+        once their leg of the job is done."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT agent_id FROM shipment_assignments
+                   WHERE shipment_id = %s AND agent_role = %s
+                   ORDER BY assigned_at DESC LIMIT 1""",
+                (shipment_id, agent_role),
+            )
+            row = cur.fetchone()
+            return row["agent_id"] if row else None
+
+    @staticmethod
+    def list_waiting_for_delivery_agent():
+        """System-wide (not scoped to one warehouse) — every shipment at
+        Ready for Dispatch with no delivery agent yet, oldest first. This
+        IS the waiting queue: no separate table needed, since a shipment's
+        presence here at all means it's waiting."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT s.* FROM shipments s
+                   WHERE s.status = 'Ready for Dispatch'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM shipment_assignments sa
+                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                   )
+                   ORDER BY s.created_at ASC"""
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def try_auto_assign_delivery_agent(shipment_id):
+        """Core automatic assignment logic — the backend replacement for
+        the old manual 'Assign Delivery Agent' button. Called the moment
+        a shipment reaches Ready for Dispatch, and again whenever an
+        agent frees up (in case shipments were left waiting).
+
+        Returns True if it successfully assigned someone, False if no
+        agent was available (shipment stays at Ready for Dispatch,
+        effectively 'waiting' — no separate status needed for that)."""
+        agent_id = DeliveryAgent.find_first_available()
+        if not agent_id:
+            return False
+
+        Shipment.create_assignment(shipment_id, agent_id, agent_role="delivery")
+        DeliveryAgent.set_busy_by_agent_id(agent_id)
+
+        agent_user_id = DeliveryAgent.get_user_id(agent_id)
+        if agent_user_id:
+            Notification.create(
+                user_id=agent_user_id,
+                shipment_id=shipment_id,
+                message="New final delivery automatically assigned to you.",
+            )
+
+        # Per the required workflow, successful auto-assignment also
+        # advances the shipment's own status to Agent Assigned.
+        Shipment.update_status(
+            shipment_id, "Agent Assigned",
+            location="Final delivery agent auto-assigned", updated_by=None,
+        )
+        return True
+
+    @staticmethod
+    def try_assign_waiting_shipments():
+        """Called whenever an agent newly becomes available (after
+        Delivered, or after manually toggling back to Available) — fairly
+        works through the waiting queue oldest-first, assigning freed
+        agents to waiting shipments until either runs out."""
+        waiting = Shipment.list_waiting_for_delivery_agent()
+        assigned_count = 0
+        for shipment in waiting:
+            if Shipment.try_auto_assign_delivery_agent(shipment["id"]):
+                assigned_count += 1
+            else:
+                break  # no more available agents, stop trying
+        return assigned_count
 
     @staticmethod
     def count_all():
@@ -368,7 +582,7 @@ class Shipment:
             in_transit = cur.fetchone()["c"]
             cur.execute("SELECT COUNT(*) AS c FROM shipments WHERE status = 'Out for Delivery'")
             out_for_delivery = cur.fetchone()["c"]
-            cur.execute("SELECT COUNT(*) AS c FROM shipments WHERE status = 'Created'")
+            cur.execute("SELECT COUNT(*) AS c FROM shipments WHERE status IN ('Created', 'Awaiting Pickup')")
             pending = cur.fetchone()["c"]
             cur.execute("SELECT COUNT(*) AS c FROM shipments WHERE status IN ('Failed Delivery','RTO')")
             failed = cur.fetchone()["c"]
@@ -411,14 +625,16 @@ class Shipment:
     @staticmethod
     def count_unassigned_system_wide():
         """Real count for the Admin dashboard's System Alerts — shipments
-        at any warehouse still waiting for an agent, not scoped to one
-        warehouse like unassigned_at_warehouse()."""
+        Ready for Dispatch anywhere with no DELIVERY agent yet."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT COUNT(*) AS c FROM shipments s
-                   WHERE s.status = 'Arrived At Warehouse'
-                   AND NOT EXISTS (SELECT 1 FROM shipment_assignments sa WHERE sa.shipment_id = s.id)"""
+                   WHERE s.status = 'Ready for Dispatch'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM shipment_assignments sa
+                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                   )"""
             )
             return cur.fetchone()["c"]
 
@@ -555,10 +771,16 @@ class DeliveryAgent:
     @staticmethod
     def get_or_create(user_id, warehouse_id=None):
         """Agents don't self-register into delivery_agents on account creation,
-        so this makes sure a row exists the first time an agent visits their dashboard."""
+        so this makes sure a row exists the first time an agent visits their dashboard.
+        Defaults to the system's warehouse if none is given — previously this
+        silently left warehouse_id as NULL, which broke warehouse-scoped
+        availability counts (NULL never matches a real warehouse_id in SQL)."""
         agent = DeliveryAgent.find_by_user_id(user_id)
         if agent:
             return agent
+        if warehouse_id is None:
+            wh = Warehouse.get_first()
+            warehouse_id = wh["id"] if wh else None
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -567,6 +789,79 @@ class DeliveryAgent:
                 (user_id, warehouse_id),
             )
             return cur.fetchone()
+
+    @staticmethod
+    def set_availability(user_id, is_available):
+        """Real write behind the Agent dashboard's Available/Not Available
+        toggle. Directly affects find_first_available() — an agent who
+        sets themselves unavailable stops receiving new auto-assignments."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE delivery_agents SET is_available = %s WHERE user_id = %s",
+                (is_available, user_id),
+            )
+
+    @staticmethod
+    def set_busy_by_agent_id(agent_id):
+        """System-internal — marks an agent unavailable the moment they're
+        auto-assigned a pickup or delivery job, so find_first_available()
+        never double-books them onto a second active task."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("UPDATE delivery_agents SET is_available = FALSE WHERE id = %s", (agent_id,))
+
+    @staticmethod
+    def set_free_by_agent_id(agent_id):
+        """System-internal — marks an agent available again once their
+        active task actually finishes (pickup handed off at In Transit,
+        or delivery completed at Delivered/Failed/RTO)."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("UPDATE delivery_agents SET is_available = TRUE WHERE id = %s", (agent_id,))
+
+    @staticmethod
+    def has_active_assignment(agent_id):
+        """True if this agent currently has an unfinished pickup or
+        delivery job. Used to block them from manually marking themselves
+        Available mid-task, which would let find_first_available() double-
+        book them onto a second active shipment."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM shipment_assignments WHERE agent_id = %s AND status IN ('assigned', 'picked_up') LIMIT 1",
+                (agent_id,),
+            )
+            return cur.fetchone() is not None
+    @staticmethod
+    def list_availability_by_user_id():
+        """Real-time Available/Busy/Offline label per agent, keyed by
+        user_id, for the Manage Users page. Derived entirely from the
+        existing is_available flag + whether they currently hold an
+        active assignment — no new column needed:
+          - Available: is_available=TRUE
+          - Busy:      is_available=FALSE AND has an active job right now
+          - Offline:   is_available=FALSE AND no active job (they opted out)"""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT da.user_id, da.is_available,
+                          EXISTS (
+                              SELECT 1 FROM shipment_assignments sa
+                              WHERE sa.agent_id = da.id AND sa.status IN ('assigned', 'picked_up')
+                          ) AS has_active_job
+                   FROM delivery_agents da"""
+            )
+            result = {}
+            for row in cur.fetchall():
+                if row["is_available"]:
+                    label = "Available"
+                elif row["has_active_job"]:
+                    label = "Busy"
+                else:
+                    label = "Offline"
+                result[row["user_id"]] = label
+            return result
 
     @staticmethod
     def count_available(warehouse_id=None):
@@ -587,6 +882,7 @@ class DeliveryAgent:
         with db.cursor() as cur:
             cur.execute("SELECT COUNT(*) AS c FROM delivery_agents")
             return cur.fetchone()["c"]
+
     @staticmethod
     def find_first_available():
         """Picks an available agent for automatic assignment at shipment
@@ -622,6 +918,33 @@ class DeliveryAgent:
                    ORDER BY u.name"""
             )
             return cur.fetchall()
+
+    @staticmethod
+    def list_available_with_names():
+        """Same as list_all_with_names() but restricted to is_available=TRUE
+        — used specifically for the final delivery agent assignment
+        dropdown, so warehouse staff can't select a busy/unavailable agent."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT da.id, u.name
+                   FROM delivery_agents da
+                   JOIN users u ON da.user_id = u.id
+                   WHERE da.is_available = TRUE
+                   ORDER BY u.name"""
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def is_available(agent_id):
+        """Server-side check — used to reject assignment attempts against
+        an agent who isn't actually available, even if someone bypasses
+        the UI and submits a request directly."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT is_available FROM delivery_agents WHERE id = %s", (agent_id,))
+            row = cur.fetchone()
+            return bool(row["is_available"]) if row else False
 
     @staticmethod
     def count_busy():
@@ -823,3 +1146,74 @@ class WarehouseActivity:
                 (warehouse_id, warehouse_id, limit),
             )
             return cur.fetchall()
+
+
+class Payment:
+    """Handles the payments table. This is a simulated payment flow —
+    there's no real payment gateway wired up, so 'paying' just records
+    a fake card's last 4 digits and marks the row as paid immediately.
+    No real money moves and no real card data is stored."""
+
+    FLAT_RATE = 50.00
+    PER_KG_RATE = 20.00
+
+    @staticmethod
+    def calculate_fee(weight):
+        """Flat rate + per-kg charge. Shipments with no weight entered
+        (it's an optional field) are billed as if they weighed 0.5kg,
+        so billing never breaks on missing data."""
+        effective_weight = float(weight) if weight else 0.5
+        return round(Payment.FLAT_RATE + (effective_weight * Payment.PER_KG_RATE), 2)
+
+    @staticmethod
+    def create(shipment_id, amount):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO payments (shipment_id, amount) VALUES (%s, %s) RETURNING id",
+                (shipment_id, amount),
+            )
+            return cur.fetchone()["id"]
+
+    @staticmethod
+    def find_by_shipment(shipment_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM payments WHERE shipment_id = %s ORDER BY created_at DESC LIMIT 1",
+                (shipment_id,),
+            )
+            return cur.fetchone()
+
+    @staticmethod
+    def mark_paid(payment_id, payment_method, transaction_ref):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE payments SET status = 'paid', payment_method = %s,
+                   transaction_ref = %s, paid_at = CURRENT_TIMESTAMP
+                   WHERE id = %s""",
+                (payment_method, transaction_ref, payment_id),
+            )
+
+    @staticmethod
+    def list_pending_for_sender(sender_id):
+        """Used by the Customer dashboard to show a 'Payment Due' list."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT p.*, s.tracking_id FROM payments p
+                   JOIN shipments s ON s.id = p.shipment_id
+                   WHERE s.sender_id = %s AND p.status = 'pending'
+                   ORDER BY p.created_at DESC""",
+                (sender_id,),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def total_revenue():
+        """Used by the Admin dashboard — sum of all successfully paid amounts."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE status = 'paid'")
+            return cur.fetchone()["total"]

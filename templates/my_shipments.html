@@ -43,7 +43,7 @@
                     <td>
                         {% if s.status == 'Delivered' %}
                         <span class="pill delivered">{{ s.status }}</span>
-                        {% elif s.status in ['In Transit', 'Out for Delivery', 'Picked Up'] %}
+                        {% elif s.status in ['In Transit', 'Out for Delivery', 'Picked Up', 'Awaiting Pickup'] %}
                         <span class="pill transit">{{ s.status }}</span>
                         {% elif s.status == 'At Warehouse' %}
                         <span class="pill warehouse">{{ s.status }}</span>

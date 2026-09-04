@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Edit User{% endblock %}
+{% block container_class %}auth-narrow{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div class="form-icon">👤</div>
+    <h2>Edit User</h2>
+    <p class="form-subtitle">Editing: <strong>{{ target_user.name }}</strong></p>
+
+    <form method="POST" action="{{ url_for('auth.edit_user', user_id=target_user.id) }}">
+        <label>Full Name</label>
+        <input type="text" name="name" value="{{ target_user.name }}" required>
+
+        <label>Email</label>
+        <input type="email" name="email" value="{{ target_user.email }}" required>
+
+        <label>Phone</label>
+        <input type="text" name="phone" value="{{ target_user.phone or '' }}">
+
+        <label>Role</label>
+        <select name="role" required>
+            <option value="customer" {{ 'selected' if target_user.role=='customer' }}>Customer</option>
+            <option value="delivery_agent" {{ 'selected' if target_user.role=='delivery_agent' }}>Delivery Agent
+            </option>
+            <option value="warehouse_staff" {{ 'selected' if target_user.role=='warehouse_staff' }}>Warehouse Staff
+            </option>
+            <option value="admin" {{ 'selected' if target_user.role=='admin' }}>Admin</option>
+        </select>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <p class="form-footer-link"><a href="{{ url_for('auth.manage_users') }}">← Back to Manage Users</a></p>
+</div>
+{% endblock %}

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse
+from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment
 import os
+import secrets
 from werkzeug.utils import secure_filename
 
 shipments_bp = Blueprint("shipments", __name__)
@@ -14,6 +15,65 @@ def login_required_role(*roles):
     if roles and session.get("user_role") not in roles:
         return False
     return True
+
+
+@shipments_bp.route("/payments/<tracking_id>/pay", methods=["GET", "POST"])
+def pay(tracking_id):
+    """Simulated payment page — no real gateway is connected. Submitting
+    the fake card form marks the payment 'paid' immediately. No real
+    money moves and the card fields are never stored, only validated
+    for shape (correct number of digits) then discarded."""
+    if "user_id" not in session:
+        flash("Please log in to make a payment.", "danger")
+        return redirect(url_for("auth.login"))
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    if not shipment:
+        flash("Shipment not found.", "danger")
+        return redirect(url_for("shipments.my_shipments"))
+
+    if shipment["sender_id"] != session["user_id"]:
+        flash("You can only pay for your own shipments.", "danger")
+        return redirect(url_for("shipments.my_shipments"))
+
+    payment = Payment.find_by_shipment(shipment["id"])
+    if not payment:
+        flash("No payment record found for this shipment.", "danger")
+        return redirect(url_for("shipments.my_shipments"))
+
+    if payment["status"] == "paid":
+        flash("This shipment has already been paid for.", "success")
+        return redirect(url_for("shipments.my_shipments"))
+
+    if request.method == "POST":
+        card_number = request.form.get("card_number", "").replace(" ", "")
+        expiry = request.form.get("expiry", "").strip()
+        cvv = request.form.get("cvv", "").strip()
+        name_on_card = request.form.get("name_on_card", "").strip()
+
+        if not name_on_card:
+            flash("Please enter the name on the card.", "danger")
+            return redirect(url_for("shipments.pay", tracking_id=tracking_id))
+
+        if not card_number.isdigit() or len(card_number) != 16:
+            flash("Card number must be exactly 16 digits.", "danger")
+            return redirect(url_for("shipments.pay", tracking_id=tracking_id))
+
+        if not cvv.isdigit() or len(cvv) != 3:
+            flash("CVV must be exactly 3 digits.", "danger")
+            return redirect(url_for("shipments.pay", tracking_id=tracking_id))
+
+        if not expiry or len(expiry) != 5 or expiry[2] != "/":
+            flash("Expiry must be in MM/YY format.", "danger")
+            return redirect(url_for("shipments.pay", tracking_id=tracking_id))
+
+        fake_transaction_ref = f"SIM{secrets.token_hex(4).upper()}"
+        Payment.mark_paid(payment["id"], payment_method=f"Card ending {card_number[-4:]}", transaction_ref=fake_transaction_ref)
+
+        flash(f"Payment of ₹{payment['amount']} successful for {tracking_id}. Reference: {fake_transaction_ref}", "success")
+        return redirect(url_for("shipments.my_shipments"))
+
+    return render_template("pay.html", shipment=shipment, payment=payment)
 
 
 @shipments_bp.route("/shipments/create", methods=["GET", "POST"])
@@ -61,6 +121,11 @@ def create_shipment():
             except ValueError:
                 flash("Package weight must be a positive number.", "danger")
                 return redirect(url_for("shipments.create_shipment"))
+
+        # Assign a warehouse so this shipment is actually visible to
+        # warehouse staff. There's only one warehouse in the system
+        # right now (same stand-in pattern used elsewhere), so every
+        # new shipment routes through it.
         warehouse = Warehouse.get_first()
 
         tracking_id = Shipment.create(
@@ -77,22 +142,37 @@ def create_shipment():
             origin_warehouse_id=warehouse["id"] if warehouse else None,
         )
 
-        # Auto-assign an available delivery agent right away, so no manual
-        # "Assign Delivery Agent" click is needed for the default flow.
+        # Create the pending payment record. Per your requirement, payment
+        # happens separately after shipment creation, not during it.
+        new_shipment_for_billing = Shipment.find_by_tracking_id(tracking_id)
+        fee = Payment.calculate_fee(weight_value)
+        Payment.create(new_shipment_for_billing["id"], fee)
+
+        # Auto-assign an available agent as the PICKUP agent right away —
+        # this is only the pickup leg, not the final delivery. The final
+        # delivery agent is assigned separately later, by warehouse staff,
+        # once the shipment reaches Ready for Dispatch.
         agent_id = DeliveryAgent.find_first_available()
         if agent_id:
             new_shipment = Shipment.find_by_tracking_id(tracking_id)
-            Shipment.create_assignment(new_shipment["id"], agent_id)
+            Shipment.create_assignment(new_shipment["id"], agent_id, agent_role="pickup")
+            DeliveryAgent.set_busy_by_agent_id(agent_id)
             agent_user_id = DeliveryAgent.get_user_id(agent_id)
             if agent_user_id:
                 Notification.create(
                     user_id=agent_user_id,
                     shipment_id=new_shipment["id"],
-                    message=f"New shipment {tracking_id} has been assigned to you.",
+                    message=f"New pickup assigned: shipment {tracking_id}.",
                 )
-            flash(f"Shipment created! Your Tracking ID is {tracking_id}. It's been assigned to a delivery agent.", "success")
+            # Real status transition: Created -> Awaiting Pickup, now that
+            # a pickup agent is actually attached to this shipment.
+            Shipment.update_status(
+                new_shipment["id"], "Awaiting Pickup",
+                location="Pickup agent assigned", updated_by=session["user_id"],
+            )
+            flash(f"Shipment created! Your Tracking ID is {tracking_id}. A pickup agent has been assigned. Payment of ₹{fee} is due.", "success")
         else:
-            flash(f"Shipment created! Your Tracking ID is {tracking_id}. No delivery agents are available right now — it'll be assigned once one is.", "success")
+            flash(f"Shipment created! Your Tracking ID is {tracking_id}. No pickup agents are available right now — it'll be assigned once one is. Payment of ₹{fee} is due.", "success")
 
         return redirect(url_for("shipments.my_shipments"))
 
@@ -167,10 +247,46 @@ def update_status(tracking_id):
 
         Shipment.update_status(
             shipment["id"], chosen_status,
-            location=location or None,
+            location=location or f"Status updated to {chosen_status}",
             remarks=remarks or None,
             updated_by=session["user_id"],
         )
+        # Keep the assignment's own status in sync too — otherwise agents
+        # stay counted as "busy" forever, even after delivering.
+        Shipment.sync_assignment_status(shipment["id"], chosen_status)
+
+        # ---- Automatic agent lifecycle hooks ----
+        if chosen_status == "In Transit":
+            # Pickup agent's leg is done — free them up for a new pickup.
+            pickup_agent_id = Shipment.get_agent_id_by_role(shipment["id"], "pickup")
+            if pickup_agent_id:
+                DeliveryAgent.set_free_by_agent_id(pickup_agent_id)
+
+        elif chosen_status == "Ready for Dispatch":
+            # This replaces the old manual "Assign Delivery Agent" button —
+            # the backend tries to auto-assign one right now. If none is
+            # available, the shipment simply stays here, waiting, and will
+            # be picked up automatically once someone frees up.
+            assigned = Shipment.try_auto_assign_delivery_agent(shipment["id"])
+            if assigned:
+                # Status just advanced a second time within this same
+                # click (Ready for Dispatch -> Agent Assigned) — reflect
+                # the real final status in the message shown below.
+                chosen_status = "Agent Assigned"
+            else:
+                flash(
+                    f"Shipment {tracking_id} is Ready for Dispatch, but no delivery agent is available right now — it will be assigned automatically as soon as one is free.",
+                    "success",
+                )
+
+        elif chosen_status in ("Delivered", "Failed Delivery", "RTO"):
+            # Delivery agent's job is done — free them, then immediately
+            # try to clear the waiting queue with this newly-freed agent.
+            delivery_agent_id = Shipment.get_agent_id_by_role(shipment["id"], "delivery")
+            if delivery_agent_id:
+                DeliveryAgent.set_free_by_agent_id(delivery_agent_id)
+                Shipment.try_assign_waiting_shipments()
+
         # Populate the (previously unused) notifications table so the
         # customer's dashboard has real notifications to show.
         Notification.create(
@@ -200,42 +316,42 @@ def goto_update_status():
     return redirect(url_for("shipments.update_status", tracking_id=tracking_id))
 
 
-@shipments_bp.route("/shipments/assign-agent", methods=["POST"])
-def assign_agent():
-    """The real write behind the warehouse dashboard's Assign Delivery Agent
-    form. Only warehouse staff and admins can do this. Once this runs, the
-    shipment stops appearing in the warehouse's 'needs agent' list and
-    starts appearing in the chosen agent's 'Assigned Shipments' list."""
-    if not login_required_role("warehouse_staff", "admin"):
-        flash("You don't have permission to assign delivery agents.", "danger")
+@shipments_bp.route("/agent/set-availability", methods=["POST"])
+def set_availability():
+    """Real write behind the Agent dashboard's Available/Not Available
+    toggle. Also now: blocks marking yourself Available while you still
+    have an unfinished job (prevents double-booking), and if you're
+    genuinely free, immediately tries to clear the auto-assignment
+    waiting queue with you."""
+    if not login_required_role("delivery_agent"):
+        flash("You don't have permission to do that.", "danger")
         return redirect(url_for("auth.login"))
 
-    tracking_id = request.form.get("tracking_id", "").strip()
-    agent_id = request.form.get("agent_id", "").strip()
+    is_available = request.form.get("is_available") == "true"
+    agent = DeliveryAgent.get_or_create(session["user_id"])
 
-    if not tracking_id or not agent_id:
-        flash("Please provide both a Tracking ID and an agent.", "danger")
-        return redirect(url_for("auth.dashboard") + "#assign-agent-card")
+    if is_available and DeliveryAgent.has_active_assignment(agent["id"]):
+        flash("You still have an active shipment in progress — you'll be marked Available automatically once it's done.", "danger")
+        return redirect(url_for("auth.dashboard") + "#availability")
 
-    shipment = Shipment.find_by_tracking_id(tracking_id)
-    if not shipment:
-        flash(f"No shipment found with Tracking ID '{tracking_id}'.", "danger")
-        return redirect(url_for("auth.dashboard") + "#assign-agent-card")
+    DeliveryAgent.set_availability(session["user_id"], is_available)
 
-    Shipment.create_assignment(shipment["id"], int(agent_id))
+    if is_available:
+        newly_assigned = Shipment.try_assign_waiting_shipments()
+        if newly_assigned:
+            flash(f"You're now marked as Available. {newly_assigned} waiting shipment(s) were just assigned to you.", "success")
+        else:
+            flash("You're now marked as Available.", "success")
+    else:
+        flash("You're now marked as Not Available — you won't receive new auto-assignments.", "success")
 
-    agent_user_id = DeliveryAgent.get_user_id(int(agent_id))
-    if agent_user_id:
-        Notification.create(
-            user_id=agent_user_id,
-            shipment_id=shipment["id"],
-            message=f"New shipment {tracking_id} has been assigned to you.",
-        )
+    return redirect(url_for("auth.dashboard") + "#availability")
 
-    flash(f"Shipment {tracking_id} has been assigned successfully.", "success")
-    return redirect(url_for("auth.dashboard") + "#outgoing-table")
+
 @shipments_bp.route("/shipments/<tracking_id>/update-location", methods=["POST"])
 def update_location(tracking_id):
+    """Real write behind the Agent dashboard's 'Update Location' card.
+    Logs a location update without advancing the shipment's status."""
     if not login_required_role("delivery_agent"):
         flash("You don't have permission to update location.", "danger")
         return redirect(url_for("auth.login"))
@@ -257,6 +373,9 @@ def update_location(tracking_id):
 
 @shipments_bp.route("/shipments/<tracking_id>/submit-proof", methods=["POST"])
 def submit_proof(tracking_id):
+    """Real write behind the Agent dashboard's 'Delivery Proof' form.
+    Saves an uploaded photo (if provided) to static/uploads and records
+    the delivery_proof row."""
     if not login_required_role("delivery_agent"):
         flash("You don't have permission to submit delivery proof.", "danger")
         return redirect(url_for("auth.login"))

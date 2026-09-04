@@ -25,7 +25,7 @@
     <!-- MAIN -->
     <main class="grad-main">
 
-        <!-- HEADER + TRACKING SECTION -->
+        <!-- HEADER + TRACKING SECTION (unchanged, pre-filled with demo ID) -->
         <div class="dash-top-row">
             <h1>Hello {{ name }}, here's your shipment overview</h1>
             <form class="quick-track-form" method="GET" action="{{ url_for('shipments.track') }}">
@@ -54,7 +54,7 @@
             </div>
         </div>
 
-        <!-- QUICK ACTIONS -->
+        <!-- 1. QUICK ACTIONS -->
         <div class="section-block">
             <div class="section-title">Quick Actions</div>
             <div class="qa-row">
@@ -108,8 +108,10 @@
                     </div>
                     <div class="cs-item"><span class="cs-k">Current Location</span><span class="cs-v">{{
                             current_location or 'Not yet updated' }}</span></div>
-                    <div class="cs-item"><span class="cs-k">Delivery Agent</span><span class="cs-v">{{ current_agent or
-                            'Not assigned yet' }}</span></div>
+                    <div class="cs-item"><span class="cs-k">Pickup Agent</span><span class="cs-v">{{ pickup_agent_name
+                            or 'Not assigned yet' }}</span></div>
+                    <div class="cs-item"><span class="cs-k">Delivery Agent</span><span class="cs-v">{{
+                            delivery_agent_name or 'Not assigned yet' }}</span></div>
                 </div>
                 <a href="{{ url_for('shipments.track') }}?tracking_id={{ current_shipment.tracking_id }}"
                     class="cta-btn">Track Shipment</a>
@@ -179,6 +181,30 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- PAYMENT DUE (real data) -->
+        {% if pending_payments %}
+        <div class="dash-section" style="border: 1px solid #E9C27A; background:#FFFBF2;">
+            <div class="sec-head">
+                <h3>Payment Due</h3>
+            </div>
+            <table class="dash-table">
+                <tr>
+                    <th>Tracking ID</th>
+                    <th>Amount</th>
+                    <th>Action</th>
+                </tr>
+                {% for p in pending_payments %}
+                <tr>
+                    <td class="mono">{{ p.tracking_id }}</td>
+                    <td>₹{{ p.amount }}</td>
+                    <td><a href="{{ url_for('shipments.pay', tracking_id=p.tracking_id) }}" class="link-btn">Pay Now
+                            →</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
 
         <!-- RECENT NOTIFICATIONS (real data from notifications table) -->
         <div class="dash-section" id="notifications">

@@ -4,7 +4,11 @@ Creates one demo account per role, for testing the 4 dashboards.
 Run once, from your project root:
     python seed_demo_accounts.py
 
-Safe to re-run — skips any account that already exists.
+Safe to re-run — skips any account that already exists (checked by email),
+so it will never create duplicates or overwrite existing passwords.
+
+Passwords are hashed with Werkzeug before being stored (same as normal
+registration) — nothing here is stored as plain text.
 """
 
 from app import create_app

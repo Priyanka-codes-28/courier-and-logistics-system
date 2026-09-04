@@ -5,8 +5,10 @@ CREATE TABLE users (
     phone VARCHAR(15),
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'customer'
-    CHECK (role IN ('customer', 'delivery_agent', 'warehouse_staff', 'admin')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        CHECK (role IN ('customer', 'delivery_agent', 'warehouse_staff', 'admin')),
+    status VARCHAR(10) NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive')),
+    reset_token VARCHAR(255),
 );
 
 CREATE TABLE warehouses (
@@ -40,13 +42,15 @@ CREATE TABLE shipments (
     receiver_address VARCHAR(255) NOT NULL,
     receiver_phone VARCHAR(15) NOT NULL,
     package_type VARCHAR(50),
-    package_description varchar(255),
+    package_description VARCHAR(255),
     weight DECIMAL(6,2),
     origin_warehouse_id INTEGER REFERENCES warehouses(id),
     destination_warehouse_id INTEGER REFERENCES warehouses(id),
-    status VARCHAR(20) NOT NULL DEFAULT 'Created'
-        CHECK (status IN ('Created','Picked Up','At Warehouse','In Transit',
-                           'Out for Delivery','Delivered','Failed Delivery','RTO')),
+    status VARCHAR(30) NOT NULL DEFAULT 'Created'
+        CHECK (status IN ('Created','Awaiting Pickup','Picked Up','In Transit','At Warehouse',
+                           'Arrived at Warehouse','Processing','Ready for Dispatch',
+                           'Agent Assigned','Out for Delivery','Delivered',
+                           'Failed Delivery','RTO')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -88,4 +92,16 @@ CREATE TABLE notifications (
         CHECK (channel IN ('sms','email','app')),
     is_read BOOLEAN DEFAULT FALSE,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+    id SERIAL PRIMARY KEY,
+    shipment_id INTEGER NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
+    amount DECIMAL(8,2) NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'paid', 'failed')),
+    payment_method VARCHAR(20),
+    transaction_ref VARCHAR(50),
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

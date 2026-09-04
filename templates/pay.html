@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Pay for Shipment{% endblock %}
+{% block container_class %}auth-narrow{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div class="form-icon">💳</div>
+    <h2>Complete Payment</h2>
+    <p class="form-subtitle">This is a simulated payment — no real card is charged.</p>
+
+    <div style="background:#F7F5EE; border-radius:8px; padding:16px; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; font-size:14px; color:#5C6B7A;">
+            <span>Tracking ID</span>
+            <span style="font-family:'Courier New',monospace;">{{ shipment.tracking_id }}</span>
+        </div>
+        <div
+            style="display:flex; justify-content:space-between; font-size:20px; font-weight:600; margin-top:8px; color:#1f4e79;">
+            <span>Amount Due</span>
+            <span>₹{{ payment.amount }}</span>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('shipments.pay', tracking_id=shipment.tracking_id) }}">
+        <label>Name on Card</label>
+        <input type="text" name="name_on_card" placeholder="e.g. Priyanka Manuboti" required>
+
+        <label>Card Number</label>
+        <input type="text" name="card_number" placeholder="16 digits, e.g. 4111111111111111" maxlength="19" required>
+
+        <div style="display:flex; gap:12px;">
+            <div style="flex:1;">
+                <label>Expiry (MM/YY)</label>
+                <input type="text" name="expiry" placeholder="12/28" maxlength="5" required>
+            </div>
+            <div style="flex:1;">
+                <label>CVV</label>
+                <input type="text" name="cvv" placeholder="123" maxlength="3" required>
+            </div>
+        </div>
+
+        <button type="submit">Pay ₹{{ payment.amount }}</button>
+    </form>
+
+    <p class="form-footer-link"><a href="{{ url_for('shipments.my_shipments') }}">← Back to My Shipments</a></p>
+</div>
+{% endblock %}

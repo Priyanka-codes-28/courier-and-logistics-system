@@ -1,6 +1,6 @@
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity
+from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -50,15 +50,17 @@ def _customer_dashboard_context():
     total = len(shipments)
     in_transit = sum(1 for s in shipments if s["status"] in ("Picked Up", "In Transit", "Arrived at Warehouse", "Processing", "Ready for Dispatch", "Agent Assigned", "Out for Delivery"))
     delivered = sum(1 for s in shipments if s["status"] == "Delivered")
-    pending = sum(1 for s in shipments if s["status"] == "Created")
+    pending = sum(1 for s in shipments if s["status"] in ("Created", "Awaiting Pickup"))
 
     current_shipment = Shipment.get_current_for_sender(session["user_id"])
     current_location = None
-    current_agent = None
+    pickup_agent_name = None
+    delivery_agent_name = None
     progress_steps = []
     if current_shipment:
         current_location = Shipment.get_latest_location(current_shipment["id"])
-        current_agent = Shipment.get_assigned_agent_name(current_shipment["id"])
+        pickup_agent_name = Shipment.get_agent_name_by_role(current_shipment["id"], "pickup")
+        delivery_agent_name = Shipment.get_agent_name_by_role(current_shipment["id"], "delivery")
         try:
             current_idx = STATUS_FLOW.index(current_shipment["status"])
         except ValueError:
@@ -72,14 +74,16 @@ def _customer_dashboard_context():
 
     notifications = Notification.list_for_user(session["user_id"], limit=4)
     delivery_proof = DeliveryProof.find_latest_for_sender(session["user_id"])
+    pending_payments = Payment.list_pending_for_sender(session["user_id"])
 
     return dict(
         name=session.get("user_name"), role="customer",
         shipments=shipments[:3], total=total, in_transit=in_transit,
         delivered=delivered, pending=pending,
         current_shipment=current_shipment, current_location=current_location,
-        current_agent=current_agent, progress_steps=progress_steps,
+        pickup_agent_name=pickup_agent_name, delivery_agent_name=delivery_agent_name, progress_steps=progress_steps,
         notifications=notifications, delivery_proof=delivery_proof,
+        pending_payments=pending_payments,
     )
 
 
@@ -114,7 +118,7 @@ def _warehouse_dashboard_context():
     warehouse = Warehouse.get_first()
     if warehouse:
         incoming = Shipment.list_at_warehouse(warehouse["id"], status="In Transit")
-        at_warehouse_now = Shipment.list_at_warehouse(warehouse["id"], status=" Arrived At Warehouse")
+        at_warehouse_now = Shipment.list_at_warehouse(warehouse["id"], status="Arrived at Warehouse")
         outgoing_unassigned = Shipment.unassigned_at_warehouse(warehouse["id"])
         agents_available = DeliveryAgent.count_available(warehouse["id"])
         received_today = WarehouseActivity.count_received_today(warehouse["id"])
@@ -123,14 +127,13 @@ def _warehouse_dashboard_context():
     else:
         incoming, at_warehouse_now, outgoing_unassigned, agents_available = [], [], [], 0
         received_today, dispatched_today, recent_activity = 0, 0, []
-    agents = DeliveryAgent.list_all_with_names()
     agents_busy = DeliveryAgent.count_busy()
     agents_offline = DeliveryAgent.count_offline()
     return dict(
         name=session.get("user_name"), role="warehouse_staff",
         warehouse=warehouse, incoming=incoming, at_warehouse_now=at_warehouse_now,
         outgoing_unassigned=outgoing_unassigned, agents_available=agents_available,
-        agents=agents, agents_busy=agents_busy, agents_offline=agents_offline,
+        waiting_shipments=outgoing_unassigned, agents_busy=agents_busy, agents_offline=agents_offline,
         received_today=received_today, dispatched_today=dispatched_today,
         recent_activity=recent_activity,
     )
@@ -157,6 +160,7 @@ def _admin_dashboard_context():
     active_shipments = total_shipments - delivered_count - breakdown["failed"]
     failed_rate = round((breakdown["failed"] / total_shipments) * 100, 1) if total_shipments else 0
     unassigned_count = Shipment.count_unassigned_system_wide()
+    total_revenue = Payment.total_revenue()
 
     return dict(
         name=session.get("user_name"), role="admin",
@@ -170,7 +174,7 @@ def _admin_dashboard_context():
         delivery_executives=delivery_executives,
         active_shipments=active_shipments, pending=breakdown["pending"],
         failed_count=breakdown["failed"], failed_rate=failed_rate,
-        unassigned_count=unassigned_count,
+        unassigned_count=unassigned_count, total_revenue=total_revenue,
     )
 
 
@@ -221,6 +225,10 @@ def login():
         user = User.find_by_email(email)
         if user is None or not User.verify_password(user, password):
             flash("Invalid email or password.", "danger")
+            return redirect(url_for("auth.login"))
+
+        if user.get("status") == "inactive":
+            flash("Your account has been deactivated. Please contact an administrator.", "danger")
             return redirect(url_for("auth.login"))
 
         session["user_id"] = user["id"]
@@ -365,6 +373,96 @@ def warehouse_dashboard():
 @role_required("admin")
 def admin_dashboard():
     return render_template(DASHBOARD_TEMPLATES["admin"], **_admin_dashboard_context())
+
+
+# ============================================================
+# USER MANAGEMENT — full dedicated page, admin-only.
+# ============================================================
+
+@auth_bp.route("/admin/users")
+@role_required("admin")
+def manage_users():
+    search = request.args.get("search", "").strip()
+    role_filter = request.args.get("role", "").strip()
+    status_filter = request.args.get("status", "").strip()
+
+    users_list = User.list_for_management(
+        search=search or None,
+        role=role_filter or None,
+        status=status_filter or None,
+    )
+    availability_map = DeliveryAgent.list_availability_by_user_id()
+
+    return render_template(
+        "manage_users.html",
+        users_list=users_list,
+        availability_map=availability_map,
+        search=search, role_filter=role_filter, status_filter=status_filter,
+    )
+
+
+@auth_bp.route("/admin/users/<int:user_id>/edit", methods=["GET", "POST"])
+@role_required("admin")
+def edit_user(user_id):
+    target_user = User.find_by_id(user_id)
+    if not target_user:
+        flash("User not found.", "danger")
+        return redirect(url_for("auth.manage_users"))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        phone = request.form.get("phone", "").strip()
+        role = request.form.get("role", "").strip()
+
+        if not name or not email:
+            flash("Name and email are required.", "danger")
+            return redirect(url_for("auth.edit_user", user_id=user_id))
+
+        if role not in ("customer", "delivery_agent", "warehouse_staff", "admin"):
+            flash("Invalid role selected.", "danger")
+            return redirect(url_for("auth.edit_user", user_id=user_id))
+
+        success, message = User.update_details(user_id, name, email, phone, role)
+        flash(message, "success" if success else "danger")
+        if success:
+            return redirect(url_for("auth.manage_users"))
+        return redirect(url_for("auth.edit_user", user_id=user_id))
+
+    return render_template("edit_user.html", target_user=target_user)
+
+
+@auth_bp.route("/admin/users/<int:user_id>/status", methods=["POST"])
+@role_required("admin")
+def set_user_status(user_id):
+    new_status = request.form.get("status", "").strip()
+    if new_status not in ("active", "inactive"):
+        flash("Invalid status.", "danger")
+        return redirect(url_for("auth.manage_users"))
+
+    if user_id == session["user_id"] and new_status == "inactive":
+        flash("You can't deactivate your own account.", "danger")
+        return redirect(url_for("auth.manage_users"))
+
+    User.set_status(user_id, new_status)
+    flash(f"User account marked as {new_status}.", "success")
+    return redirect(url_for("auth.manage_users"))
+
+
+@auth_bp.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@role_required("admin")
+def delete_user(user_id):
+    if user_id == session["user_id"]:
+        flash("You can't delete your own account.", "danger")
+        return redirect(url_for("auth.manage_users"))
+
+    if User.has_shipment_history(user_id):
+        flash("This user has shipment history and can't be permanently deleted — deactivate them instead to preserve records.", "danger")
+        return redirect(url_for("auth.manage_users"))
+
+    User.delete(user_id)
+    flash("User permanently deleted.", "success")
+    return redirect(url_for("auth.manage_users"))
 
 
 # ============================================================
