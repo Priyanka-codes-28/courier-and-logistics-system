@@ -47,6 +47,7 @@
             <a href="{{ url_for('auth.dashboard') }}#reports-analytics">Reports &amp; Analytics</a>
             <a href="{{ url_for('auth.dashboard') }}#notifications-log">Notifications Log</a>
             <a href="{{ url_for('auth.dashboard') }}#system-settings">System Settings</a>
+            <div class="item active">Profile &amp; Account</div>
             {% endif %}
 
             <a href="{{ url_for('auth.logout') }}">Logout</a>
@@ -59,8 +60,11 @@
         <p class="page-sub">Update your name, phone, and email.</p>
 
         <div class="section-block">
+            <div class="section-title">Profile Information</div>
             <div class="current-ship-card">
                 <form method="POST" action="{{ url_for('auth.profile') }}">
+                    <input type="hidden" name="form_type" value="profile">
+
                     <label class="form-label">Full Name</label>
                     <input type="text" name="name" class="proof-input" value="{{ user.name if user else '' }}" required>
 
@@ -71,8 +75,33 @@
                     <label class="form-label">Phone</label>
                     <input type="text" name="phone" class="proof-input" value="{{ user.phone if user else '' }}">
 
+                    <label class="form-label">Role</label>
+                    <input type="text" class="proof-input"
+                        value="{{ (user.role.replace('_', ' ') | title) if user else '' }}" readonly>
+
                     <button type="submit" class="cta-btn" style="border:none; cursor:pointer; margin-top:16px;">Save
                         Changes</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="section-block">
+            <div class="section-title">Account &amp; Security</div>
+            <div class="current-ship-card">
+                <form method="POST" action="{{ url_for('auth.profile') }}">
+                    <input type="hidden" name="form_type" value="password">
+
+                    <label class="form-label">Current Password</label>
+                    <input type="password" name="current_password" class="proof-input" required>
+
+                    <label class="form-label">New Password</label>
+                    <input type="password" name="new_password" class="proof-input" required minlength="6">
+
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" name="confirm_new_password" class="proof-input" required minlength="6">
+
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer; margin-top:16px;">Change
+                        Password</button>
                 </form>
             </div>
         </div>

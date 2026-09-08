@@ -1,8 +1,20 @@
+import re
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment
 
 auth_bp = Blueprint("auth", __name__)
+
+# ============================================================
+# Validation patterns for the Profile & Account module.
+# Kept simple and permissive on purpose — these only exist to
+# catch obviously malformed input, not to be a full RFC-grade
+# validator, matching the lightweight validation style already
+# used elsewhere in this file (register/login).
+# ============================================================
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PHONE_PATTERN = re.compile(r"^[0-9+\-\s()]{7,20}$")
+NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z\s.'-]{1,79}$")
 
 DASHBOARD_TEMPLATES = {
     "customer": "dashboard_customer.html",
@@ -131,7 +143,8 @@ def _warehouse_dashboard_context():
     agents_offline = DeliveryAgent.count_offline()
     return dict(
         name=session.get("user_name"), role="warehouse_staff",
-        warehouse=warehouse, incoming=incoming, at_warehouse_now=at_warehouse_now,
+        warehouse=warehouse, incoming=incoming,
+        at_warehouse_now=at_warehouse_now,
         outgoing_unassigned=outgoing_unassigned, agents_available=agents_available,
         waiting_shipments=outgoing_unassigned, agents_busy=agents_busy, agents_offline=agents_offline,
         received_today=received_today, dispatched_today=dispatched_today,
@@ -296,8 +309,10 @@ def reset_password(token):
 @auth_bp.route("/profile", methods=["GET", "POST"])
 def profile():
     """Profile & Account page — shared across all 4 roles, since the
-    feature (update name/phone/email) is identical regardless of role.
-    Only requires being logged in, not any specific role."""
+    feature (update name/phone/email, change password) is identical
+    regardless of role. Only requires being logged in, not any specific
+    role. Role itself is never editable here — it's rendered read-only
+    in the template and never read from the submitted form."""
     if "user_id" not in session:
         flash("Please log in to continue.", "danger")
         return redirect(url_for("auth.login"))
@@ -305,12 +320,57 @@ def profile():
     user = User.find_by_id(session["user_id"])
 
     if request.method == "POST":
+        form_type = request.form.get("form_type")
+
+        # ---------- Account & Security: change password ----------
+        if form_type == "password":
+            current_password = request.form.get("current_password", "")
+            new_password = request.form.get("new_password", "")
+            confirm_new_password = request.form.get("confirm_new_password", "")
+
+            if not current_password or not new_password or not confirm_new_password:
+                flash("All password fields are required.", "danger")
+                return redirect(url_for("auth.profile"))
+
+            if not User.verify_password(user, current_password):
+                flash("Current password is incorrect.", "danger")
+                return redirect(url_for("auth.profile"))
+
+            if new_password != confirm_new_password:
+                flash("New password and confirmation do not match.", "danger")
+                return redirect(url_for("auth.profile"))
+
+            if len(new_password) < 6:
+                flash("New password must be at least 6 characters long.", "danger")
+                return redirect(url_for("auth.profile"))
+
+            # Reuses the same hashing + update path as the forgot-password
+            # flow (User.reset_password) — no duplicate password-writing
+            # logic. It also clears any stale reset token, which is safe
+            # and harmless here.
+            User.reset_password(session["user_id"], new_password)
+            flash("Password changed successfully.", "success")
+            return redirect(url_for("auth.profile"))
+
+        # ---------- Profile Information: name / email / phone ----------
         name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
         email = request.form.get("email", "").strip().lower()
 
         if not name or not email:
             flash("Name and email are required.", "danger")
+            return redirect(url_for("auth.profile"))
+
+        if not NAME_PATTERN.match(name):
+            flash("Please enter a valid full name (letters only, 2-80 characters).", "danger")
+            return redirect(url_for("auth.profile"))
+
+        if not EMAIL_PATTERN.match(email):
+            flash("Please enter a valid email address.", "danger")
+            return redirect(url_for("auth.profile"))
+
+        if phone and not PHONE_PATTERN.match(phone):
+            flash("Please enter a valid phone number.", "danger")
             return redirect(url_for("auth.profile"))
 
         success, message = User.update_profile(session["user_id"], name, phone, email)
@@ -440,6 +500,8 @@ def set_user_status(user_id):
         flash("Invalid status.", "danger")
         return redirect(url_for("auth.manage_users"))
 
+    # Guard: admin cannot deactivate their own account, so they can never
+    # accidentally lock themselves out.
     if user_id == session["user_id"] and new_status == "inactive":
         flash("You can't deactivate your own account.", "danger")
         return redirect(url_for("auth.manage_users"))
