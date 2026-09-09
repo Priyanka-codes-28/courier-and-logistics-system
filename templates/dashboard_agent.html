@@ -176,7 +176,8 @@
             {% if current_shipment %}
             <div class="current-ship-card">
                 <form method="POST"
-                    action="{{ url_for('shipments.update_location', tracking_id=current_shipment.tracking_id) }}">
+                    action="{{ url_for('shipments.update_location', tracking_id=current_shipment.tracking_id) }}"
+                    id="update-location-form">
                     <div class="cs-row">
                         <div class="cs-item"><span class="cs-k">Tracking ID</span><span class="cs-v mono">{{
                                 current_shipment.tracking_id }}</span></div>
@@ -184,8 +185,38 @@
                     <label class="form-label">Current Location</label>
                     <input type="text" name="location" class="proof-input" placeholder="e.g. Near HSR Layout, Bengaluru"
                         required>
+
+                    <!-- Live Tracking Map: optional GPS coordinates, additive to the
+               existing text field above. Leaving these blank still works
+               exactly as before. -->
+                    <input type="hidden" name="latitude" id="loc-latitude">
+                    <input type="hidden" name="longitude" id="loc-longitude">
+                    <button type="button" class="avail-btn" style="margin: 10px 0;" onclick="useMyLocation()">📍 Use My
+                        Current Location</button>
+                    <span id="geo-status" style="font-size:12px; color:var(--d-text-dim); margin-left:8px;"></span>
+
                     <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Update Location</button>
                 </form>
+                <script>
+                    function useMyLocation() {
+                        const statusEl = document.getElementById('geo-status');
+                        if (!navigator.geolocation) {
+                            statusEl.textContent = 'Geolocation not supported on this device.';
+                            return;
+                        }
+                        statusEl.textContent = 'Getting location...';
+                        navigator.geolocation.getCurrentPosition(
+                            function (pos) {
+                                document.getElementById('loc-latitude').value = pos.coords.latitude;
+                                document.getElementById('loc-longitude').value = pos.coords.longitude;
+                                statusEl.textContent = 'GPS coordinates captured ✓ (will be saved with your update)';
+                            },
+                            function () {
+                                statusEl.textContent = 'Could not get GPS location — you can still submit the text location above.';
+                            }
+                        );
+                    }
+                </script>
             </div>
             {% else %}
             <div class="empty-note">No active shipment to update location for.</div>

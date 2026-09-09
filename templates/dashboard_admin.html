@@ -7,6 +7,7 @@
 
 <div class="grad-shell">
 
+    <!-- GRADIENT SIDEBAR (unchanged) -->
     <aside class="grad-sidebar">
         <div class="brand"><span class="dot"></span>CourierOS</div>
         <nav class="grad-nav">
@@ -18,13 +19,15 @@
             <a href="#reports-analytics">Reports &amp; Analytics</a>
             <a href="#notifications-log">Notifications Log</a>
             <a href="#system-settings">System Settings</a>
-            <a href="{{ url_for('auth.profile') }}">Profile &amp; Accounts</a>
+            <a href="{{ url_for('auth.profile') }}">Profile &amp; Account</a>
             <a href="{{ url_for('auth.logout') }}">Logout</a>
         </nav>
     </aside>
 
+    <!-- MAIN -->
     <main class="grad-main">
 
+        <!-- 10. SEARCH (functional, frontend only) -->
         <div class="dash-top-row">
             <div></div>
             <input type="text" id="adminSearch" class="agent-search" placeholder="🔍 Search shipments..."
@@ -33,6 +36,7 @@
 
         <h1>Hello {{ name }}, here's today's overview</h1>
 
+        <!-- SUMMARY CARDS (real data) -->
         <div class="info-row admin-6col">
             <div class="info-card">
                 <div class="k">Total Shipments</div>
@@ -64,6 +68,7 @@
             </div>
         </div>
 
+        <!-- 2. QUICK ACTIONS -->
         <div class="section-block">
             <div class="section-title">Quick Actions</div>
             <div class="qa-row">
@@ -71,9 +76,11 @@
                 <a href="#delivery-exec-overview" class="qa-btn">🚚 Delivery Executives</a>
                 <a href="#warehouse-overview" class="qa-btn">🏢 Warehouses</a>
                 <a href="#" class="qa-btn">📊 View Reports</a>
+                <a href="{{ url_for('shipments.track') }}" class="qa-btn">🔍 Track a Shipment</a>
             </div>
         </div>
 
+        <!-- SHIPMENT STATUS OVERVIEW (real data) -->
         <div class="chart-widget" id="reports-analytics">
             <div class="w-title">Shipment Status Overview</div>
             {% if total_shipments %}
@@ -124,6 +131,7 @@
             {% endif %}
         </div>
 
+        <!-- DELIVERIES THIS WEEK (real data) -->
         <div class="chart-widget">
             <div class="w-title">Deliveries This Week</div>
             {% if weekly %}
@@ -142,6 +150,7 @@
             {% endif %}
         </div>
 
+        <!-- DELIVERY EXECUTIVE OVERVIEW (real data) -->
         <div class="dash-section" id="delivery-exec-overview">
             <div class="sec-head">
                 <h3>Delivery Executive Overview</h3>
@@ -156,6 +165,7 @@
             </div>
         </div>
 
+        <!-- WAREHOUSE OVERVIEW (real data) -->
         <div class="dash-section" id="warehouse-overview">
             <div class="sec-head">
                 <h3>Warehouse Overview</h3>
@@ -178,6 +188,7 @@
             {% endif %}
         </div>
 
+        <!-- RECENT SHIPMENTS (real data) -->
         <div class="dash-section" id="recent-shipments-table">
             <div class="sec-head">
                 <h3>Recent Shipments</h3>
@@ -215,6 +226,7 @@
             </div>
         </div>
 
+        <!-- MANAGE USERS (real data) -->
         <div class="dash-section" id="manage-users">
             <div class="sec-head">
                 <h3>Manage Users</h3>
@@ -245,6 +257,7 @@
             {% endif %}
         </div>
 
+        <!-- NOTIFICATIONS LOG (real data) -->
         <div class="dash-section" id="notifications-log">
             <div class="sec-head">
                 <h3>Notifications Log</h3>
@@ -261,6 +274,7 @@
             {% endif %}
         </div>
 
+        <!-- SYSTEM PERFORMANCE (real data) -->
         <div class="section-block">
             <div class="section-title">System Performance</div>
             <div class="perf-row">
@@ -273,23 +287,231 @@
             </div>
         </div>
 
+        <!-- SYSTEM SETTINGS (now fully persisted in PostgreSQL via SystemSettings /
+         POST /admin/system-settings/save — replaces the old non-functional
+         mock, which called a saveSettingsDemo() function that didn't even
+         exist anywhere in the codebase.) -->
+        <style>
+            /* Scoped to System Settings only — doesn't touch dashboard.css */
+            .settings-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 18px;
+                margin-top: 4px;
+            }
+
+            @media (max-width: 900px) {
+                .settings-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .settings-card-title {
+                font-size: 14px;
+                font-weight: 700;
+                color: var(--d-ink);
+                margin-bottom: 14px;
+            }
+
+            .setting-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 10px 0;
+                border-bottom: 1px solid var(--d-line);
+            }
+
+            .setting-row:last-child {
+                border-bottom: none;
+            }
+
+            .setting-row .setting-label {
+                font-size: 13.5px;
+                color: var(--d-ink);
+            }
+
+            .setting-row .setting-hint {
+                display: block;
+                font-size: 11.5px;
+                color: var(--d-text-dim);
+                margin-top: 2px;
+            }
+
+            .setting-row .proof-input,
+            .setting-row .status-select {
+                margin-top: 0;
+                width: 160px;
+                flex-shrink: 0;
+            }
+
+            .checkbox-group {
+                display: flex;
+                gap: 16px;
+                flex-wrap: wrap;
+            }
+
+            .checkbox-group label {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 13px;
+                color: var(--d-ink);
+                font-weight: 400;
+            }
+
+            /* Pure-CSS toggle switch, no JS framework needed */
+            .toggle-switch {
+                position: relative;
+                display: inline-block;
+                width: 42px;
+                height: 24px;
+                flex-shrink: 0;
+            }
+
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            .toggle-slider {
+                position: absolute;
+                cursor: pointer;
+                inset: 0;
+                background: var(--d-line);
+                border-radius: 24px;
+                transition: 0.15s;
+            }
+
+            .toggle-slider::before {
+                content: "";
+                position: absolute;
+                height: 18px;
+                width: 18px;
+                left: 3px;
+                bottom: 3px;
+                background: white;
+                border-radius: 50%;
+                transition: 0.15s;
+            }
+
+            .toggle-switch input:checked+.toggle-slider {
+                background: var(--d-teal);
+            }
+
+            .toggle-switch input:checked+.toggle-slider::before {
+                transform: translateX(18px);
+            }
+
+            .settings-save-row {
+                margin-top: 20px;
+                display: flex;
+                align-items: center;
+                gap: 14px;
+            }
+        </style>
         <div class="section-block" id="system-settings">
             <div class="section-title">System Settings</div>
-            <div class="current-ship-card">
-                <label class="form-label">Tracking ID Format</label>
-                <input type="text" class="proof-input" value="CLYYYYMMDDXXXX" readonly>
 
-                <label class="form-label">Customer Notification Preference</label>
-                <select class="status-select" id="notifPrefSelect">
-                    <option>Email + SMS</option>
-                    <option>Email only</option>
-                    <option>SMS only</option>
-                </select>
-                <button type="button" class="cta-btn" onclick="saveSettingsDemo()">Save Settings</button>
-                <div id="settingsMsg" class="update-msg"></div>
-            </div>
+            <form method="POST" action="{{ url_for('auth.save_system_settings') }}">
+                <div class="settings-grid">
+
+                    <!-- Shipment Settings -->
+                    <div class="current-ship-card">
+                        <div class="settings-card-title">📦 Shipment Settings</div>
+
+                        <label class="form-label">Tracking ID Format</label>
+                        <input type="text" name="tracking_id_format" class="proof-input"
+                            value="{{ settings.tracking_id_format }}" required>
+
+                        <div class="setting-row">
+                            <span class="setting-label">Auto-generate Tracking ID
+                                <span class="setting-hint">Currently always on — no manual-entry field exists yet</span>
+                            </span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="auto_generate_tracking_id" {{ 'checked' if
+                                    settings.auto_generate_tracking_id else '' }}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Automatic Agent Assignment -->
+                    <div class="current-ship-card">
+                        <div class="settings-card-title">🚚 Automatic Agent Assignment</div>
+
+                        <div class="setting-row">
+                            <span class="setting-label">Automatic Agent Assignment</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="auto_assign_agents" {{ 'checked' if
+                                    settings.auto_assign_agents else '' }}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <label class="form-label">Assignment Method</label>
+                        <input type="text" class="proof-input" value="Least Busy Agent" readonly>
+
+                        <label class="form-label">Maximum Active Shipments per Agent</label>
+                        <input type="number" name="max_active_shipments_per_agent" class="proof-input" min="1"
+                            value="{{ settings.max_active_shipments_per_agent }}" required>
+
+                        <div class="setting-row">
+                            <span class="setting-label">Auto Reassignment on Unavailable
+                                <span class="setting-hint">No effect yet — agents can't go offline mid-shipment
+                                    today</span>
+                            </span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="auto_reassign_on_unavailable" {{ 'checked' if
+                                    settings.auto_reassign_on_unavailable else '' }}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Notification Settings -->
+                    <div class="current-ship-card">
+                        <div class="settings-card-title">🔔 Notification Settings</div>
+
+                        <div class="setting-row">
+                            <span class="setting-label">In-App Notifications</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="in_app_notifications_enabled" {{ 'checked' if
+                                    settings.in_app_notifications_enabled else '' }}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-row">
+                            <span class="setting-label">Shipment Status Change Notifications</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="status_change_notifications_enabled" {{ 'checked' if
+                                    settings.status_change_notifications_enabled else '' }}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <label class="form-label">Customer Notification Preference</label>
+                        <select class="status-select" name="customer_notification_preference">
+                            {% for opt in ['In-App', 'Email', 'SMS'] %}
+                            <option value="{{ opt }}" {{ 'selected' if settings.customer_notification_preference==opt
+                                else '' }}>{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                        <span class="setting-hint">Only In-App is actually delivered right now — Email/SMS aren't
+                            connected to a real provider.</span>
+                    </div>
+
+                </div>
+
+                <div class="settings-save-row">
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Save Settings</button>
+                </div>
+            </form>
         </div>
 
+        <!-- SYSTEM ALERTS (real data) -->
         <div class="dash-section">
             <div class="sec-head">
                 <h3>System Alerts</h3>

@@ -64,10 +64,11 @@
                 <a href="#outgoing-table" class="qa-btn">📤 Outgoing Shipments</a>
                 <a href="#assign-agent-card" class="qa-btn">🚚 Assign Agent</a>
                 <a href="#update-shipment-card" class="qa-btn">🔄 Update Shipment</a>
+                <a href="{{ url_for('shipments.track') }}" class="qa-btn">🔍 Track a Shipment</a>
             </div>
         </div>
 
-        <!-- INCOMING SHIPMENTS (real data) -->
+        <!-- INCOMING SHIPMENTS — IN TRANSIT (real data) -->
         <div class="dash-section" id="incoming-table">
             <div class="sec-head">
                 <h3>Incoming Shipments — In Transit</h3>
@@ -88,10 +89,11 @@
                         <td>{{ s.sender_name or '—' }}</td>
                         <td>{{ s.receiver_name }}</td>
                         <td><span class="pill transit">{{ s.status }}</span></td>
-                        <td><a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}"
+                        <td>
+                            <a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}"
                                 class="link-btn">View</a>
                             <a href="{{ url_for('shipments.update_status', tracking_id=s.tracking_id) }}"
-                                class="link-btn">update</a>
+                                class="link-btn">Update</a>
                         </td>
                     </tr>
                     {% endfor %}

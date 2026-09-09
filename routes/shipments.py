@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings
 import os
 import secrets
 from werkzeug.utils import secure_filename
@@ -67,6 +67,8 @@ def pay(tracking_id):
             flash("Expiry must be in MM/YY format.", "danger")
             return redirect(url_for("shipments.pay", tracking_id=tracking_id))
 
+        # Simulated success — real gateways would call out to an API here.
+        # Only the card's last 4 digits are kept as a reference, nothing else.
         fake_transaction_ref = f"SIM{secrets.token_hex(4).upper()}"
         Payment.mark_paid(payment["id"], payment_method=f"Card ending {card_number[-4:]}", transaction_ref=fake_transaction_ref)
 
@@ -152,13 +154,19 @@ def create_shipment():
         # this is only the pickup leg, not the final delivery. The final
         # delivery agent is assigned separately later, by warehouse staff,
         # once the shipment reaches Ready for Dispatch.
-        agent_id = DeliveryAgent.find_first_available()
+        #
+        # Respects the Automatic Agent Assignment setting: if turned OFF,
+        # agent_id stays None and the shipment simply falls into the same
+        # 'no agent available yet' waiting state already handled below —
+        # no manual-assignment path is introduced.
+        settings = SystemSettings.load()
+        agent_id = DeliveryAgent.find_first_available() if settings.get("auto_assign_agents", True) else None
         if agent_id:
             new_shipment = Shipment.find_by_tracking_id(tracking_id)
             Shipment.create_assignment(new_shipment["id"], agent_id, agent_role="pickup")
             DeliveryAgent.set_busy_by_agent_id(agent_id)
             agent_user_id = DeliveryAgent.get_user_id(agent_id)
-            if agent_user_id:
+            if agent_user_id and settings.get("in_app_notifications_enabled", True):
                 Notification.create(
                     user_id=agent_user_id,
                     shipment_id=new_shipment["id"],
@@ -197,11 +205,37 @@ def track():
     tracking_id = request.values.get("tracking_id", "").strip()
     shipment = None
     history = []
+    live_location_text = None
+    eta_label = None
+    pickup_agent_name = None
+    delivery_agent_name = None
+    origin_warehouse_json = None
+    last_updated_at = None
 
     if tracking_id:
         shipment = Shipment.find_by_tracking_id(tracking_id)
         if shipment:
             history = Shipment.get_status_history(shipment["id"])
+            # ---- Live Tracking Map: initial values (JS then polls
+            # /api/tracking/<id>/location to keep these fresh without
+            # a page reload) ----
+            live_location_text = Shipment.get_latest_location(shipment["id"])
+            eta_label = Shipment.eta_label(shipment["status"])
+            pickup_agent_name = Shipment.get_agent_name_by_role(shipment["id"], "pickup")
+            delivery_agent_name = Shipment.get_agent_name_by_role(shipment["id"], "delivery")
+            # "Last Updated" reuses the same shipment_status_history data
+            # already powering the Tracking History list below — the most
+            # recent row in that (already-fetched) list is the latest
+            # tracking/status/location update, so no extra query needed.
+            last_updated_at = history[-1]["timestamp"] if history else None
+            if shipment.get("origin_warehouse_id"):
+                wh = Warehouse.find_by_id(shipment["origin_warehouse_id"])
+                if wh and wh.get("latitude") is not None and wh.get("longitude") is not None:
+                    origin_warehouse_json = {
+                        "name": wh["name"],
+                        "latitude": float(wh["latitude"]),
+                        "longitude": float(wh["longitude"]),
+                    }
         else:
             flash(f"No shipment found with Tracking ID '{tracking_id}'.", "danger")
 
@@ -213,6 +247,12 @@ def track():
         shipment=shipment,
         history=history,
         progress=progress,
+        live_location_text=live_location_text,
+        eta_label=eta_label,
+        pickup_agent_name=pickup_agent_name,
+        delivery_agent_name=delivery_agent_name,
+        origin_warehouse_json=origin_warehouse_json,
+        last_updated_at=last_updated_at,
     )
 
 
@@ -289,11 +329,18 @@ def update_status(tracking_id):
 
         # Populate the (previously unused) notifications table so the
         # customer's dashboard has real notifications to show.
-        Notification.create(
-            user_id=shipment["sender_id"],
-            shipment_id=shipment["id"],
-            message=f"Your shipment {tracking_id} is now {chosen_status}.",
-        )
+        #
+        # Gated by two settings: the master In-App Notifications switch,
+        # and the more specific Shipment Status Change Notifications
+        # switch. Either OFF means this particular notification is
+        # skipped — the shipment itself still updates normally.
+        settings = SystemSettings.load()
+        if settings.get("in_app_notifications_enabled", True) and settings.get("status_change_notifications_enabled", True):
+            Notification.create(
+                user_id=shipment["sender_id"],
+                shipment_id=shipment["id"],
+                message=f"Your shipment {tracking_id} is now {chosen_status}.",
+            )
         flash(f"Shipment {tracking_id} updated to '{chosen_status}'.", "success")
         return redirect(url_for("shipments.update_status", tracking_id=tracking_id))
 
@@ -351,7 +398,13 @@ def set_availability():
 @shipments_bp.route("/shipments/<tracking_id>/update-location", methods=["POST"])
 def update_location(tracking_id):
     """Real write behind the Agent dashboard's 'Update Location' card.
-    Logs a location update without advancing the shipment's status."""
+    Logs a location update without advancing the shipment's status.
+
+    Live Tracking Map addition: also accepts optional latitude/longitude
+    fields. If present, they're validated and saved to shipment_locations
+    so the customer's tracking map can show a live pin. The original
+    text-only 'location' field still works exactly as before — lat/lng
+    are purely additive and never required."""
     if not login_required_role("delivery_agent"):
         flash("You don't have permission to update location.", "danger")
         return redirect(url_for("auth.login"))
@@ -364,38 +417,15 @@ def update_location(tracking_id):
     shipment = Shipment.find_by_tracking_id(tracking_id)
     if not shipment:
         flash("Shipment not found.", "danger")
-        return redirect(url_for("auth.dashboard") + "#update-location")
-
-    Shipment.update_location_only(shipment["id"], location, session["user_id"])
-    flash(f"Location updated for {tracking_id}.", "success")
-    return redirect(url_for("auth.dashboard") + "#update-location")
-
-
-@shipments_bp.route("/shipments/<tracking_id>/submit-proof", methods=["POST"])
-def submit_proof(tracking_id):
-    """Real write behind the Agent dashboard's 'Delivery Proof' form.
-    Saves an uploaded photo (if provided) to static/uploads and records
-    the delivery_proof row."""
-    if not login_required_role("delivery_agent"):
-        flash("You don't have permission to submit delivery proof.", "danger")
-        return redirect(url_for("auth.login"))
-
-    shipment = Shipment.find_by_tracking_id(tracking_id)
-    if not shipment:
-        flash("Shipment not found.", "danger")
         return redirect(url_for("auth.dashboard") + "#delivery-proof")
 
     agent = DeliveryAgent.get_or_create(session["user_id"])
-
-    file_path = None
+    settings = SystemSettings.load()
     photo = request.files.get("photo")
-    if photo and photo.filename:
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-        filename = secure_filename(f"{tracking_id}_{photo.filename}")
-        full_path = os.path.join(UPLOAD_FOLDER, filename)
-        photo.save(full_path)
-        file_path = url_for("static", filename=f"uploads/{filename}")
+    has_photo = bool(photo and photo.filename)
 
-    DeliveryProof.create(shipment["id"], agent["id"], proof_type="photo", file_path=file_path)
-    flash(f"Delivery proof submitted for {tracking_id}.", "success")
-    return redirect(url_for("auth.dashboard") + "#delivery-proof")
+    if settings.get("delivery_proof_required") and not has_photo:
+        flash("Delivery proof (a photo) is required before this shipment can be completed.", "danger")
+        return redirect(url_for("auth.dashboard") + "#delivery-proof")
+
+    

@@ -1,7 +1,7 @@
 import re
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment
+from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -174,6 +174,7 @@ def _admin_dashboard_context():
     failed_rate = round((breakdown["failed"] / total_shipments) * 100, 1) if total_shipments else 0
     unassigned_count = Shipment.count_unassigned_system_wide()
     total_revenue = Payment.total_revenue()
+    settings = SystemSettings.load()
 
     return dict(
         name=session.get("user_name"), role="admin",
@@ -188,6 +189,7 @@ def _admin_dashboard_context():
         active_shipments=active_shipments, pending=breakdown["pending"],
         failed_count=breakdown["failed"], failed_rate=failed_rate,
         unassigned_count=unassigned_count, total_revenue=total_revenue,
+        settings=settings,
     )
 
 
@@ -525,6 +527,69 @@ def delete_user(user_id):
     User.delete(user_id)
     flash("User permanently deleted.", "success")
     return redirect(url_for("auth.manage_users"))
+
+
+# ============================================================
+# SYSTEM SETTINGS — Admin-only. Settings are displayed as part of
+# the existing Admin Dashboard page (via _admin_dashboard_context's
+# 'settings' key), matching how that page already works. This route
+# is only the POST handler behind the Save Settings button, mirroring
+# the same dedicated-action-route pattern already used elsewhere in
+# this project (update_location, set_availability, submit_proof all
+# work the same way: POST -> validate -> redirect back to the anchor).
+# ============================================================
+
+VALID_NOTIFICATION_PREFERENCES = {"In-App", "Email", "SMS"}
+
+
+@auth_bp.route("/admin/system-settings/save", methods=["POST"])
+@role_required("admin")
+def save_system_settings():
+    errors = []
+
+    tracking_id_format = request.form.get("tracking_id_format", "").strip()
+    if not tracking_id_format:
+        errors.append("Tracking ID Format cannot be empty.")
+
+    try:
+        max_active = int(request.form.get("max_active_shipments_per_agent", "").strip())
+        if max_active <= 0:
+            raise ValueError
+    except ValueError:
+        errors.append("Maximum Active Shipments per Agent must be a positive number.")
+        max_active = None
+
+    notification_preference = request.form.get("customer_notification_preference", "In-App").strip()
+    if notification_preference not in VALID_NOTIFICATION_PREFERENCES:
+        notification_preference = "In-App"
+
+    if errors:
+        for message in errors:
+            flash(message, "danger")
+        return redirect(url_for("auth.dashboard") + "#system-settings")
+
+    SystemSettings.update({
+        "tracking_id_format": tracking_id_format,
+        "auto_generate_tracking_id": request.form.get("auto_generate_tracking_id") == "on",
+        "auto_assign_agents": request.form.get("auto_assign_agents") == "on",
+        # Only one assignment method is actually implemented today
+        # (least-busy-agent, in DeliveryAgent.find_first_available) —
+        # stored as-is rather than offered as a real multi-way choice.
+        "agent_assignment_method": "Least Busy Agent",
+        "max_active_shipments_per_agent": max_active,
+        "auto_reassign_on_unavailable": request.form.get("auto_reassign_on_unavailable") == "on",
+        "in_app_notifications_enabled": request.form.get("in_app_notifications_enabled") == "on",
+        "status_change_notifications_enabled": request.form.get("status_change_notifications_enabled") == "on",
+        "customer_notification_preference": notification_preference,
+        # Delivery Settings and Security Settings were removed from the
+        # System Settings page — their columns still exist (so nothing
+        # about delivery-proof validation or login breaks) and simply
+        # keep whatever value they already had; this route just no
+        # longer offers a UI to change them.
+    })
+
+    flash("System settings saved successfully.", "success")
+    return redirect(url_for("auth.dashboard") + "#system-settings")
 
 
 # ============================================================

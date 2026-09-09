@@ -3,6 +3,63 @@
 {% block container_class %}dash-wide{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% if shipment %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endif %}
+<style>
+    /* ===== Live Tracking Map (additive — doesn't touch any rule above) ===== */
+    .live-info-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin: 20px 0;
+    }
+
+    .live-info-cell {
+        background: #F7F5EE;
+        border: 1px solid #E2DFD3;
+        border-radius: 8px;
+        padding: 12px 14px;
+    }
+
+    .live-info-cell .li-k {
+        font-size: 11px;
+        color: #5C6B7A;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-weight: 600;
+    }
+
+    .live-info-cell .li-v {
+        font-size: 14px;
+        color: #0B1F3A;
+        font-weight: 700;
+        margin-top: 4px;
+    }
+
+    #tracking-map {
+        height: 340px;
+        border-radius: 10px;
+        margin: 16px 0 22px;
+        border: 1px solid #E2DFD3;
+    }
+
+    .route-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        font-size: 12.5px;
+        color: #5C6B7A;
+        margin-bottom: 10px;
+    }
+
+    @media (max-width: 700px) {
+        .live-info-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
 <style>
     .track-page {
         max-width: 800px;
@@ -12,7 +69,7 @@
 
     .track-search-card {
         background: #fff;
-        border: 1px solid #E2DFD3;
+        border: 1px solid var(--d-line, #E2DFD3);
         border-radius: 14px;
         padding: 26px 28px;
         box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
@@ -28,11 +85,6 @@
         color: #5C6B7A;
         font-size: 13.5px;
         margin: 0 0 18px;
-    }
-
-    .track-search-form {
-        display: flex;
-        gap: 10px;
     }
 
     .track-search-form {
@@ -69,7 +121,7 @@
 
     .track-result-card {
         background: #fff;
-        border: 1px solid #E2DFD3;
+        border: 1px solid var(--d-line, #E2DFD3);
         border-radius: 14px;
         padding: 28px;
         box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
@@ -190,6 +242,32 @@
             <div class="progress-marker" style="left: {{ progress }}%;"></div>
         </div>
 
+        <!-- LIVE TRACKING (additive) -->
+        <div class="live-info-grid">
+            <div class="live-info-cell">
+                <div class="li-k">Current Location</div>
+                <div class="li-v" id="live-current-location">{{ live_location_text or 'Not available yet' }}</div>
+            </div>
+            <div class="live-info-cell">
+                <div class="li-k">ETA</div>
+                <div class="li-v" id="live-eta">{{ eta_label }}</div>
+            </div>
+            <div class="live-info-cell">
+                <div class="li-k">Last Updated</div>
+                <div class="li-v" id="live-updated">{{ last_updated_at.strftime('%b %d, %Y %I:%M %p') if last_updated_at
+                    else 'Not available' }}</div>
+            </div>
+            <div class="live-info-cell">
+                <div class="li-k">Assigned Agent</div>
+                <div class="li-v" id="live-agent">{{ delivery_agent_name or pickup_agent_name or 'Not yet assigned' }}
+                </div>
+            </div>
+        </div>
+
+        <div class="route-legend">📍 Pickup &nbsp;→&nbsp; 🏭 Warehouse &nbsp;→&nbsp; 🚚 Delivery Agent &nbsp;→&nbsp; 📍
+            Destination</div>
+        <div id="tracking-map"></div>
+
         <h4 style="color:#0B1F3A; margin-bottom:14px;">Tracking History</h4>
         <ul class="timeline">
             {% for h in history|reverse %}
@@ -211,4 +289,135 @@
     {% endif %}
 
 </div>
+
+{% if shipment %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    (function () {
+        // ---- Data rendered server-side for THIS tracking page only ----
+        // (Addresses come from the page itself, same as the "To: ..." line
+        // already shown above — never fetched via the polling API, so the
+        // JSON endpoint never has to carry customer address data.)
+        const trackingId = {{ shipment.tracking_id | tojson
+    }};
+    const pickupAddressText = {{ shipment.sender_address | tojson }};
+    const destinationAddressText = {{ shipment.receiver_address | tojson }};
+    const shipmentStatus = {{ shipment.status | tojson }};
+    const originWarehouse = {{ origin_warehouse_json | tojson }};
+
+    const map = L.map('tracking-map').setView([20.5937, 78.9629], 5); // default: India-wide view
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18,
+    }).addTo(map);
+
+    let pickupMarker = null, warehouseMarker = null, agentMarker = null, destMarker = null;
+    let routeLine = null;
+    const bounds = [];
+
+    function addToBounds(latlng) { bounds.push(latlng); if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] }); }
+
+    // Free OSM geocoder — fine for a handful of lookups per page view.
+    // For production-scale traffic, storing lat/lng directly on the
+    // shipment at creation time (instead of geocoding on every page
+    // load) would be the next step.
+    async function geocode(address) {
+        if (!address) return null;
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`);
+            const data = await res.json();
+            if (data && data.length) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        } catch (e) { /* geocoding is best-effort; silently skip the pin */ }
+        return null;
+    }
+
+    function pickupIcon(emoji) {
+        return L.divIcon({ html: `<div style="font-size:22px;">${emoji}</div>`, className: '', iconSize: [26, 26], iconAnchor: [13, 22] });
+    }
+
+    async function placeStaticMarkers() {
+        const pickupLatLng = await geocode(pickupAddressText);
+        if (pickupLatLng) {
+            pickupMarker = L.marker(pickupLatLng, { icon: pickupIcon('📍') }).addTo(map).bindPopup('Pickup Location');
+            addToBounds(pickupLatLng);
+        }
+
+        if (originWarehouse) {
+            const whLatLng = [originWarehouse.latitude, originWarehouse.longitude];
+            warehouseMarker = L.marker(whLatLng, { icon: pickupIcon('🏭') }).addTo(map).bindPopup(originWarehouse.name || 'Warehouse');
+            addToBounds(whLatLng);
+        }
+
+        const destLatLng = await geocode(destinationAddressText);
+        if (destLatLng) {
+            destMarker = L.marker(destLatLng, { icon: pickupIcon('📍') }).addTo(map).bindPopup('Delivery Destination');
+            addToBounds(destLatLng);
+            window.__destLatLng = destLatLng;
+        }
+    }
+
+    function timeAgo(isoString) {
+        if (!isoString) return '—';
+        const seconds = Math.floor((Date.now() - new Date(isoString + 'Z')) / 1000);
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
+        if (seconds < 86400) return Math.floor(seconds / 3600) + ' hr ago';
+        return Math.floor(seconds / 86400) + ' day(s) ago';
+    }
+
+    // Mirrors the exact format already used in the Tracking History list
+    // (Python's '%b %d, %Y %I:%M %p'), so the Last Updated card and the
+    // Tracking History timestamps always read the same way.
+    function formatLastUpdated(isoString) {
+        if (!isoString) return 'Not available';
+        const d = new Date(isoString);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12; if (hours === 0) hours = 12;
+        return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()} ${hours}:${minutes} ${ampm}`;
+    }
+
+    async function pollLocation() {
+        try {
+            const res = await fetch(`/api/tracking/${encodeURIComponent(trackingId)}/location`);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            document.getElementById('live-current-location').textContent = data.current_location_text || 'Not available yet';
+            document.getElementById('live-eta').textContent = data.eta_label || 'Calculating...';
+            document.getElementById('live-updated').textContent = formatLastUpdated(data.last_updated_at);
+            document.getElementById('live-agent').textContent = data.delivery_agent_name || data.pickup_agent_name || 'Not yet assigned';
+
+            if (data.latitude != null && data.longitude != null) {
+                const agentLatLng = [data.latitude, data.longitude];
+                if (!agentMarker) {
+                    agentMarker = L.marker(agentLatLng, { icon: pickupIcon('🚚') }).addTo(map).bindPopup('Delivery Agent — live location');
+                } else {
+                    agentMarker.setLatLng(agentLatLng);
+                }
+                addToBounds(agentLatLng);
+
+                // Simple straight-line "route" from the agent's current spot to
+                // the destination — a full routing engine is unnecessary
+                // infrastructure for this feature; this still visually connects
+                // "where it is" to "where it's going".
+                if (window.__destLatLng) {
+                    if (routeLine) map.removeLayer(routeLine);
+                    routeLine = L.polyline([agentLatLng, window.__destLatLng], { color: '#F5A623', dashArray: '6 6', weight: 3 }).addTo(map);
+                }
+            }
+        } catch (e) { /* polling failure is non-fatal; try again next interval */ }
+    }
+
+    placeStaticMarkers().then(() => {
+        pollLocation();
+        if (shipmentStatus !== 'Delivered') {
+            setInterval(pollLocation, 15000); // poll every 15s until delivered
+        }
+    });
+}) ();
+</script>
+{% endif %}
 {% endblock %}
