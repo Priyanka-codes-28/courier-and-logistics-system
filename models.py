@@ -39,8 +39,6 @@ class User:
 
     @staticmethod
     def find_first_by_role(role):
-        """Used by the demo quick-login feature. Returns the first real user
-        with this role, or None if no such user exists yet."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE role = %s ORDER BY id LIMIT 1", (role,))
@@ -48,10 +46,6 @@ class User:
 
     @staticmethod
     def find_any():
-        """Fallback for demo quick-login when no user of the requested role
-        exists at all — picks any real user so session['user_id'] always
-        points at a genuine row (keeps foreign keys like shipments.sender_id
-        valid even in demo mode)."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT * FROM users ORDER BY id LIMIT 1")
@@ -59,8 +53,6 @@ class User:
 
     @staticmethod
     def update_profile(user_id, name, phone, email):
-        """Updates name, phone, and email for the Profile & Account page.
-        Checks the new email isn't already used by a different account."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT id FROM users WHERE email = %s AND id != %s", (email, user_id))
@@ -74,7 +66,6 @@ class User:
 
     @staticmethod
     def list_all(limit=20):
-        """Used by the Admin dashboard's small Manage Users widget."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT id, name, email, role FROM users ORDER BY created_at DESC LIMIT %s", (limit,))
@@ -82,9 +73,6 @@ class User:
 
     @staticmethod
     def list_for_management(search=None, role=None, status=None):
-        """Full-featured version for the dedicated Manage Users page —
-        search by name/email, filter by role, filter by status. All
-        filters are optional and combine with AND when present."""
         db = get_db()
         query = "SELECT id, name, email, phone, role, status, created_at FROM users WHERE 1=1"
         params = []
@@ -107,9 +95,6 @@ class User:
 
     @staticmethod
     def update_details(user_id, name, email, phone, role):
-        """Admin-side edit — distinct from update_profile() (which is the
-        self-service version on the Profile & Account page). Checks the
-        new email isn't already used by someone else first."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT id FROM users WHERE email = %s AND id != %s", (email, user_id))
@@ -129,8 +114,6 @@ class User:
 
     @staticmethod
     def has_shipment_history(user_id):
-        """Safety check before allowing a real delete — true if this user
-        has ever sent a shipment or been assigned to one as an agent."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT 1 FROM shipments WHERE sender_id = %s LIMIT 1", (user_id,))
@@ -146,16 +129,11 @@ class User:
 
     @staticmethod
     def delete(user_id):
-        """Only call this after has_shipment_history() confirms it's safe
-        — this is a real, permanent delete. ON DELETE CASCADE on other
-        tables referencing users would otherwise silently wipe related
-        rows, which is exactly what has_shipment_history() exists to
-        prevent callers from doing by accident."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
-    # ---------- Password reset ----------
+    # Password reset
 
     @staticmethod
     def set_reset_token(email):
@@ -192,12 +170,6 @@ class User:
                    WHERE id = %s""",
                 (password_hash, user_id),
             )
-
-
-# Order of statuses in the shipment lifecycle (Phase 3 — 9-stage flow).
-# Used to calculate progress percentage for the live tracking map, and
-# to determine the "next" status an agent/warehouse staff can move a
-# shipment to.
 STATUS_FLOW = [
     "Created",
     "Awaiting Pickup",
@@ -211,8 +183,6 @@ STATUS_FLOW = [
     "Delivered",
 ]
 
-# Exception statuses — valid as a transition from any non-final status,
-# not part of the normal forward sequence above.
 EXCEPTION_STATUSES = ["Failed Delivery", "RTO"]
 
 
@@ -305,11 +275,6 @@ class Shipment:
 
     @staticmethod
     def get_last_update_timestamp(shipment_id):
-        """Timestamp of the most recent shipment_status_history row for
-        this shipment — drives the Track Shipment page's 'Last Updated'
-        card. Covers both real status changes (update_status) AND
-        agent location-only updates (update_location_only), since both
-        write to this same table. No new table or duplicate data."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -332,8 +297,6 @@ class Shipment:
 
     @staticmethod
     def progress_percent(status):
-        """Returns 0-100 based on how far along STATUS_FLOW this status is. Used to
-        position the marker on the live tracking map."""
         try:
             idx = STATUS_FLOW.index(status)
             return int((idx / (len(STATUS_FLOW) - 1)) * 100)
@@ -342,8 +305,6 @@ class Shipment:
 
     @staticmethod
     def next_status(current_status):
-        """Returns the next status in the flow, or None if already at the end
-        or the status isn't part of the normal flow (e.g. Failed Delivery, RTO)."""
         try:
             idx = STATUS_FLOW.index(current_status)
             if idx + 1 < len(STATUS_FLOW):
@@ -354,15 +315,6 @@ class Shipment:
 
     @staticmethod
     def is_valid_transition(current_status, requested_status):
-        """Phase 3 requirement: 'Do not allow invalid status transitions.'
-        A transition is valid only if:
-          - requested_status is the immediate next stage in STATUS_FLOW, OR
-          - requested_status is one of the exception statuses (Failed
-            Delivery / RTO), which can happen at any point except once
-            a shipment is already Delivered.
-        This is checked here, server-side, regardless of what a POST
-        request claims — even if someone bypasses the UI and sends a
-        raw request, an invalid jump is still rejected."""
         if current_status == "Delivered":
             return False  # final status, no further transitions allowed
 
@@ -373,11 +325,7 @@ class Shipment:
 
     @staticmethod
     def list_assigned_to_agent(agent_id):
-        """An agent could end up as BOTH the pickup and delivery agent on
-        the same shipment (2 separate rows in shipment_assignments) — this
-        dedupes to one row per shipment (their most recent assignment on
-        it), and exposes agent_role so the dashboard can label which job
-        this actually is."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -416,11 +364,7 @@ class Shipment:
 
     @staticmethod
     def list_incoming_at_warehouse(warehouse_id):
-        """Real 'Incoming Shipments' for the Warehouse dashboard — every
-        shipment that has actually reached the warehouse (status =
-        'Arrived at Warehouse'), with the customer's real name joined in.
-        This is what warehouse staff should act on — filtered from the
-        existing shipments table by status, no separate table needed."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -436,11 +380,7 @@ class Shipment:
 
     @staticmethod
     def unassigned_at_warehouse(warehouse_id):
-        """Shipments ready for the final-mile leg, with no DELIVERY agent
-        yet. A pickup agent assignment already exists by this point (from
-        creation) — that's expected and doesn't count here. This now
-        triggers at 'Ready for Dispatch', matching the new workflow where
-        the delivery agent is assigned only after warehouse processing."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -457,11 +397,7 @@ class Shipment:
 
     @staticmethod
     def create_assignment(shipment_id, agent_id, agent_role="pickup"):
-        """Assigns an agent to a shipment for a specific role — 'pickup'
-        (auto-assigned at creation, handles Created → In Transit) or
-        'delivery' (manually assigned by warehouse once Ready for
-        Dispatch, handles the final-mile Out for Delivery → Delivered).
-        A shipment can have up to 2 rows here, one per role."""
+    
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -488,10 +424,7 @@ class Shipment:
 
     @staticmethod
     def sync_assignment_status(shipment_id, new_shipment_status):
-        """Keeps shipment_assignments.status in sync with the shipment's
-        real lifecycle — this was previously never updated after the
-        initial 'assigned' value, which meant count_busy() would count
-        an agent as busy forever, even for shipments delivered long ago."""
+        
         db = get_db()
         with db.cursor() as cur:
             if new_shipment_status == "Picked Up":
@@ -514,9 +447,7 @@ class Shipment:
 
     @staticmethod
     def get_agent_id_by_role(shipment_id, agent_role):
-        """Returns the delivery_agents.id (not the name) holding a given
-        role on this shipment — used internally to know WHO to free up
-        once their leg of the job is done."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -530,10 +461,7 @@ class Shipment:
 
     @staticmethod
     def list_waiting_for_delivery_agent():
-        """System-wide (not scoped to one warehouse) — every shipment at
-        Ready for Dispatch with no delivery agent yet, oldest first. This
-        IS the waiting queue: no separate table needed, since a shipment's
-        presence here at all means it's waiting."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -549,19 +477,7 @@ class Shipment:
 
     @staticmethod
     def try_auto_assign_delivery_agent(shipment_id):
-        """Core automatic assignment logic — the backend replacement for
-        the old manual 'Assign Delivery Agent' button. Called the moment
-        a shipment reaches Ready for Dispatch, and again whenever an
-        agent frees up (in case shipments were left waiting).
-
-        Returns True if it successfully assigned someone, False if no
-        agent was available (shipment stays at Ready for Dispatch,
-        effectively 'waiting' — no separate status needed for that).
-
-        Respects the Automatic Agent Assignment setting: if turned OFF,
-        this simply returns False every time, so shipments fall into
-        the exact same 'waiting' state as 'no agent available' — no new
-        status or manual-assignment path is introduced."""
+        
         settings = SystemSettings.load()
         if not settings.get("auto_assign_agents", True):
             return False
@@ -581,8 +497,23 @@ class Shipment:
                 message="New final delivery automatically assigned to you.",
             )
 
-        # Per the required workflow, successful auto-assignment also
-        # advances the shipment's own status to Agent Assigned.
+        if settings.get("in_app_notifications_enabled", True):
+            shipment_row = Shipment.find_by_id(shipment_id)
+            warehouse_id = None
+            if shipment_row:
+                warehouse_id = shipment_row.get("origin_warehouse_id") or shipment_row.get("destination_warehouse_id")
+            if warehouse_id:
+                agent_user = User.find_by_id(agent_user_id) if agent_user_id else None
+                agent_name = agent_user["name"] if agent_user else f"Agent #{agent_id}"
+                tracking_id = shipment_row["tracking_id"] if shipment_row else shipment_id
+                Notification.create(
+                    shipment_id=shipment_id,
+                    warehouse_id=warehouse_id,
+                    title="Delivery Agent Assigned",
+                    notif_type="agent_assigned",
+                    message=f"Agent {agent_name} has been automatically assigned to shipment {tracking_id}.",
+                )
+
         Shipment.update_status(
             shipment_id, "Agent Assigned",
             location="Final delivery agent auto-assigned", updated_by=None,
@@ -591,17 +522,14 @@ class Shipment:
 
     @staticmethod
     def try_assign_waiting_shipments():
-        """Called whenever an agent newly becomes available (after
-        Delivered, or after manually toggling back to Available) — fairly
-        works through the waiting queue oldest-first, assigning freed
-        agents to waiting shipments until either runs out."""
+        
         waiting = Shipment.list_waiting_for_delivery_agent()
         assigned_count = 0
         for shipment in waiting:
             if Shipment.try_auto_assign_delivery_agent(shipment["id"]):
                 assigned_count += 1
             else:
-                break  # no more available agents, stop trying
+                break  
         return assigned_count
 
     @staticmethod
@@ -620,8 +548,6 @@ class Shipment:
 
     @staticmethod
     def status_breakdown():
-        """Real counts grouped into the 5 buckets shown on the Admin
-        dashboard's Shipment Status Overview bars."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT COUNT(*) AS c FROM shipments WHERE status = 'Delivered'")
@@ -642,8 +568,7 @@ class Shipment:
 
     @staticmethod
     def deliveries_this_week():
-        """Real count of shipments marked Delivered on each of the last 7
-        days — used by the Admin dashboard's weekly bar chart."""
+
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -661,8 +586,7 @@ class Shipment:
 
     @staticmethod
     def list_all_with_sender(limit=10):
-        """Same as list_all() but joins the sender's name — used by the
-        Admin dashboard's Recent Shipments table (shows Customer + Route)."""
+    
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -675,8 +599,7 @@ class Shipment:
 
     @staticmethod
     def count_unassigned_system_wide():
-        """Real count for the Admin dashboard's System Alerts — shipments
-        Ready for Dispatch anywhere with no DELIVERY agent yet."""
+    
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -691,9 +614,7 @@ class Shipment:
 
     @staticmethod
     def get_current_for_sender(sender_id):
-        """The customer's 'Current Shipment' — their most recent shipment
-        that isn't yet Delivered. Falls back to their most recent shipment
-        overall if everything they have is already delivered."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -712,8 +633,7 @@ class Shipment:
 
     @staticmethod
     def get_latest_location(shipment_id):
-        """Most recent location string logged in the status history —
-        used as the 'Current Location' field."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -743,9 +663,7 @@ class Shipment:
 
     @staticmethod
     def get_current_for_agent(agent_id):
-        """The agent's 'current job' — most recently assigned shipment that
-        isn't yet Delivered/Failed/RTO. Falls back to their most recent
-        assignment overall if everything is already finished."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -786,8 +704,7 @@ class Shipment:
 
     @staticmethod
     def update_location_only(shipment_id, location, updated_by):
-        """Logs a location update without changing the shipment's status —
-        for the agent dashboard's standalone 'Update Location' feature."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT status FROM shipments WHERE id = %s", (shipment_id,))
@@ -798,10 +715,7 @@ class Shipment:
                 (shipment_id, current_status, location, updated_by),
             )
 
-    # ---------- Live Tracking Map ----------
-
-    # Rough, non-GPS-routed ETA labels per status — just a friendly
-    # estimate for the tracking page, not a real routing calculation.
+    # Live Tracking Map
     ETA_BY_STATUS = {
         "Created": "Pending pickup assignment",
         "Awaiting Pickup": "Pickup scheduled shortly",
@@ -823,7 +737,6 @@ class Shipment:
 
 
 class DeliveryAgent:
-    """Handles delivery_agents table — one row per agent, linked to a user account."""
 
     @staticmethod
     def find_by_user_id(user_id):
@@ -844,11 +757,7 @@ class DeliveryAgent:
 
     @staticmethod
     def get_or_create(user_id, warehouse_id=None):
-        """Agents don't self-register into delivery_agents on account creation,
-        so this makes sure a row exists the first time an agent visits their dashboard.
-        Defaults to the system's warehouse if none is given — previously this
-        silently left warehouse_id as NULL, which broke warehouse-scoped
-        availability counts (NULL never matches a real warehouse_id in SQL)."""
+        
         agent = DeliveryAgent.find_by_user_id(user_id)
         if agent:
             return agent
@@ -866,9 +775,7 @@ class DeliveryAgent:
 
     @staticmethod
     def set_availability(user_id, is_available):
-        """Real write behind the Agent dashboard's Available/Not Available
-        toggle. Directly affects find_first_available() — an agent who
-        sets themselves unavailable stops receiving new auto-assignments."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -878,28 +785,21 @@ class DeliveryAgent:
 
     @staticmethod
     def set_busy_by_agent_id(agent_id):
-        """System-internal — marks an agent unavailable the moment they're
-        auto-assigned a pickup or delivery job, so find_first_available()
-        never double-books them onto a second active task."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute("UPDATE delivery_agents SET is_available = FALSE WHERE id = %s", (agent_id,))
 
     @staticmethod
     def set_free_by_agent_id(agent_id):
-        """System-internal — marks an agent available again once their
-        active task actually finishes (pickup handed off at In Transit,
-        or delivery completed at Delivered/Failed/RTO)."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute("UPDATE delivery_agents SET is_available = TRUE WHERE id = %s", (agent_id,))
 
     @staticmethod
     def is_assigned_to_shipment(agent_id, shipment_id):
-        """True if this agent holds ANY role (pickup or delivery) on this
-        shipment. Used to enforce that an agent can only update location
-        for shipments actually assigned to them — required by the Live
-        Tracking Map feature's security rule."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -910,10 +810,7 @@ class DeliveryAgent:
 
     @staticmethod
     def has_active_assignment(agent_id):
-        """True if this agent currently has an unfinished pickup or
-        delivery job. Used to block them from manually marking themselves
-        Available mid-task, which would let find_first_available() double-
-        book them onto a second active shipment."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -924,13 +821,7 @@ class DeliveryAgent:
 
     @staticmethod
     def list_availability_by_user_id():
-        """Real-time Available/Busy/Offline label per agent, keyed by
-        user_id, for the Manage Users page. Derived entirely from the
-        existing is_available flag + whether they currently hold an
-        active assignment — no new column needed:
-          - Available: is_available=TRUE
-          - Busy:      is_available=FALSE AND has an active job right now
-          - Offline:   is_available=FALSE AND no active job (they opted out)"""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -974,19 +865,7 @@ class DeliveryAgent:
 
     @staticmethod
     def find_first_available():
-        """Picks an available agent for automatic assignment at shipment
-        creation. Among available agents, prefers whoever currently has
-        the fewest active (not yet delivered/failed) assignments, so load
-        spreads out reasonably instead of always picking the same agent.
-
-        Self-healing fallback: a delivery_agents row is normally only
-        created the first time an agent logs in and visits their own
-        dashboard (get_or_create()). If an agent account was created
-        (e.g. via registration or a seed script) but has never logged in
-        yet, they'd have no row here and would be silently invisible to
-        auto-assignment — even though they're a real, valid agent. This
-        checks for that case and creates the missing row on the spot,
-        so 'never logged in yet' never means 'not assignable'."""
+        
         db = get_db()
         settings = SystemSettings.load()
         max_active = settings.get("max_active_shipments_per_agent") or 5
@@ -1007,9 +886,6 @@ class DeliveryAgent:
             if row:
                 return row["id"]
 
-            # Fallback: any delivery_agent-role user with no delivery_agents
-            # row at all yet — create one now so they become assignable
-            # immediately, without needing to log in first.
             cur.execute(
                 """SELECT u.id FROM users u
                    LEFT JOIN delivery_agents da ON da.user_id = u.id
@@ -1025,9 +901,7 @@ class DeliveryAgent:
 
     @staticmethod
     def list_all_with_names():
-        """Joins delivery_agents with users to get each agent's real name —
-        used to populate the Assign Delivery Agent dropdown with real agents
-        instead of hardcoded fake names."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1040,9 +914,7 @@ class DeliveryAgent:
 
     @staticmethod
     def list_available_with_names():
-        """Same as list_all_with_names() but restricted to is_available=TRUE
-        — used specifically for the final delivery agent assignment
-        dropdown, so warehouse staff can't select a busy/unavailable agent."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1056,9 +928,7 @@ class DeliveryAgent:
 
     @staticmethod
     def is_available(agent_id):
-        """Server-side check — used to reject assignment attempts against
-        an agent who isn't actually available, even if someone bypasses
-        the UI and submits a request directly."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT is_available FROM delivery_agents WHERE id = %s", (agent_id,))
@@ -1067,9 +937,7 @@ class DeliveryAgent:
 
     @staticmethod
     def count_busy():
-        """Agents currently marked available=True but who have at least
-        one assignment that isn't yet delivered/failed — i.e. actively
-        out on a delivery right now."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1100,9 +968,7 @@ class Warehouse:
 
     @staticmethod
     def get_first():
-        """Temporary helper: since users table has no warehouse_id link yet for
-        warehouse_staff, this returns the first warehouse as a stand-in until
-        that relationship is added."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT * FROM warehouses ORDER BY id ASC LIMIT 1")
@@ -1117,8 +983,7 @@ class Warehouse:
 
     @staticmethod
     def list_all_with_counts():
-        """Used by the Admin dashboard's Warehouse Overview table — real
-        shipment count per warehouse instead of hardcoded numbers."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1134,18 +999,16 @@ class Warehouse:
 
 
 class Notification:
-    """Handles the notifications table — was defined in the schema but
-    never used until now. Populated automatically whenever a shipment's
-    status changes (see Shipment.update_status side effect in the route)."""
-
+    
     @staticmethod
-    def create(user_id, shipment_id, message, channel="app"):
+    def create(user_id=None, shipment_id=None, message=None, channel="app",
+               title=None, notif_type=None, warehouse_id=None):
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
-                """INSERT INTO notifications (user_id, shipment_id, message, channel)
-                   VALUES (%s, %s, %s, %s)""",
-                (user_id, shipment_id, message, channel),
+                """INSERT INTO notifications (user_id, shipment_id, message, channel, title, type, warehouse_id)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (user_id, shipment_id, message, channel, title, notif_type, warehouse_id),
             )
 
     @staticmethod
@@ -1163,8 +1026,7 @@ class Notification:
 
     @staticmethod
     def list_all_recent(limit=5):
-        """System-wide notification feed for the Admin dashboard's
-        Notifications Log — shows who each notification was sent to."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1176,11 +1038,60 @@ class Notification:
             )
             return cur.fetchall()
 
+    # Warehouse Notifications
 
+    @staticmethod
+    def list_for_warehouse(warehouse_id, limit=50):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT n.*, s.tracking_id FROM notifications n
+                   LEFT JOIN shipments s ON s.id = n.shipment_id
+                   WHERE n.warehouse_id = %s
+                   ORDER BY n.sent_at DESC LIMIT %s""",
+                (warehouse_id, limit),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def count_unread_for_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM notifications WHERE warehouse_id = %s AND is_read = FALSE",
+                (warehouse_id,),
+            )
+            return cur.fetchone()["c"]
+
+    @staticmethod
+    def count_for_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM notifications WHERE warehouse_id = %s",
+                (warehouse_id,),
+            )
+            return cur.fetchone()["c"]
+
+    @staticmethod
+    def mark_read_for_warehouse(notification_id, warehouse_id):
+        
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE notifications SET is_read = TRUE WHERE id = %s AND warehouse_id = %s",
+                (notification_id, warehouse_id),
+            )
+
+    @staticmethod
+    def mark_all_read_for_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE notifications SET is_read = TRUE WHERE warehouse_id = %s AND is_read = FALSE",
+                (warehouse_id,),
+            )
 class DeliveryProof:
-    """Handles the delivery_proof table — was defined in the schema but
-    never used until now."""
-
     @staticmethod
     def find_by_shipment(shipment_id):
         db = get_db()
@@ -1193,8 +1104,7 @@ class DeliveryProof:
 
     @staticmethod
     def find_latest_for_sender(sender_id):
-        """Most recent delivery proof across all of a customer's shipments —
-        used by the Customer Dashboard's Delivery Proof section."""
+    
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1218,10 +1128,7 @@ class DeliveryProof:
 
 
 class WarehouseActivity:
-    """Small helper queries for the Warehouse dashboard's 'Warehouse
-    Activity' cards and 'Recent Warehouse Activity' feed — all derived
-    from shipment_status_history, so no new table was needed."""
-
+    
     @staticmethod
     def count_received_today(warehouse_id):
         db = get_db()
@@ -1266,21 +1173,12 @@ class WarehouseActivity:
             )
             return cur.fetchall()
 
-
-class Payment:
-    """Handles the payments table. This is a simulated payment flow —
-    there's no real payment gateway wired up, so 'paying' just records
-    a fake card's last 4 digits and marks the row as paid immediately.
-    No real money moves and no real card data is stored."""
-
+class Payment:  
     FLAT_RATE = 50.00
     PER_KG_RATE = 20.00
 
     @staticmethod
     def calculate_fee(weight):
-        """Flat rate + per-kg charge. Shipments with no weight entered
-        (it's an optional field) are billed as if they weighed 0.5kg,
-        so billing never breaks on missing data."""
         effective_weight = float(weight) if weight else 0.5
         return round(Payment.FLAT_RATE + (effective_weight * Payment.PER_KG_RATE), 2)
 
@@ -1339,13 +1237,7 @@ class Payment:
 
 
 class ShipmentLocation:
-    """Handles the shipment_locations table — GPS coordinates for the
-    Live Tracking Map feature. One row is inserted per location update
-    (append-only), which serves as both the 'latest location' (most
-    recent row for a shipment) and the full location history, the same
-    pattern already used by shipment_status_history elsewhere in this
-    file. No separate 'latest' table is needed."""
-
+    
     @staticmethod
     def record(shipment_id, agent_id, latitude, longitude):
         db = get_db()
@@ -1358,9 +1250,7 @@ class ShipmentLocation:
 
     @staticmethod
     def get_latest(shipment_id):
-        """Most recent GPS coordinate logged for this shipment, or None
-        if the assigned agent has never submitted coordinates (e.g. they
-        only ever used the plain text 'location' field)."""
+        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1387,16 +1277,7 @@ class ShipmentLocation:
 
 
 class SystemSettings:
-    """Single-row table (system_settings, id=1) holding every
-    admin-configurable value on the System Settings page. Loaded fresh
-    on each use rather than cached in memory, so a saved change takes
-    effect immediately for the very next request that reads it —
-    consistent with how every other read in this project already
-    works (no caching layer exists anywhere else either)."""
-
-    # Mirrors the migration's column defaults exactly, so if the
-    # settings row is ever missing (e.g. migration not yet run), the
-    # app still behaves exactly as it did before this feature existed.
+    
     DEFAULTS = {
         "tracking_id_format": "CLYYYYMMDDXXXX",
         "auto_generate_tracking_id": True,
@@ -1419,9 +1300,6 @@ class SystemSettings:
 
     @staticmethod
     def update(values):
-        """values: dict of column_name -> new value. Silently ignores
-        any key that isn't a real column (defensive, not user-facing —
-        the save route only ever sends known keys)."""
         allowed_columns = set(SystemSettings.DEFAULTS.keys())
         columns = [c for c in values if c in allowed_columns]
         if not columns:

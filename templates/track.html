@@ -294,10 +294,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     (function () {
-        // ---- Data rendered server-side for THIS tracking page only ----
-        // (Addresses come from the page itself, same as the "To: ..." line
-        // already shown above — never fetched via the polling API, so the
-        // JSON endpoint never has to carry customer address data.)
         const trackingId = {{ shipment.tracking_id | tojson
     }};
     const pickupAddressText = {{ shipment.sender_address | tojson }};
@@ -317,10 +313,6 @@
 
     function addToBounds(latlng) { bounds.push(latlng); if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] }); }
 
-    // Free OSM geocoder — fine for a handful of lookups per page view.
-    // For production-scale traffic, storing lat/lng directly on the
-    // shipment at creation time (instead of geocoding on every page
-    // load) would be the next step.
     async function geocode(address) {
         if (!address) return null;
         try {
@@ -365,9 +357,6 @@
         return Math.floor(seconds / 86400) + ' day(s) ago';
     }
 
-    // Mirrors the exact format already used in the Tracking History list
-    // (Python's '%b %d, %Y %I:%M %p'), so the Last Updated card and the
-    // Tracking History timestamps always read the same way.
     function formatLastUpdated(isoString) {
         if (!isoString) return 'Not available';
         const d = new Date(isoString);
@@ -399,10 +388,6 @@
                 }
                 addToBounds(agentLatLng);
 
-                // Simple straight-line "route" from the agent's current spot to
-                // the destination — a full routing engine is unnecessary
-                // infrastructure for this feature; this still visually connects
-                // "where it is" to "where it's going".
                 if (window.__destLatLng) {
                     if (routeLine) map.removeLayer(routeLine);
                     routeLine = L.polyline([agentLatLng, window.__destLatLng], { color: '#F5A623', dashArray: '6 6', weight: 3 }).addTo(map);

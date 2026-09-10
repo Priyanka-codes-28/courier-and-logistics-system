@@ -5,13 +5,6 @@ from models import User, Shipment, DeliveryAgent, Warehouse, Notification, Deliv
 
 auth_bp = Blueprint("auth", __name__)
 
-# ============================================================
-# Validation patterns for the Profile & Account module.
-# Kept simple and permissive on purpose — these only exist to
-# catch obviously malformed input, not to be a full RFC-grade
-# validator, matching the lightweight validation style already
-# used elsewhere in this file (register/login).
-# ============================================================
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_PATTERN = re.compile(r"^[0-9+\-\s()]{7,20}$")
 NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z\s.'-]{1,79}$")
@@ -23,16 +16,8 @@ DASHBOARD_TEMPLATES = {
     "admin": "dashboard_admin.html",
 }
 
-
-# ============================================================
 # ROLE-BASED ROUTE PROTECTION
-#
-# Use on any route that should only be reachable by specific
-# roles. If the user isn't logged in, sends them to login. If
-# they're logged in but with the wrong role, they are NOT shown
-# the page — they're redirected to their OWN correct dashboard
-# with an "Access Denied" message, per requirement #5.
-# ============================================================
+
 def role_required(*allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
@@ -48,14 +33,6 @@ def role_required(*allowed_roles):
             return view_func(*args, **kwargs)
         return wrapped
     return decorator
-
-
-# ============================================================
-# Per-role dashboard data. Extracted into standalone functions
-# so both the smart /dashboard route AND the specific protected
-# routes below (/customer/dashboard, /admin/dashboard, etc.)
-# render identical data without duplicating any query logic.
-# ============================================================
 
 def _customer_dashboard_context():
     shipments = Shipment.list_by_sender(session["user_id"])
@@ -110,8 +87,6 @@ def _agent_dashboard_context():
     delivery_history = Shipment.list_delivery_history_for_agent(agent["id"], limit=5)
     notifications = Notification.list_for_user(session["user_id"], limit=4)
 
-    # Today's route: real addresses of this agent's currently active
-    # (non-final) assigned shipments, in assignment order.
     route_stops = [s["receiver_address"] for s in assigned if s["status"] not in ("Delivered", "Failed Delivery", "RTO")]
 
     return dict(
@@ -125,8 +100,6 @@ def _agent_dashboard_context():
 
 
 def _warehouse_dashboard_context():
-    # NOTE: users table doesn't yet link a warehouse_staff account to a specific
-    # warehouse, so this uses the first warehouse in the table as a stand-in.
     warehouse = Warehouse.get_first()
     if warehouse:
         incoming = Shipment.list_at_warehouse(warehouse["id"], status="In Transit")
@@ -136,9 +109,12 @@ def _warehouse_dashboard_context():
         received_today = WarehouseActivity.count_received_today(warehouse["id"])
         dispatched_today = WarehouseActivity.count_dispatched_today(warehouse["id"])
         recent_activity = WarehouseActivity.list_recent(warehouse["id"], limit=4)
+        notification_count = Notification.count_for_warehouse(warehouse["id"])
+        unread_notification_count = Notification.count_unread_for_warehouse(warehouse["id"])
     else:
         incoming, at_warehouse_now, outgoing_unassigned, agents_available = [], [], [], 0
         received_today, dispatched_today, recent_activity = 0, 0, []
+        notification_count, unread_notification_count = 0,0
     agents_busy = DeliveryAgent.count_busy()
     agents_offline = DeliveryAgent.count_offline()
     return dict(
@@ -149,6 +125,8 @@ def _warehouse_dashboard_context():
         waiting_shipments=outgoing_unassigned, agents_busy=agents_busy, agents_offline=agents_offline,
         received_today=received_today, dispatched_today=dispatched_today,
         recent_activity=recent_activity,
+        notification_count=notification_count,
+        unread_notification_count=unread_notification_count,
     )
 
 
@@ -269,14 +247,10 @@ def forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         user = User.find_by_email(email)
-
-        # Always show the same message whether or not the email exists —
-        # prevents leaking which emails are registered.
+        
         if user:
             token = User.set_reset_token(email)
             reset_link = url_for("auth.reset_password", token=token, _external=True)
-            # No email service is configured yet, so the link is shown directly here
-            # for testing. Once you add Flask-Mail, replace this with an actual email send.
             flash(f"Reset link (for testing, since email isn't configured yet): {reset_link}", "success")
         else:
             flash("If an account exists with that email, a reset link has been generated.", "success")
@@ -324,7 +298,7 @@ def profile():
     if request.method == "POST":
         form_type = request.form.get("form_type")
 
-        # ---------- Account & Security: change password ----------
+        # Account & Security: change password
         if form_type == "password":
             current_password = request.form.get("current_password", "")
             new_password = request.form.get("new_password", "")
@@ -346,15 +320,11 @@ def profile():
                 flash("New password must be at least 6 characters long.", "danger")
                 return redirect(url_for("auth.profile"))
 
-            # Reuses the same hashing + update path as the forgot-password
-            # flow (User.reset_password) — no duplicate password-writing
-            # logic. It also clears any stale reset token, which is safe
-            # and harmless here.
             User.reset_password(session["user_id"], new_password)
             flash("Password changed successfully.", "success")
             return redirect(url_for("auth.profile"))
 
-        # ---------- Profile Information: name / email / phone ----------
+        # Profile Information: name / email / phone 
         name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
         email = request.form.get("email", "").strip().lower()
@@ -400,19 +370,6 @@ def dashboard():
     context_builder = _CONTEXT_BUILDERS.get(role, _customer_dashboard_context)
     return render_template(template_name, **context_builder())
 
-
-# ============================================================
-# SPECIFIC ROLE-PROTECTED ROUTES (requirement #5)
-#
-# Direct URLs per role, each guarded by role_required(). If a
-# customer tries to visit /admin/dashboard directly, they are
-# redirected to their own dashboard with an Access Denied
-# message instead of ever seeing admin content.
-#
-# These reuse the exact same context builders and templates as
-# the smart /dashboard route above — no duplicated logic.
-# ============================================================
-
 @auth_bp.route("/customer/dashboard")
 @role_required("customer")
 def customer_dashboard():
@@ -430,16 +387,46 @@ def delivery_agent_dashboard():
 def warehouse_dashboard():
     return render_template(DASHBOARD_TEMPLATES["warehouse_staff"], **_warehouse_dashboard_context())
 
+@auth_bp.route("/warehouse/notifications")
+@role_required("warehouse_staff")
+def warehouse_notifications():
+    warehouse = Warehouse.get_first()
+    notifications = Notification.list_for_warehouse(warehouse["id"], limit=50) if warehouse else []
+    unread_count = Notification.count_unread_for_warehouse(warehouse["id"]) if warehouse else 0
+    return render_template(
+        "warehouse_notifications.html",
+        role="warehouse_staff",
+        name=session.get("user_name"),
+        notifications=notifications,
+        unread_count=unread_count,
+    )
+
+
+@auth_bp.route("/warehouse/notifications/<int:notification_id>/read", methods=["POST"])
+@role_required("warehouse_staff")
+def mark_warehouse_notification_read(notification_id):
+    warehouse = Warehouse.get_first()
+    if warehouse:
+        Notification.mark_read_for_warehouse(notification_id, warehouse["id"])
+    return redirect(url_for("auth.warehouse_notifications"))
+
+
+@auth_bp.route("/warehouse/notifications/mark-all-read", methods=["POST"])
+@role_required("warehouse_staff")
+def mark_all_warehouse_notifications_read():
+    warehouse = Warehouse.get_first()
+    if warehouse:
+        Notification.mark_all_read_for_warehouse(warehouse["id"])
+        flash("All notifications marked as read.", "success")
+    return redirect(url_for("auth.warehouse_notifications"))
+
 
 @auth_bp.route("/admin/dashboard")
 @role_required("admin")
 def admin_dashboard():
     return render_template(DASHBOARD_TEMPLATES["admin"], **_admin_dashboard_context())
 
-
-# ============================================================
 # USER MANAGEMENT — full dedicated page, admin-only.
-# ============================================================
 
 @auth_bp.route("/admin/users")
 @role_required("admin")
@@ -502,8 +489,6 @@ def set_user_status(user_id):
         flash("Invalid status.", "danger")
         return redirect(url_for("auth.manage_users"))
 
-    # Guard: admin cannot deactivate their own account, so they can never
-    # accidentally lock themselves out.
     if user_id == session["user_id"] and new_status == "inactive":
         flash("You can't deactivate your own account.", "danger")
         return redirect(url_for("auth.manage_users"))
@@ -527,17 +512,6 @@ def delete_user(user_id):
     User.delete(user_id)
     flash("User permanently deleted.", "success")
     return redirect(url_for("auth.manage_users"))
-
-
-# ============================================================
-# SYSTEM SETTINGS — Admin-only. Settings are displayed as part of
-# the existing Admin Dashboard page (via _admin_dashboard_context's
-# 'settings' key), matching how that page already works. This route
-# is only the POST handler behind the Save Settings button, mirroring
-# the same dedicated-action-route pattern already used elsewhere in
-# this project (update_location, set_availability, submit_proof all
-# work the same way: POST -> validate -> redirect back to the anchor).
-# ============================================================
 
 VALID_NOTIFICATION_PREFERENCES = {"In-App", "Email", "SMS"}
 
@@ -581,28 +555,10 @@ def save_system_settings():
         "in_app_notifications_enabled": request.form.get("in_app_notifications_enabled") == "on",
         "status_change_notifications_enabled": request.form.get("status_change_notifications_enabled") == "on",
         "customer_notification_preference": notification_preference,
-        # Delivery Settings and Security Settings were removed from the
-        # System Settings page — their columns still exist (so nothing
-        # about delivery-proof validation or login breaks) and simply
-        # keep whatever value they already had; this route just no
-        # longer offers a UI to change them.
     })
 
     flash("System settings saved successfully.", "success")
     return redirect(url_for("auth.dashboard") + "#system-settings")
-
-
-# ============================================================
-# DEMO ROLE SWITCHER — for testing/demonstration purposes only.
-#
-# Changes ONLY the current session's role, in memory. Nothing is
-# written to the database — the user's real role in the `users`
-# table is completely untouched. This lets you preview all 4
-# dashboards instantly without ever running an SQL UPDATE.
-#
-# Log out (or close the browser) and log back in normally, and
-# your account reverts to its real, database-stored role.
-# ============================================================
 
 DEMO_ROLES = ["customer", "delivery_agent", "warehouse_staff", "admin"]
 
@@ -639,6 +595,7 @@ def demo_login_as(role_name):
 @auth_bp.route("/demo/switch-role/<role_name>")
 def demo_switch_role(role_name):
     if "user_id" not in session:
+        
         flash("Please log in first.", "danger")
         return redirect(url_for("auth.login"))
 

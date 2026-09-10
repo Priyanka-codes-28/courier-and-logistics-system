@@ -18,10 +18,60 @@
             <a href="#warehouse-inventory">Warehouse Inventory</a>
             <a href="#update-shipment-card">Update Shipment Status</a>
             <a href="#warehouse-details">Warehouse Details</a>
+            <a href="{{ url_for('auth.warehouse_notifications') }}">Notifications
+                {% if unread_notification_count and unread_notification_count > 0 %}
+                <span class="wh-nav-badge">{{ unread_notification_count }}</span>
+                {% endif %}
+            </a>
             <a href="{{ url_for('auth.profile') }}">Profile</a>
             <a href="{{ url_for('auth.logout') }}">Logout</a>
         </nav>
     </aside>
+
+    <style>
+        /* Scoped to this page — small numbered badge for the Notifications nav link */
+        .wh-nav-badge {
+            display: inline-block;
+            min-width: 18px;
+            padding: 1px 5px;
+            background: var(--d-amber);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 10px;
+            text-align: center;
+            margin-left: 6px;
+        }
+
+        .notif-summary-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--d-card);
+            border: 1px solid var(--d-line);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin: 18px 0;
+        }
+
+        .notif-summary-card .ns-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--d-ink);
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .notif-summary-card .ns-counts {
+            font-size: 13px;
+            color: var(--d-text-dim);
+            margin-top: 4px;
+        }
+
+        .notif-summary-card .ns-counts strong {
+            color: var(--d-ink);
+        }
+    </style>
 
     <!-- MAIN -->
     <main class="grad-main">
@@ -54,6 +104,16 @@
                 <div class="k">Agents Available</div>
                 <div class="v">{{ agents_available }}</div>
             </div>
+        </div>
+
+        <!-- NOTIFICATIONS SUMMARY (real data — Warehouse Notifications feature) -->
+        <div class="notif-summary-card">
+            <div>
+                <div class="ns-title">🔔 Notifications</div>
+                <div class="ns-counts"><strong>{{ notification_count }}</strong> Total &nbsp;·&nbsp; <strong>{{
+                        unread_notification_count }}</strong> Unread</div>
+            </div>
+            <a href="{{ url_for('auth.warehouse_notifications') }}" class="qa-btn">🔔 View Notifications</a>
         </div>
 
         <!-- 2. QUICK ACTIONS -->

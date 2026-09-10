@@ -37,6 +37,7 @@
             <a href="{{ url_for('auth.dashboard') }}#warehouse-inventory">Warehouse Inventory</a>
             <a href="{{ url_for('auth.dashboard') }}#update-shipment-card">Update Shipment Status</a>
             <a href="{{ url_for('auth.dashboard') }}#warehouse-details">Warehouse Details</a>
+            <a href="{{ url_for('auth.warehouse_notifications') }}">Notifications</a>
             <div class="item active">Profile</div>
 
             {% elif role == 'admin' %}

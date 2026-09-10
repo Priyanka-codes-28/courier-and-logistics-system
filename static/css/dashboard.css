@@ -1022,11 +1022,6 @@ table.dash-table td.mono {
     color: var(--d-text-dim);
 }
 
-/* Desktop layout is forced at all times below — no collapsing to mobile view.
-   A horizontal scrollbar will appear instead if the window is narrower than
-   the content, keeping the sidebar and 4-column grid always visible. */
-
-/* CTA box for empty states (matches "Create Your First Shipment" sketch box) */
 .cta-box {
     background: var(--d-card);
     border: 2px dashed var(--d-ink);
@@ -1058,11 +1053,6 @@ table.dash-table td.mono {
     background: #16305A;
 }
 
-/* (2-column mobile fallback removed — desktop layout is now forced) */
-
-/* Root-cause fix applied in style.css instead: .container is full-width by
-   default now, and only auth pages (login/register/etc.) opt into a narrow
-   centered box via .auth-narrow. No fragile override needed here anymore. */
 html,
 body {
     margin: 0;
@@ -1282,7 +1272,6 @@ body {
     background: #16305A;
 }
 
-/* Pending pill (distinct gray, so it doesn't look identical to In Transit's amber) */
 .pill.pending {
     background: #EDEBE3;
     color: #5C6B7A;
@@ -1324,13 +1313,6 @@ body {
     flex-shrink: 0;
     margin-top: 5px;
 }
-
-/* ============================================================
-   RESPONSIVE — desktop / laptop / tablet / mobile.
-   Sidebar and all nav links stay present at every size; they
-   reflow to a horizontal top bar on narrower screens instead
-   of disappearing, so navigation is never lost.
-   ============================================================ */
 
 @media (max-width: 900px) {
     .grad-shell {
@@ -1588,7 +1570,6 @@ body {
 
 /* ===== Admin dashboard additions ===== */
 
-/* 6-card summary row (wraps to fewer columns on narrow screens automatically) */
 .admin-6col {
     grid-template-columns: repeat(6, 1fr);
 }

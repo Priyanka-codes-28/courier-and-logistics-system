@@ -1,17 +1,3 @@
-"""
-Creates 10 delivery agent accounts, each with a real delivery_agents row
-already set up (not lazily created on first login) — needed to properly
-test the automatic round-robin / least-busy assignment logic with a
-realistic pool of agents.
-
-Run once, from your project root:
-    python seed_test_agents.py
-
-Safe to re-run — skips creating a duplicate USER if one already exists,
-but will still create their delivery_agents row if that's missing (e.g.
-if it was deleted separately from the user account).
-"""
-
 from app import create_app
 from models import User, DeliveryAgent, Warehouse, get_db
 
@@ -44,10 +30,6 @@ with app.app_context():
                 print(f"Created user: {email}  (Agent {i})")
                 created_users += 1
 
-            # Check specifically for the delivery_agents row too — this is
-            # the part that was missing before: a user can exist without
-            # this row (e.g. if it was deleted separately), and the old
-            # version of this script would silently skip them entirely.
             existing_agent_row = DeliveryAgent.find_by_user_id(user_id)
             if existing_agent_row:
                 print(f"  delivery_agents row already exists for {email}")

@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Warehouse Notifications{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<div class="grad-shell">
+
+    <!-- GRADIENT SIDEBAR — same nav as the Warehouse Dashboard, Notifications marked active -->
+    <aside class="grad-sidebar">
+        <div class="brand"><span class="dot"></span>CourierOS</div>
+        <nav class="grad-nav">
+            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
+            <a href="{{ url_for('auth.dashboard') }}#incoming-table">Incoming Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#outgoing-table">Outgoing Shipments</a>
+            <a href="{{ url_for('auth.dashboard') }}#assign-agent-card">Assign Delivery Agent</a>
+            <a href="{{ url_for('auth.dashboard') }}#warehouse-inventory">Warehouse Inventory</a>
+            <a href="{{ url_for('auth.dashboard') }}#update-shipment-card">Update Shipment Status</a>
+            <a href="{{ url_for('auth.dashboard') }}#warehouse-details">Warehouse Details</a>
+            <div class="item active">Notifications</div>
+            <a href="{{ url_for('auth.profile') }}">Profile</a>
+            <a href="{{ url_for('auth.logout') }}">Logout</a>
+        </nav>
+    </aside>
+
+    <style>
+        /* Scoped to this page only */
+        .wn-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .wn-unread-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: var(--d-amber);
+            color: #fff;
+            font-size: 12.5px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+
+        .wn-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .wn-card {
+            background: var(--d-card);
+            border: 1px solid var(--d-line);
+            border-radius: 12px;
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .wn-card.unread {
+            border-left: 4px solid var(--d-amber);
+            background: #FFFBF2;
+        }
+
+        .wn-card.read {
+            opacity: 0.75;
+        }
+
+        .wn-title {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--d-ink);
+            margin-bottom: 4px;
+        }
+
+        .wn-message {
+            font-size: 13.5px;
+            color: var(--d-ink);
+            margin-bottom: 8px;
+        }
+
+        .wn-meta {
+            font-size: 12px;
+            color: var(--d-text-dim);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .wn-meta .mono {
+            font-family: 'Courier New', monospace;
+        }
+
+        .wn-type-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            background: var(--d-bg);
+            color: var(--d-text-dim);
+            text-transform: capitalize;
+        }
+
+        .wn-status {
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .wn-status.unread-label {
+            color: var(--d-amber);
+        }
+
+        .wn-status.read-label {
+            color: var(--d-teal);
+        }
+
+        .wn-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .wn-mark-btn {
+            background: none;
+            border: 1px solid var(--d-line);
+            color: var(--d-ink);
+            padding: 5px 12px;
+            border-radius: 7px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .wn-mark-btn:hover {
+            background: var(--d-bg);
+        }
+
+        .wn-empty {
+            text-align: center;
+            color: var(--d-text-dim);
+            padding: 40px 0;
+        }
+    </style>
+
+    <!-- MAIN -->
+    <main class="grad-main">
+
+        <div class="wn-header-row">
+            <div>
+                <h1 style="margin-bottom:2px;">Warehouse Notifications
+                    {% if unread_count and unread_count > 0 %}<span class="wn-unread-pill">{{ unread_count }}
+                        unread</span>{% endif %}
+                </h1>
+                <p class="page-sub">Automatic alerts for warehouse-relevant shipment events.</p>
+            </div>
+            {% if unread_count and unread_count > 0 %}
+            <form method="POST" action="{{ url_for('auth.mark_all_warehouse_notifications_read') }}">
+                <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Mark All as Read</button>
+            </form>
+            {% endif %}
+        </div>
+
+        {% set type_emoji = {
+        'arrived': '🔵', 'processing': '🟡', 'ready_for_dispatch': '🟢',
+        'agent_assigned': '🚚', 'dispatched': '📤', 'failed_rto': '🔴'
+        } %}
+
+        <div class="wn-list">
+            {% for n in notifications %}
+            <div class="wn-card {{ 'unread' if not n.is_read else 'read' }}">
+                <div style="flex:1; min-width:240px;">
+                    <div class="wn-title">{{ type_emoji.get(n.type, '🔔') }} {{ n.title or 'Notification' }}</div>
+                    <div class="wn-message">{{ n.message }}</div>
+                    <div class="wn-meta">
+                        {% if n.tracking_id %}<span class="mono">{{ n.tracking_id }}</span>{% endif %}
+                        {% if n.type %}<span class="wn-type-tag">{{ n.type.replace('_', ' ') }}</span>{% endif %}
+                        <span>{{ n.sent_at.strftime('%b %d, %Y %I:%M %p') if n.sent_at else '' }}</span>
+                    </div>
+                </div>
+                <div class="wn-actions">
+                    <span class="wn-status {{ 'unread-label' if not n.is_read else 'read-label' }}">{{ 'Unread' if not
+                        n.is_read else 'Read' }}</span>
+                    {% if not n.is_read %}
+                    <form method="POST"
+                        action="{{ url_for('auth.mark_warehouse_notification_read', notification_id=n.id) }}">
+                        <button type="submit" class="wn-mark-btn">Mark as Read</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="wn-empty">No warehouse notifications yet — they'll appear here automatically as shipments move
+                through the warehouse.</div>
+            {% endfor %}
+        </div>
+
+    </main>
+</div>
+{% endblock %}
