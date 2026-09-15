@@ -11,6 +11,7 @@ def get_db():
             user=current_app.config["PG_USER"],
             password=current_app.config["PG_PASSWORD"],
             dbname=current_app.config["PG_DB"],
+                sslmode="require",
             cursor_factory=psycopg2.extras.RealDictCursor,
         )
         g.db.autocommit = True
