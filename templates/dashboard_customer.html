@@ -34,7 +34,7 @@
             </form>
         </div>
 
-        <!-- SUMMARY CARDS (real data) -->
+        <!-- SUMMARY CARDS -->
         <div class="info-row">
             <div class="info-card">
                 <div class="k">Total Shipments</div>
@@ -64,7 +64,7 @@
             </div>
         </div>
 
-        <!-- SHIPMENT STATUS OVERVIEW — progress tracker (real data) -->
+        <!-- SHIPMENT STATUS OVERVIEW -->
         <div class="chart-widget">
             <div class="w-title">Shipment Status Overview</div>
             {% if progress_steps %}
@@ -89,7 +89,7 @@
             {% endif %}
         </div>
 
-        <!-- CURRENT SHIPMENT (real data) -->
+        <!-- CURRENT SHIPMENT -->
         <div class="section-block">
             <div class="section-title">Current Shipment</div>
             {% if current_shipment %}
@@ -124,7 +124,7 @@
             {% endif %}
         </div>
 
-        <!-- DELIVERY PROOF VIEW (real data) -->
+        <!-- DELIVERY PROOF VIEW -->
         <div class="dash-section" id="delivery-proof">
             <div class="sec-head">
                 <h3>Delivery Proof</h3>
@@ -147,7 +147,7 @@
             {% endif %}
         </div>
 
-        <!-- RECENT SHIPMENTS (real data) -->
+        <!-- RECENT SHIPMENTS -->
         <div class="dash-section">
             <div class="sec-head">
                 <h3>Recent Shipments</h3>
@@ -182,7 +182,7 @@
             </div>
         </div>
 
-        <!-- PAYMENT DUE (real data) -->
+        <!-- PAYMENT DUE -->
         {% if pending_payments %}
         <div class="dash-section" style="border: 1px solid #E9C27A; background:#FFFBF2;">
             <div class="sec-head">
@@ -206,7 +206,7 @@
         </div>
         {% endif %}
 
-        <!-- RECENT NOTIFICATIONS (real data from notifications table) -->
+        <!-- RECENT NOTIFICATIONS -->
         <div class="dash-section" id="notifications">
             <div class="sec-head">
                 <h3>Recent Notifications</h3>

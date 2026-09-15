@@ -7,7 +7,7 @@
 
 <div class="grad-shell">
 
-    <!-- GRADIENT SIDEBAR (unchanged) -->
+    <!-- GRADIENT SIDEBAR -->
     <aside class="grad-sidebar">
         <div class="brand"><span class="dot"></span>CourierOS</div>
         <nav class="grad-nav">
@@ -80,7 +80,7 @@
             </div>
         </div>
 
-        <!-- SHIPMENT STATUS OVERVIEW (real data) -->
+        <!-- SHIPMENT STATUS OVERVIEW -->
         <div class="chart-widget" id="reports-analytics">
             <div class="w-title">Shipment Status Overview</div>
             {% if total_shipments %}
@@ -150,7 +150,7 @@
             {% endif %}
         </div>
 
-        <!-- DELIVERY EXECUTIVE OVERVIEW (real data) -->
+        <!-- DELIVERY EXECUTIVE OVERVIEW -->
         <div class="dash-section" id="delivery-exec-overview">
             <div class="sec-head">
                 <h3>Delivery Executive Overview</h3>
@@ -165,7 +165,7 @@
             </div>
         </div>
 
-        <!-- WAREHOUSE OVERVIEW (real data) -->
+        <!-- WAREHOUSE OVERVIEW -->
         <div class="dash-section" id="warehouse-overview">
             <div class="sec-head">
                 <h3>Warehouse Overview</h3>
@@ -188,7 +188,7 @@
             {% endif %}
         </div>
 
-        <!-- RECENT SHIPMENTS (real data) -->
+        <!-- RECENT SHIPMENTS -->
         <div class="dash-section" id="recent-shipments-table">
             <div class="sec-head">
                 <h3>Recent Shipments</h3>
@@ -257,24 +257,32 @@
             {% endif %}
         </div>
 
-        <!-- NOTIFICATIONS LOG (real data) -->
+        <!-- NOTIFICATIONS LOG -->
         <div class="dash-section" id="notifications-log">
             <div class="sec-head">
                 <h3>Notifications Log</h3>
             </div>
             {% if notifications_log %}
-            <div class="notif-list">
+            <table class="dash-table">
+                <tr>
+                    <th>Recipient</th>
+                    <th>Message</th>
+                    <th>Date &amp; Time</th>
+                </tr>
                 {% for n in notifications_log %}
-                <div class="notif-item"><span class="notif-dot"></span>Sent to {{ n.recipient_name }}: "{{ n.message }}"
-                </div>
+                <tr>
+                    <td>{{ n.recipient_name }}</td>
+                    <td>{{ n.message }}</td>
+                    <td>{{ n.sent_at.strftime('%b %d, %Y, %I:%M %p') if n.sent_at else '—' }}</td>
+                </tr>
                 {% endfor %}
-            </div>
+            </table>
             {% else %}
             <div class="empty-note">No notifications sent yet.</div>
             {% endif %}
         </div>
 
-        <!-- SYSTEM PERFORMANCE (real data) -->
+        <!-- SYSTEM PERFORMANCE -->
         <div class="section-block">
             <div class="section-title">System Performance</div>
             <div class="perf-row">

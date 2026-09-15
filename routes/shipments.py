@@ -4,10 +4,12 @@ import os
 import secrets
 from werkzeug.utils import secure_filename
 
+#create the shipment blueprint for shipment-related routes
 shipments_bp = Blueprint("shipments", __name__)
+#define the folder where uploaded files are stored
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 
-
+#check whether the current user has the required role
 def login_required_role(*roles):
     """Returns True if logged in and (no roles given OR role matches one of roles)."""
     if "user_id" not in session:
@@ -16,7 +18,7 @@ def login_required_role(*roles):
         return False
     return True
 
-
+#display the payment page for a shipment
 @shipments_bp.route("/payments/<tracking_id>/pay", methods=["GET", "POST"])
 def pay(tracking_id):
     
@@ -63,9 +65,6 @@ def pay(tracking_id):
         if not expiry or len(expiry) != 5 or expiry[2] != "/":
             flash("Expiry must be in MM/YY format.", "danger")
             return redirect(url_for("shipments.pay", tracking_id=tracking_id))
-
-        # Simulated success — real gateways would call out to an API here.
-        # Only the card's last 4 digits are kept as a reference, nothing else.
         fake_transaction_ref = f"SIM{secrets.token_hex(4).upper()}"
         Payment.mark_paid(payment["id"], payment_method=f"Card ending {card_number[-4:]}", transaction_ref=fake_transaction_ref)
 
@@ -74,7 +73,7 @@ def pay(tracking_id):
 
     return render_template("pay.html", shipment=shipment, payment=payment)
 
-
+#create a new shipment
 @shipments_bp.route("/shipments/create", methods=["GET", "POST"])
 def create_shipment():
     if "user_id" not in session:
@@ -91,8 +90,6 @@ def create_shipment():
         package_type = request.form.get("package_type", "").strip()
         package_description = request.form.get("package_description", "").strip()
         weight = request.form.get("weight", "").strip()
-
-        # ---- Validation (Phase 13) ----
         required = {
             "Sender Name": sender_name, "Sender Phone": sender_phone,
             "Pickup Address": sender_address, "Receiver Name": receiver_name,
@@ -120,13 +117,7 @@ def create_shipment():
             except ValueError:
                 flash("Package weight must be a positive number.", "danger")
                 return redirect(url_for("shipments.create_shipment"))
-
-        # Assign a warehouse so this shipment is actually visible to
-        # warehouse staff. There's only one warehouse in the system
-        # right now (same stand-in pattern used elsewhere), so every
-        # new shipment routes through it.
         warehouse = Warehouse.get_first()
-
         tracking_id = Shipment.create(
             sender_id=session["user_id"],
             receiver_name=receiver_name,
@@ -167,13 +158,10 @@ def create_shipment():
             flash(f"Shipment created! Your Tracking ID is {tracking_id}. No pickup agents are available right now — it'll be assigned once one is. Payment of ₹{fee} is due.", "success")
 
         return redirect(url_for("shipments.my_shipments"))
-
-    # Pre-fill sender name/phone from the logged-in account as a convenience —
-    # customer can still edit them before submitting.
     sender = User.find_by_id(session["user_id"])
     return render_template("create_shipment.html", sender=sender)
 
-
+#display the customer's shipments
 @shipments_bp.route("/shipments/my")
 def my_shipments():
     if "user_id" not in session:
@@ -183,7 +171,7 @@ def my_shipments():
     shipments = Shipment.list_by_sender(session["user_id"])
     return render_template("my_shipments.html", shipments=shipments)
 
-
+#track a shipment using its tracking id
 @shipments_bp.route("/track", methods=["GET", "POST"])
 def track():
     tracking_id = request.values.get("tracking_id", "").strip()
@@ -200,9 +188,7 @@ def track():
         shipment = Shipment.find_by_tracking_id(tracking_id)
         if shipment:
             history = Shipment.get_status_history(shipment["id"])
-            # ---- Live Tracking Map: initial values (JS then polls
-            # /api/tracking/<id>/location to keep these fresh without
-            # a page reload) ----
+            
             live_location_text = Shipment.get_latest_location(shipment["id"])
             eta_label = Shipment.eta_label(shipment["status"])
             pickup_agent_name = Shipment.get_agent_name_by_role(shipment["id"], "pickup")
@@ -235,11 +221,9 @@ def track():
         origin_warehouse_json=origin_warehouse_json,
         last_updated_at=last_updated_at,
     )
-
-
+#update shipment status  
 @shipments_bp.route("/shipments/<tracking_id>/update-status", methods=["GET", "POST"])
 def update_status(tracking_id):
-    # Only delivery agents, warehouse staff, and admins can advance shipment status.
     if not login_required_role("delivery_agent", "warehouse_staff", "admin"):
         flash("You don't have permission to update shipment status.", "danger")
         return redirect(url_for("auth.login"))
@@ -272,10 +256,7 @@ def update_status(tracking_id):
         Shipment.sync_assignment_status(shipment["id"], chosen_status)
 
         original_status = chosen_status
-
-        # ---- Automatic agent lifecycle hooks ----
         if chosen_status == "In Transit":
-            # Pickup agent's leg is done — free them up for a new pickup.
             pickup_agent_id = Shipment.get_agent_id_by_role(shipment["id"], "pickup")
             if pickup_agent_id:
                 DeliveryAgent.set_free_by_agent_id(pickup_agent_id)
@@ -354,7 +335,7 @@ def goto_update_status():
         return redirect(url_for("auth.dashboard") + "#update-shipment-card")
     return redirect(url_for("shipments.update_status", tracking_id=tracking_id))
 
-
+#update delivery agent availability
 @shipments_bp.route("/agent/set-availability", methods=["POST"])
 def set_availability():
     
@@ -382,7 +363,7 @@ def set_availability():
 
     return redirect(url_for("auth.dashboard") + "#availability")
 
-
+#update the current shipment location
 @shipments_bp.route("/shipments/<tracking_id>/update-location", methods=["POST"])
 def update_location(tracking_id):
     
@@ -399,9 +380,6 @@ def update_location(tracking_id):
     if not shipment:
         flash("Shipment not found.", "danger")
         return redirect(url_for("auth.dashboard") + "#update-location")
-
-    # Security rule: an agent may only update location for a shipment
-    # actually assigned to them (as pickup or delivery agent).
     agent = DeliveryAgent.get_or_create(session["user_id"])
     if not DeliveryAgent.is_assigned_to_shipment(agent["id"], shipment["id"]):
         flash("You can only update location for shipments assigned to you.", "danger")
@@ -409,7 +387,6 @@ def update_location(tracking_id):
 
     Shipment.update_location_only(shipment["id"], location, session["user_id"])
 
-    # Optional GPS coordinates for the live tracking map.
     lat_raw = request.form.get("latitude", "").strip()
     lng_raw = request.form.get("longitude", "").strip()
     if lat_raw and lng_raw:
@@ -426,7 +403,7 @@ def update_location(tracking_id):
     flash(f"Location updated for {tracking_id}.", "success")
     return redirect(url_for("auth.dashboard") + "#update-location")
 
-
+#API endpoint for live shipment tracking
 @shipments_bp.route("/api/tracking/<tracking_id>/location")
 def tracking_location_api(tracking_id):
     shipment = Shipment.find_by_tracking_id(tracking_id)
@@ -459,7 +436,7 @@ def tracking_location_api(tracking_id):
         "destination_warehouse": warehouse_json(destination_warehouse),
     })
 
-
+#upload proof of delivery
 @shipments_bp.route("/shipments/<tracking_id>/submit-proof", methods=["POST"])
 def submit_proof(tracking_id):
     """Real write behind the Agent dashboard's 'Delivery Proof' form.
@@ -475,7 +452,7 @@ def submit_proof(tracking_id):
         return redirect(url_for("auth.dashboard") + "#delivery-proof")
 
     agent = DeliveryAgent.get_or_create(session["user_id"])
-
+#save the uploaded photo to disk, if one was actually attached.
     file_path = None
     photo = request.files.get("photo")
     if photo and photo.filename:

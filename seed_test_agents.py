@@ -1,8 +1,8 @@
 from app import create_app
 from models import User, DeliveryAgent, Warehouse, get_db
-
+#create flask application
 app = create_app()
-
+#use the flask application context to access the database
 with app.app_context():
     warehouse = Warehouse.get_first()
     warehouse_id = warehouse["id"] if warehouse else None
@@ -27,6 +27,7 @@ with app.app_context():
                     password="Agent@1234",
                     role="delivery_agent",
                 )
+#display the newly created user
                 print(f"Created user: {email}  (Agent {i})")
                 created_users += 1
 
@@ -45,5 +46,7 @@ with app.app_context():
                 created_rows += 1
 
         print()
+#display the number of users and delivery agent records created
         print(f"Done. {created_users} new user(s), {created_rows} delivery_agents row(s) created/repaired.")
+#display the login credentials for the test delivery agents
         print("Log in with agent1@courieros.com ... agent10@courieros.com, password: Agent@1234")

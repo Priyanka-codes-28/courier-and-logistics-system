@@ -1,5 +1,6 @@
 from flask import Flask, redirect, url_for, render_template
 from config import Config
+import os
 import db
 from routes.auth import auth_bp
 from routes.shipments import shipments_bp

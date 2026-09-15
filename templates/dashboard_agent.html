@@ -18,15 +18,36 @@
             <a href="#delivery-proof">Upload Delivery Proof</a>
             <a href="#availability">Availability</a>
             <a href="#delivery-history">Delivery History</a>
+            <a href="#recent-notifications">Notifications
+                {% if unread_notification_count and unread_notification_count > 0 %}
+                <span class="ag-nav-badge">{{ unread_notification_count }}</span>
+                {% endif %}
+            </a>
             <a href="{{ url_for('auth.profile') }}">Profile</a>
             <a href="{{ url_for('auth.logout') }}">Logout</a>
         </nav>
     </aside>
 
+    <style>
+        
+        .ag-nav-badge {
+            display: inline-block;
+            min-width: 18px;
+            padding: 1px 5px;
+            background: var(--d-amber);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 10px;
+            text-align: center;
+            margin-left: 6px;
+        }
+    </style>
+
     <!-- MAIN -->
     <main class="grad-main">
 
-        <!-- 9. SEARCH (functional, frontend only) -->
+        <!--  SEARCH  -->
         <div class="dash-top-row">
             <div></div>
             <input type="text" id="shipSearch" class="agent-search" placeholder="🔍 Search assigned shipments..."
@@ -36,27 +57,27 @@
         <h1>Hello {{ name }}, Good Morning!</h1>
         <p class="page-sub">Here are your assigned deliveries for today.</p>
 
-        <!-- SUMMARY CARDS (real data) -->
+        <!-- SUMMARY CARDS -->
         <div class="info-row">
             <div class="info-card">
-                <div class="k">Assigned</div>
+                <div class="k">📦 Assigned Shipments</div>
                 <div class="v">{{ assigned_count }}</div>
             </div>
             <div class="info-card">
-                <div class="k">Picked Up</div>
-                <div class="v">{{ picked_up }}</div>
+                <div class="k">🚚 Out for Delivery</div>
+                <div class="v">{{ out_for_delivery }}</div>
             </div>
             <div class="info-card">
-                <div class="k">Delivered</div>
+                <div class="k">✅ Delivered</div>
                 <div class="v">{{ delivered }}</div>
             </div>
             <div class="info-card">
-                <div class="k">Failed / RTO</div>
-                <div class="v">{{ failed }}</div>
+                <div class="k">🔔 Notifications</div>
+                <div class="v">{{ unread_notification_count }}</div>
             </div>
         </div>
 
-        <!-- AVAILABILITY (real — writes to delivery_agents.is_available) -->
+        <!-- AVAILABILITY -->
         <div class="chart-widget" id="availability">
             <div class="w-title">Availability</div>
             <span class="avail-toggle {{ '' if is_available else 'off' }}">
@@ -85,7 +106,7 @@
             </div>
         </div>
 
-        <!-- 3. ASSIGNED SHIPMENTS (main table, static demo data, searchable) -->
+        <!-- 3. ASSIGNED SHIPMENTS -->
         <div class="dash-section" id="assigned-shipments">
             <div class="sec-head">
                 <h3>Assigned Shipments</h3>
@@ -147,7 +168,7 @@
             {% endif %}
         </div>
 
-        <!-- UPDATE SHIPMENT STATUS (real — takes you to the actual working update page) -->
+        <!-- UPDATE SHIPMENT STATUS -->
         <div class="section-block" id="update-status-card">
             <div class="section-title">Update Shipment Status</div>
             <div class="current-ship-card">
@@ -170,7 +191,7 @@
             </div>
         </div>
 
-        <!-- UPDATE LOCATION (real — writes to shipment_status_history) -->
+        <!-- UPDATE LOCATION -->
         <div class="section-block" id="update-location">
             <div class="section-title">Update Location</div>
             {% if current_shipment %}
@@ -223,7 +244,7 @@
             {% endif %}
         </div>
 
-        <!-- DELIVERY PROOF (real — writes to delivery_proof table, real file upload) -->
+        <!-- DELIVERY PROOF -->
         <div class="section-block" id="delivery-proof">
             <div class="section-title">Delivery Proof</div>
             {% if current_shipment %}
@@ -249,7 +270,7 @@
             {% endif %}
         </div>
 
-        <!-- DELIVERY HISTORY (real data) -->
+        <!-- DELIVERY HISTORY -->
         <div class="dash-section" id="delivery-history">
             <div class="sec-head">
                 <h3>Delivery History</h3>
@@ -277,8 +298,8 @@
             {% endif %}
         </div>
 
-        <!-- RECENT NOTIFICATIONS (real data) -->
-        <div class="dash-section">
+        <!-- RECENT NOTIFICATIONS -->
+        <div class="dash-section" id="recent-notifications">
             <div class="sec-head">
                 <h3>Recent Notifications</h3>
             </div>
@@ -287,9 +308,15 @@
                 {% for n in notifications %}
                 <div class="notif-item">
                     <span class="notif-dot"></span>
-                    {{ n.message }}
-                    {% if n.sent_at %}<br><span style="font-size:11px; color:var(--d-text-dim);">{{
-                        n.sent_at.strftime('%b %d, %Y %I:%M %p') }}</span>{% endif %}
+                    <div>
+                        {{ n.message }}
+                        <br>
+                        <span style="font-size:11px; color:var(--d-text-dim);">
+                            {% if n.tracking_id %}<span style="font-family:'Courier New', monospace;">{{ n.tracking_id
+                                }}</span> &nbsp;·&nbsp; {% endif %}
+                            {% if n.sent_at %}{{ n.sent_at.strftime('%b %d, %Y %I:%M %p') }}{% endif %}
+                        </span>
+                    </div>
                 </div>
                 {% endfor %}
             </div>

@@ -2,11 +2,8 @@ import secrets
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db
-
-
 class User:
     """Handles all DB operations for the users table."""
-
     @staticmethod
     def create(name, email, phone, password, role="customer"):
         db = get_db()
@@ -316,7 +313,7 @@ class Shipment:
     @staticmethod
     def is_valid_transition(current_status, requested_status):
         if current_status == "Delivered":
-            return False  # final status, no further transitions allowed
+            return False 
 
         if requested_status in EXCEPTION_STATUSES:
             return True
@@ -747,8 +744,6 @@ class DeliveryAgent:
 
     @staticmethod
     def get_user_id(agent_id):
-        """Reverse lookup: given a delivery_agents.id, return the linked
-        users.id — used to send that agent a real notification."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT user_id FROM delivery_agents WHERE id = %s", (agent_id,))
@@ -957,8 +952,6 @@ class DeliveryAgent:
 
 
 class Warehouse:
-    """Handles warehouses table."""
-
     @staticmethod
     def find_by_id(warehouse_id):
         db = get_db()
@@ -1215,7 +1208,6 @@ class Payment:
 
     @staticmethod
     def list_pending_for_sender(sender_id):
-        """Used by the Customer dashboard to show a 'Payment Due' list."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -1229,7 +1221,6 @@ class Payment:
 
     @staticmethod
     def total_revenue():
-        """Used by the Admin dashboard — sum of all successfully paid amounts."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute("SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE status = 'paid'")

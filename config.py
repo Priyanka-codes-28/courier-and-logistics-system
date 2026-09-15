@@ -6,7 +6,7 @@ class Config:
     PG_HOST = os.environ.get("PG_HOST", "localhost")
     PG_PORT = os.environ.get("PG_PORT", "5432")
     PG_USER = os.environ.get("PG_USER", "postgres")
-    PG_PASSWORD = os.environ.get("PG_PASSWORD", "Shivaya@123")
+    PG_PASSWORD = os.environ.get("PG_PASSWORD","PG_PASSWORD")
     PG_DB = os.environ.get("PG_DB", "courier_logistics")
 
     UPLOAD_FOLDER = os.path.join("static", "uploads")

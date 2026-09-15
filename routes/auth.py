@@ -3,12 +3,15 @@ from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings
 
+# BLUEPRINT
 auth_bp = Blueprint("auth", __name__)
 
+#INPUT VALIDATION
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_PATTERN = re.compile(r"^[0-9+\-\s()]{7,20}$")
 NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z\s.'-]{1,79}$")
 
+#ROLE-BASED DASHBOARD MAPPING
 DASHBOARD_TEMPLATES = {
     "customer": "dashboard_customer.html",
     "delivery_agent": "dashboard_agent.html",
@@ -17,7 +20,6 @@ DASHBOARD_TEMPLATES = {
 }
 
 # ROLE-BASED ROUTE PROTECTION
-
 def role_required(*allowed_roles):
     def decorator(view_func):
         @wraps(view_func)
@@ -34,6 +36,7 @@ def role_required(*allowed_roles):
         return wrapped
     return decorator
 
+#CUSTOMER DASHBOARD CONTEXT
 def _customer_dashboard_context():
     shipments = Shipment.list_by_sender(session["user_id"])
     total = len(shipments)
@@ -53,14 +56,14 @@ def _customer_dashboard_context():
         try:
             current_idx = STATUS_FLOW.index(current_shipment["status"])
         except ValueError:
-            current_idx = -1  # status is an exception status (Failed/RTO), not in the normal flow
+            current_idx = -1  
         for i, stage in enumerate(STATUS_FLOW):
             progress_steps.append({
                 "label": stage,
                 "done": i < current_idx,
                 "active": i == current_idx,
             })
-
+#CUSTOMER NOTIFICATIONS, PROOF AND PAYMENTS
     notifications = Notification.list_for_user(session["user_id"], limit=4)
     delivery_proof = DeliveryProof.find_latest_for_sender(session["user_id"])
     pending_payments = Payment.list_pending_for_sender(session["user_id"])
@@ -75,7 +78,7 @@ def _customer_dashboard_context():
         pending_payments=pending_payments,
     )
 
-
+#DELIVERY AGENT DASHBOARD
 def _agent_dashboard_context():
     agent = DeliveryAgent.get_or_create(session["user_id"])
     assigned = Shipment.list_assigned_to_agent(agent["id"])
@@ -98,7 +101,7 @@ def _agent_dashboard_context():
         notifications=notifications, route_stops=route_stops,
     )
 
-
+#WAREHOUSE DASHBOARD
 def _warehouse_dashboard_context():
     warehouse = Warehouse.get_first()
     if warehouse:
@@ -129,7 +132,7 @@ def _warehouse_dashboard_context():
         unread_notification_count=unread_notification_count,
     )
 
-
+#ADMIN DASHBOARD
 def _admin_dashboard_context():
     all_shipments = Shipment.list_all_with_sender(limit=5)
     total_shipments = Shipment.count_all()
@@ -170,7 +173,7 @@ def _admin_dashboard_context():
         settings=settings,
     )
 
-
+#CONTEXT BUILDER MAPPING
 _CONTEXT_BUILDERS = {
     "customer": _customer_dashboard_context,
     "delivery_agent": _agent_dashboard_context,
@@ -178,7 +181,7 @@ _CONTEXT_BUILDERS = {
     "admin": _admin_dashboard_context,
 }
 
-
+#REGISTRATION
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -199,16 +202,13 @@ def register():
         if User.find_by_email(email):
             flash("An account with this email already exists.", "danger")
             return redirect(url_for("auth.register"))
-
-        # Role is fixed to 'customer' on public signup.
-        # Agent / warehouse_staff / admin accounts are created separately by an admin.
         User.create(name, email, phone, password, role="customer")
         flash("Registration successful. Please log in.", "success")
         return redirect(url_for("auth.login"))
 
     return render_template("register.html")
 
-
+#LOGIN
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -219,7 +219,8 @@ def login():
         if user is None or not User.verify_password(user, password):
             flash("Invalid email or password.", "danger")
             return redirect(url_for("auth.login"))
-
+        
+#ACCOUNT STATUS CHECK
         if user.get("status") == "inactive":
             flash("Your account has been deactivated. Please contact an administrator.", "danger")
             return redirect(url_for("auth.login"))
@@ -234,14 +235,14 @@ def login():
 
     return render_template("login.html")
 
-
+#LOGOUT
 @auth_bp.route("/logout")
 def logout():
     session.clear()
     flash("You have been logged out.", "success")
     return redirect(url_for("auth.login"))
 
-
+#FORGOT PASSWORD
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
@@ -259,7 +260,7 @@ def forgot_password():
 
     return render_template("forgot_password.html")
 
-
+#RESET PASSWORD
 @auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
     user = User.find_by_reset_token(token)
@@ -281,14 +282,9 @@ def reset_password(token):
 
     return render_template("reset_password.html", token=token)
 
-
+#PROFILE & ACCOUNT MANAGEMENT
 @auth_bp.route("/profile", methods=["GET", "POST"])
 def profile():
-    """Profile & Account page — shared across all 4 roles, since the
-    feature (update name/phone/email, change password) is identical
-    regardless of role. Only requires being logged in, not any specific
-    role. Role itself is never editable here — it's rendered read-only
-    in the template and never read from the submitted form."""
     if "user_id" not in session:
         flash("Please log in to continue.", "danger")
         return redirect(url_for("auth.login"))
@@ -298,7 +294,7 @@ def profile():
     if request.method == "POST":
         form_type = request.form.get("form_type")
 
-        # Account & Security: change password
+        # Account & Security
         if form_type == "password":
             current_password = request.form.get("current_password", "")
             new_password = request.form.get("new_password", "")
@@ -354,13 +350,9 @@ def profile():
 
     return render_template("profile.html", user=user, role=session.get("user_role"))
 
-
+#DASHBOARD ROUTE
 @auth_bp.route("/dashboard")
 def dashboard():
-    """Smart entry point — always shows YOUR OWN role's dashboard.
-    This is what login() redirects to, and what all existing
-    templates link to via url_for('auth.dashboard'). Unchanged
-    behavior from before this refactor."""
     if "user_id" not in session:
         flash("Please log in to continue.", "danger")
         return redirect(url_for("auth.login"))
@@ -386,7 +378,7 @@ def delivery_agent_dashboard():
 @role_required("warehouse_staff")
 def warehouse_dashboard():
     return render_template(DASHBOARD_TEMPLATES["warehouse_staff"], **_warehouse_dashboard_context())
-
+#WAREHOUSE NOTIFICATIONS
 @auth_bp.route("/warehouse/notifications")
 @role_required("warehouse_staff")
 def warehouse_notifications():
@@ -420,13 +412,13 @@ def mark_all_warehouse_notifications_read():
         flash("All notifications marked as read.", "success")
     return redirect(url_for("auth.warehouse_notifications"))
 
-
+#ADMIN USER MANAGEMENT
 @auth_bp.route("/admin/dashboard")
 @role_required("admin")
 def admin_dashboard():
     return render_template(DASHBOARD_TEMPLATES["admin"], **_admin_dashboard_context())
 
-# USER MANAGEMENT — full dedicated page, admin-only.
+# USER MANAGEMENT 
 
 @auth_bp.route("/admin/users")
 @role_required("admin")
@@ -480,7 +472,6 @@ def edit_user(user_id):
 
     return render_template("edit_user.html", target_user=target_user)
 
-
 @auth_bp.route("/admin/users/<int:user_id>/status", methods=["POST"])
 @role_required("admin")
 def set_user_status(user_id):
@@ -515,7 +506,7 @@ def delete_user(user_id):
 
 VALID_NOTIFICATION_PREFERENCES = {"In-App", "Email", "SMS"}
 
-
+#SYSTEM SETTINGS
 @auth_bp.route("/admin/system-settings/save", methods=["POST"])
 @role_required("admin")
 def save_system_settings():
@@ -546,9 +537,6 @@ def save_system_settings():
         "tracking_id_format": tracking_id_format,
         "auto_generate_tracking_id": request.form.get("auto_generate_tracking_id") == "on",
         "auto_assign_agents": request.form.get("auto_assign_agents") == "on",
-        # Only one assignment method is actually implemented today
-        # (least-busy-agent, in DeliveryAgent.find_first_available) —
-        # stored as-is rather than offered as a real multi-way choice.
         "agent_assignment_method": "Least Busy Agent",
         "max_active_shipments_per_agent": max_active,
         "auto_reassign_on_unavailable": request.form.get("auto_reassign_on_unavailable") == "on",
@@ -559,25 +547,18 @@ def save_system_settings():
 
     flash("System settings saved successfully.", "success")
     return redirect(url_for("auth.dashboard") + "#system-settings")
-
+#DEMO LOGIN
 DEMO_ROLES = ["customer", "delivery_agent", "warehouse_staff", "admin"]
 
 
 @auth_bp.route("/demo/login-as/<role_name>")
 def demo_login_as(role_name):
-    """Quick demo login — signs in directly as the given role with no
-    password. Uses a real existing user account under the hood (so
-    session['user_id'] is always valid for foreign keys), but overrides
-    the displayed name/role for the session only. Nothing about the
-    account's real database role is changed."""
     if role_name not in DEMO_ROLES:
         flash("Unknown role.", "danger")
         return redirect(url_for("auth.login"))
 
     user = User.find_first_by_role(role_name)
     if not user:
-        # No account with this role exists yet — fall back to any user,
-        # but still show the requested role's dashboard for the demo.
         user = User.find_any()
 
     if not user:
@@ -591,7 +572,7 @@ def demo_login_as(role_name):
     flash(f"Logged in as a demo {role_name.replace('_', ' ').title()} account.", "success")
     return redirect(url_for("auth.dashboard"))
 
-
+#DEMO ROLE SWITCHING
 @auth_bp.route("/demo/switch-role/<role_name>")
 def demo_switch_role(role_name):
     if "user_id" not in session:
