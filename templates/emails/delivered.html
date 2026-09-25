@@ -1,0 +1,22 @@
+{% extends "emails/base_email.html" %}
+{% from "emails/_macros.html" import detail_table %}
+
+{% block email_title %}Delivered — {{ tracking_id }}{% endblock %}
+{% block preheader %}{{ tracking_id }} has been delivered{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#1c2733; font-size:20px;">Delivered!</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, your shipment has been delivered successfully.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Delivered On", delivered_at_str),
+("Proof of Delivery", proof_line or "Will be added shortly"),
+]) }}
+
+<p style="margin:16px 0 0; color:#4a5568; font-size:13px; line-height:1.6;">
+    Thank you for shipping with CourierOS.
+</p>
+{% endblock %}

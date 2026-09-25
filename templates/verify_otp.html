@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Verify OTP{% endblock %}
+{% block container_class %}auth-narrow{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div class="form-icon">🔢</div>
+    <h2>Enter Your OTP</h2>
+    <p class="form-subtitle">We've sent a 6-digit code to your email. It expires in 5 minutes.</p>
+
+    <form method="POST" action="{{ url_for('auth.verify_otp') }}">
+        <label>OTP</label>
+        <input type="text" name="otp" placeholder="6-digit code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+            autocomplete="one-time-code" required>
+        <span class="field-hint">Didn't get it? Check spam, or go back and request a new one.</span>
+
+        <button type="submit">Verify OTP</button>
+    </form>
+
+    <p class="form-footer-link"><a href="{{ url_for('auth.forgot_password') }}">← Request a new OTP</a></p>
+</div>
+{% endblock %}

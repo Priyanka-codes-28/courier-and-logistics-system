@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+{% from "_macros.html" import detail_table, status_pill %}
+
+{% block email_title %}Delivery Agent Assigned — {{ tracking_id }}{% endblock %}
+{% block preheader %}A delivery agent has been assigned to {{ tracking_id }}{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#1c2733; font-size:20px;">A delivery agent has been assigned</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, <strong>{{ agent_name }}</strong> has been assigned to deliver the shipment below —
+    it will be leaving the warehouse once picked up.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Status", status_pill(status)),
+("Delivery Agent", agent_name),
+("Receiver", receiver_name),
+("Delivery Address", receiver_address),
+]) }}
+{% endblock %}

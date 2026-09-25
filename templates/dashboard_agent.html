@@ -1,332 +1,761 @@
 {% extends "base.html" %}
 {% block title %}Delivery Agent Dashboard{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
-
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="agentMenuBtn" type="button" aria-label="Open navigation">
+    ☰
+</button>
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="agentSidebarOverlay">
+</div>
 <div class="grad-shell">
 
-    <!-- GRADIENT SIDEBAR (unchanged) -->
-    <aside class="grad-sidebar">
-        <div class="brand"><span class="dot"></span>CourierOS</div>
+    <!-- SIDEBAR -->
+    <aside class="grad-sidebar" id="agentSidebar">
+        <!-- CLOSE BUTTON -->
+        <button class="sidebar-close-btn" id="agentCloseBtn" type="button" aria-label="Close navigation">
+            ✕
+        </button>
+        <!-- BRAND -->
+        <div class="brand">
+            <span class="dot"></span>
+            CourierOS
+        </div>
+        <!-- NAVIGATION -->
         <nav class="grad-nav">
-            <div class="item active">Dashboard</div>
-            <a href="#assigned-shipments">Assigned Shipments</a>
-            <a href="#update-status-card">Update Shipment Status</a>
-            <a href="#update-location">Update Location</a>
-            <a href="#delivery-proof">Upload Delivery Proof</a>
-            <a href="#availability">Availability</a>
-            <a href="#delivery-history">Delivery History</a>
-            <a href="#recent-notifications">Notifications
+            <div class="item active">
+                Dashboard
+            </div>
+            <a href="#assigned-shipments">
+                Assigned Shipments
+            </a>
+            <a href="#update-status-card">
+                Update Shipment Status
+            </a>
+            <a href="#update-location">
+                Update Location
+            </a>
+            <a href="#delivery-proof">
+                Upload Delivery Proof
+            </a>
+            <a href="#availability">
+                Availability
+            </a>
+            <a href="#delivery-history">
+                Delivery History
+            </a>
+            <a href="#recent-notifications">
+                Notifications
+
                 {% if unread_notification_count and unread_notification_count > 0 %}
-                <span class="ag-nav-badge">{{ unread_notification_count }}</span>
+                <span class="ag-nav-badge">
+                    {{ unread_notification_count }}
+                </span>
                 {% endif %}
             </a>
-            <a href="{{ url_for('auth.profile') }}">Profile</a>
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
+            <a href="{{ url_for('auth.profile') }}">
+                Profile
+            </a>
+            <a href="{{ url_for('auth.logout') }}">
+                Logout
+            </a>
         </nav>
     </aside>
+    <!-- MAIN CONTENT -->
 
-    <style>
-        
-        .ag-nav-badge {
-            display: inline-block;
-            min-width: 18px;
-            padding: 1px 5px;
-            background: var(--d-amber);
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            border-radius: 10px;
-            text-align: center;
-            margin-left: 6px;
-        }
-    </style>
-
-    <!-- MAIN -->
     <main class="grad-main">
-
-        <!--  SEARCH  -->
+        <!-- SEARCH -->
         <div class="dash-top-row">
             <div></div>
             <input type="text" id="shipSearch" class="agent-search" placeholder="🔍 Search assigned shipments..."
                 onkeyup="filterShipments()">
         </div>
+        <!-- PAGE HEADING -->
+        <h1>
+            Hello {{ name }}, Good Morning!
+        </h1>
 
-        <h1>Hello {{ name }}, Good Morning!</h1>
-        <p class="page-sub">Here are your assigned deliveries for today.</p>
+        <p class="page-sub">
+            Here are your assigned deliveries for today.
+        </p>
+
 
         <!-- SUMMARY CARDS -->
-        <div class="info-row">
-            <div class="info-card">
-                <div class="k">📦 Assigned Shipments</div>
-                <div class="v">{{ assigned_count }}</div>
-            </div>
-            <div class="info-card">
-                <div class="k">🚚 Out for Delivery</div>
-                <div class="v">{{ out_for_delivery }}</div>
-            </div>
-            <div class="info-card">
-                <div class="k">✅ Delivered</div>
-                <div class="v">{{ delivered }}</div>
-            </div>
-            <div class="info-card">
-                <div class="k">🔔 Notifications</div>
-                <div class="v">{{ unread_notification_count }}</div>
-            </div>
-        </div>
 
+        <div class="info-row">
+
+            <div class="info-card">
+                <div class="k">
+                    📦 Assigned Shipments
+                </div>
+
+                <div class="v">
+                    {{ assigned_count }}
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="k">
+                    🚚 Out for Delivery
+                </div>
+
+                <div class="v">
+                    {{ out_for_delivery }}
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="k">
+                    ✅ Delivered
+                </div>
+
+                <div class="v">
+                    {{ delivered }}
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="k">
+                    🔔 Notifications
+                </div>
+
+                <div class="v">
+                    {{ unread_notification_count }}
+                </div>
+            </div>
+
+        </div>
         <!-- AVAILABILITY -->
+
         <div class="chart-widget" id="availability">
-            <div class="w-title">Availability</div>
+
+            <div class="w-title">
+                Availability
+            </div>
+
             <span class="avail-toggle {{ '' if is_available else 'off' }}">
+
                 <span class="dot"></span>
-                {{ 'Available for new assignments' if is_available else 'Currently unavailable' }}
+
+                {{
+                'Available for new assignments'
+                if is_available
+                else 'Currently unavailable'
+                }}
             </span>
             <div class="avail-btn-row">
                 <form method="POST" action="{{ url_for('shipments.set_availability') }}" style="display:contents;">
                     <input type="hidden" name="is_available" value="true">
-                    <button type="submit" class="avail-btn on">Available</button>
+                    <button type="submit" class="avail-btn on">
+
+                        Available
+                    </button>
+
                 </form>
                 <form method="POST" action="{{ url_for('shipments.set_availability') }}" style="display:contents;">
+
                     <input type="hidden" name="is_available" value="false">
-                    <button type="submit" class="avail-btn off">Not Available</button>
+
+                    <button type="submit" class="avail-btn off">
+
+                        Not Available
+
+                    </button>
                 </form>
             </div>
         </div>
+        <!-- QUICK ACTIONS -->
 
-        <!-- 2. QUICK ACTIONS -->
         <div class="section-block">
-            <div class="section-title">Quick Actions</div>
+
+            <div class="section-title">
+                Quick Actions
+            </div>
             <div class="qa-row">
-                <a href="#assigned-shipments" class="qa-btn">📦 Assigned Shipments</a>
-                <a href="#update-status-card" class="qa-btn">🔄 Update Status</a>
-                <a href="#delivery-history" class="qa-btn">🕓 Delivery History</a>
+
+                <a href="#assigned-shipments" class="qa-btn">
+
+                    📦 Assigned Shipments
+
+                </a>
+                <a href="#update-status-card" class="qa-btn">
+
+                    🔄 Update Status
+
+                </a>
+                <a href="#delivery-history" class="qa-btn">
+
+                    🕓 Delivery History
+                </a>
             </div>
         </div>
+        <!-- ASSIGNED SHIPMENTS -->
 
-        <!-- 3. ASSIGNED SHIPMENTS -->
         <div class="dash-section" id="assigned-shipments">
+
             <div class="sec-head">
-                <h3>Assigned Shipments</h3>
+
+                <h3>
+                    Assigned Shipments
+                </h3>
+
             </div>
+
+
             <div class="table-scroll">
+
                 <table class="dash-table recent-table" id="shipTable">
+
                     <tr>
+
                         <th>Tracking ID</th>
                         <th>Role</th>
                         <th>Receiver</th>
                         <th>Address</th>
                         <th>Status</th>
                         <th>Action</th>
+
                     </tr>
+
+
                     {% if assigned %}
+
                     {% for s in assigned %}
+
                     <tr>
-                        <td class="mono">{{ s.tracking_id }}</td>
-                        <td>{% if s.agent_role == 'pickup' %}<span class="pill created">Pickup</span>{% else %}<span
-                                class="pill transit">Delivery</span>{% endif %}</td>
-                        <td>{{ s.receiver_name }}</td>
-                        <td>{{ s.receiver_address }}</td>
-                        <td>
-                            {% if s.status == 'Delivered' %}<span class="pill delivered">{{ s.status }}</span>
-                            {% elif s.status in ['In Transit','Out for Delivery','Picked Up','Awaiting Pickup'] %}<span
-                                class="pill transit">{{ s.status }}</span>
-                            {% elif s.status in ['Failed Delivery','RTO'] %}<span class="pill failed">{{ s.status
-                                }}</span>
-                            {% else %}<span class="pill created">{{ s.status }}</span>{% endif %}
+
+                        <td class="mono">
+                            {{ s.tracking_id }}
                         </td>
-                        <td><a href="{{ url_for('shipments.update_status', tracking_id=s.tracking_id) }}"
-                                class="link-btn">Update</a></td>
+
+
+                        <td>
+
+                            {% if s.agent_role == 'pickup' %}
+
+                            <span class="pill created">
+                                Pickup
+                            </span>
+
+                            {% else %}
+
+                            <span class="pill transit">
+                                Delivery
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+                            {{ s.receiver_name }}
+                        </td>
+
+
+                        <td>
+                            {{ s.receiver_address }}
+                        </td>
+
+
+                        <td>
+
+                            {% if s.status == 'Delivered' %}
+
+                            <span class="pill delivered">
+                                {{ s.status }}
+                            </span>
+
+
+                            {% elif s.status in [
+                            'In Transit',
+                            'Out for Delivery',
+                            'Picked Up',
+                            'Awaiting Pickup'
+                            ] %}
+
+                            <span class="pill transit">
+                                {{ s.status }}
+                            </span>
+
+
+                            {% elif s.status in [
+                            'Failed Delivery',
+                            'RTO'
+                            ] %}
+
+                            <span class="pill failed">
+                                {{ s.status }}
+                            </span>
+
+
+                            {% else %}
+
+                            <span class="pill created">
+                                {{ s.status }}
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+
+                            <a href="{{ url_for(
+                                    'shipments.update_status',
+                                    tracking_id=s.tracking_id
+                                ) }}" class="link-btn">
+
+                                Update
+
+                            </a>
+
+                        </td>
+
                     </tr>
+
                     {% endfor %}
+
+
                     {% else %}
+
                     <tr>
-                        <td colspan="6" class="empty-note">No shipments assigned to you yet. Once a warehouse assigns
-                            one, it'll show up here.</td>
+
+                        <td colspan="6" class="empty-note">
+
+                            No shipments assigned to you yet.
+                            Once a warehouse assigns one,
+                            it will show up here.
+
+                        </td>
+
                     </tr>
+
                     {% endif %}
+
                 </table>
-                <div id="noResults" class="empty-note" style="display:none;">No shipments match your search.</div>
+
+
+                <div id="noResults" class="empty-note" style="display:none;">
+
+                    No shipments match your search.
+
+                </div>
 
             </div>
+
         </div>
 
-        <!-- TODAY'S DELIVERY ROUTE (real data) -->
+
+        <!-- DELIVERY ROUTE -->
+
         <div class="section-block">
-            <div class="section-title">Today's Delivery Route</div>
-            {% if route_stops %}
-            <div class="route-flow">
-                {% for stop in route_stops %}
-                <div class="route-stop">{{ stop }}</div>
-                {% if not loop.last %}<div class="route-arrow">↓</div>{% endif %}
-                {% endfor %}
+
+            <div class="section-title">
+                Today's Delivery Route
             </div>
+
+
+            {% if route_stops %}
+
+            <div class="route-flow">
+
+                {% for stop in route_stops %}
+
+                <div class="route-stop">
+                    {{ stop }}
+                </div>
+
+
+                {% if not loop.last %}
+
+                <div class="route-arrow">
+                    ↓
+                </div>
+
+                {% endif %}
+
+                {% endfor %}
+
+            </div>
+
+
             {% else %}
-            <div class="empty-note">No active deliveries on your route right now.</div>
+
+            <div class="empty-note">
+
+                No active deliveries on your route right now.
+
+            </div>
+
             {% endif %}
+
         </div>
+
 
         <!-- UPDATE SHIPMENT STATUS -->
+
         <div class="section-block" id="update-status-card">
-            <div class="section-title">Update Shipment Status</div>
+
+            <div class="section-title">
+                Update Shipment Status
+            </div>
+
+
             <div class="current-ship-card">
+
                 {% if current_shipment %}
+
                 <div class="cs-row">
-                    <div class="cs-item"><span class="cs-k">Current Job</span><span class="cs-v mono">{{
-                            current_shipment.tracking_id }}</span></div>
-                    <div class="cs-item"><span class="cs-k">Status</span><span class="pill transit">{{
-                            current_shipment.status }}</span></div>
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Current Job
+                        </span>
+
+                        <span class="cs-v mono">
+                            {{ current_shipment.tracking_id }}
+                        </span>
+
+                    </div>
+
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Status
+                        </span>
+
+                        <span class="pill transit">
+                            {{ current_shipment.status }}
+                        </span>
+
+                    </div>
+
                 </div>
+
                 {% endif %}
-                <form method="GET" action="{{ url_for('shipments.goto_update_status') }}">
-                    <label class="form-label">Tracking ID</label>
+
+
+                <form method="GET" action="{{ url_for(
+                          'shipments.goto_update_status'
+                      ) }}">
+
+                    <label class="form-label">
+                        Tracking ID
+                    </label>
+
+
                     <input type="text" name="tracking_id" class="proof-input"
                         value="{{ current_shipment.tracking_id if current_shipment else '' }}"
                         placeholder="e.g. CL20260830X7F2" required>
-                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Go to Update
-                        Status</button>
+
+
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">
+
+                        Go to Update Status
+
+                    </button>
+
                 </form>
+
             </div>
+
         </div>
 
-        <!-- UPDATE LOCATION -->
+
+        <!-- ================= UPDATE LOCATION ================= -->
+
         <div class="section-block" id="update-location">
-            <div class="section-title">Update Location</div>
+
+            <div class="section-title">
+                Update Location
+            </div>
+
+
             {% if current_shipment %}
+
             <div class="current-ship-card">
-                <form method="POST"
-                    action="{{ url_for('shipments.update_location', tracking_id=current_shipment.tracking_id) }}"
-                    id="update-location-form">
+
+                <form method="POST" action="{{ url_for(
+                              'shipments.update_location',
+                              tracking_id=current_shipment.tracking_id
+                          ) }}" id="update-location-form">
+
+
                     <div class="cs-row">
-                        <div class="cs-item"><span class="cs-k">Tracking ID</span><span class="cs-v mono">{{
-                                current_shipment.tracking_id }}</span></div>
+
+                        <div class="cs-item">
+
+                            <span class="cs-k">
+                                Tracking ID
+                            </span>
+
+                            <span class="cs-v mono">
+                                {{ current_shipment.tracking_id }}
+                            </span>
+
+                        </div>
+
                     </div>
-                    <label class="form-label">Current Location</label>
+
+
+                    <label class="form-label">
+                        Current Location
+                    </label>
+
+
                     <input type="text" name="location" class="proof-input" placeholder="e.g. Near HSR Layout, Bengaluru"
                         required>
 
-                    <!-- Live Tracking Map: optional GPS coordinates, additive to the
-               existing text field above. Leaving these blank still works
-               exactly as before. -->
-                    <input type="hidden" name="latitude" id="loc-latitude">
-                    <input type="hidden" name="longitude" id="loc-longitude">
-                    <button type="button" class="avail-btn" style="margin: 10px 0;" onclick="useMyLocation()">📍 Use My
-                        Current Location</button>
-                    <span id="geo-status" style="font-size:12px; color:var(--d-text-dim); margin-left:8px;"></span>
 
-                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Update Location</button>
+                    <!-- GPS COORDINATES -->
+
+                    <input type="hidden" name="latitude" id="loc-latitude">
+
+
+                    <input type="hidden" name="longitude" id="loc-longitude">
+
+
+                    <button type="button" class="avail-btn" style="margin:10px 0;" onclick="useMyLocation()">
+
+                        📍 Use My Current Location
+
+                    </button>
+
+
+                    <span id="geo-status" style="font-size:12px;
+                                     color:var(--d-text-dim);
+                                     margin-left:8px;">
+
+                    </span>
+
+
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">
+
+                        Update Location
+
+                    </button>
+
                 </form>
-                <script>
-                    function useMyLocation() {
-                        const statusEl = document.getElementById('geo-status');
-                        if (!navigator.geolocation) {
-                            statusEl.textContent = 'Geolocation not supported on this device.';
-                            return;
-                        }
-                        statusEl.textContent = 'Getting location...';
-                        navigator.geolocation.getCurrentPosition(
-                            function (pos) {
-                                document.getElementById('loc-latitude').value = pos.coords.latitude;
-                                document.getElementById('loc-longitude').value = pos.coords.longitude;
-                                statusEl.textContent = 'GPS coordinates captured ✓ (will be saved with your update)';
-                            },
-                            function () {
-                                statusEl.textContent = 'Could not get GPS location — you can still submit the text location above.';
-                            }
-                        );
-                    }
-                </script>
+
             </div>
+
+
             {% else %}
-            <div class="empty-note">No active shipment to update location for.</div>
+
+            <div class="empty-note">
+
+                No active shipment to update location for.
+
+            </div>
+
             {% endif %}
+
         </div>
 
-        <!-- DELIVERY PROOF -->
+
+        <!-- ================= DELIVERY PROOF ================= -->
+
         <div class="section-block" id="delivery-proof">
-            <div class="section-title">Delivery Proof</div>
+
+            <div class="section-title">
+                Delivery Proof
+            </div>
+
+
             {% if current_shipment %}
+
             <div class="current-ship-card">
-                <form method="POST"
-                    action="{{ url_for('shipments.submit_proof', tracking_id=current_shipment.tracking_id) }}"
-                    enctype="multipart/form-data">
-                    <label class="form-label">Tracking ID</label>
+
+                <form method="POST" action="{{ url_for(
+                              'shipments.submit_proof',
+                              tracking_id=current_shipment.tracking_id
+                          ) }}" enctype="multipart/form-data">
+
+
+                    <label class="form-label">
+                        Tracking ID
+                    </label>
+
+
                     <input type="text" class="proof-input" value="{{ current_shipment.tracking_id }}" readonly>
 
-                    <label class="form-label">Receiver Name</label>
+
+                    <label class="form-label">
+                        Receiver Name
+                    </label>
+
+
                     <input type="text" class="proof-input" value="{{ current_shipment.receiver_name }}" readonly>
 
-                    <label class="form-label">Upload Delivery Photo</label>
+
+                    <label class="form-label">
+                        Upload Delivery Photo
+                    </label>
+
+
                     <input type="file" name="photo" class="proof-input" accept="image/*">
 
-                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Submit Delivery
-                        Proof</button>
+
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">
+
+                        Submit Delivery Proof
+
+                    </button>
+
                 </form>
+
             </div>
+
+
             {% else %}
-            <div class="empty-note">No active shipment to submit delivery proof for.</div>
+
+            <div class="empty-note">
+
+                No active shipment to submit delivery proof for.
+
+            </div>
+
             {% endif %}
+
         </div>
+
 
         <!-- DELIVERY HISTORY -->
-        <div class="dash-section" id="delivery-history">
-            <div class="sec-head">
-                <h3>Delivery History</h3>
-            </div>
-            {% if delivery_history %}
-            <table class="dash-table">
-                <tr>
-                    <th>Tracking ID</th>
-                    <th>Finished</th>
-                    <th>Result</th>
-                </tr>
-                {% for h in delivery_history %}
-                <tr>
-                    <td class="mono">{{ h.tracking_id }}</td>
-                    <td>{{ h.finished_at.strftime('%b %d, %Y %I:%M %p') if h.finished_at else '' }}</td>
-                    <td>
-                        {% if h.status == 'Delivered' %}<span class="pill delivered">Delivered</span>
-                        {% else %}<span class="pill failed">Failed / RTO</span>{% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% else %}
-            <div class="empty-note">No completed deliveries yet.</div>
-            {% endif %}
-        </div>
 
-        <!-- RECENT NOTIFICATIONS -->
-        <div class="dash-section" id="recent-notifications">
+        <div class="dash-section" id="delivery-history">
+
             <div class="sec-head">
-                <h3>Recent Notifications</h3>
+
+                <h3>
+                    Delivery History
+                </h3>
+
             </div>
-            {% if notifications %}
-            <div class="notif-list">
-                {% for n in notifications %}
-                <div class="notif-item">
-                    <span class="notif-dot"></span>
-                    <div>
-                        {{ n.message }}
-                        <br>
-                        <span style="font-size:11px; color:var(--d-text-dim);">
-                            {% if n.tracking_id %}<span style="font-family:'Courier New', monospace;">{{ n.tracking_id
-                                }}</span> &nbsp;·&nbsp; {% endif %}
-                            {% if n.sent_at %}{{ n.sent_at.strftime('%b %d, %Y %I:%M %p') }}{% endif %}
-                        </span>
-                    </div>
+
+
+            {% if delivery_history %}
+
+            <div class="table-scroll">
+
+                <table class="dash-table">
+
+                    <tr>
+
+                        <th>Tracking ID</th>
+                        <th>Finished</th>
+                        <th>Result</th>
+
+                    </tr>
+
+
+                    {% for h in delivery_history %}
+
+                    <tr>
+
+                        <td class="mono">
+                            {{ h.tracking_id }}
+                        </td>
+
+
+                        <td>
+
+                            {{
+                            (h.finished_at | ist(
+                            '%b %d, %Y %I:%M %p'
+                            ))
+                            if h.finished_at
+                            else ''
+                            }}
+
+                        </td>
+
+
+                        <td>
+
+                            {% if h.status == 'Delivered' %}
+
+                            <span class="pill delivered">
+                                Delivered</span>
+                            {% else %}<span class="pill failed">Failed / RTO</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="empty-note">No completed deliveries yet.</div>
+                {% endif %}
+            </div>
+
+            <!-- RECENT NOTIFICATIONS -->
+            <div class="dash-section" id="recent-notifications">
+                <div class="sec-head">
+                    <h3>Recent Notifications</h3>
                 </div>
-                {% endfor %}
+                {% if notifications %}
+                <div class="notif-list">
+                    {% for n in notifications %}
+                    <div class="notif-item">
+                        <span class="notif-dot"></span>
+                        <div>
+                            {{ n.message }}
+                            <br>
+                            <span style="font-size:11px; color:var(--d-text-dim);">
+                                {% if n.tracking_id %}<span style="font-family:'Courier New', monospace;">{{
+                                    n.tracking_id
+                                    }}</span> &nbsp;·&nbsp; {% endif %}
+                                {% if n.sent_at %}{{ n.sent_at | ist('%b %d, %Y %I:%M %p') }}{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-note">No notifications yet.</div>
+                {% endif %}
             </div>
-            {% else %}
-            <div class="empty-note">No notifications yet.</div>
-            {% endif %}
-        </div>
 
     </main>
 </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+        const menuBtn = document.getElementById("agentMenuBtn");
+        const closeBtn = document.getElementById("agentCloseBtn");
+        const sidebar = document.getElementById("agentSidebar");
+        const overlay = document.getElementById("agentSidebarOverlay");
+
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) {
+                closeSidebar();
+            }
+        });
+
+    });
+</script>
+
 {% endblock %}

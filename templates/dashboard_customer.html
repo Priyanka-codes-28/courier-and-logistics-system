@@ -1,215 +1,553 @@
 {% extends "base.html" %}
 {% block title %}Customer Dashboard{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
-
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">
+    ☰
+</button>
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay">
+</div>
 <div class="grad-shell">
 
-    <!-- GRADIENT SIDEBAR (unchanged) -->
-    <aside class="grad-sidebar">
-        <div class="brand"><span class="dot"></span>CourierOS</div>
+    <!-- GRADIENT SIDEBAR -->
+    <aside class="grad-sidebar" id="customerSidebar">
+        <!-- MOBILE CLOSE BUTTON -->
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button">
+            ✕
+        </button>
+        <!-- BRAND -->
+        <div class="brand">
+            <span class="dot"></span>
+            CourierOS
+        </div>
+        <!-- NAVIGATION -->
         <nav class="grad-nav">
-            <div class="item active">Dashboard</div>
-            <a href="{{ url_for('shipments.my_shipments') }}">My Shipments</a>
-            <a href="{{ url_for('shipments.create_shipment') }}">Create Shipment</a>
-            <a href="{{ url_for('shipments.track') }}">Track Shipment</a>
-            <a href="#notifications">Delivery Notifications</a>
-            <a href="#delivery-proof">Delivery Proof</a>
-            <a href="{{ url_for('auth.profile') }}">Profile &amp; Account</a>
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
+
+            <div class="item active">
+                Dashboard
+            </div>
+
+            <a href="{{ url_for('shipments.my_shipments') }}">
+                My Shipments
+            </a>
+
+            <a href="{{ url_for('shipments.create_shipment') }}">
+                Create Shipment
+            </a>
+
+            <a href="{{ url_for('shipments.track') }}">
+                Track Shipment
+            </a>
+
+            <a href="#notifications">
+                Delivery Notifications
+            </a>
+
+            <a href="#delivery-proof">
+                Delivery Proof
+            </a>
+
+            <a href="{{ url_for('auth.profile') }}">
+                Profile &amp; Account
+            </a>
+
+            <a href="{{ url_for('auth.logout') }}">
+                Logout
+            </a>
+
         </nav>
+
     </aside>
 
-    <!-- MAIN -->
+
+    <!-- MAIN CONTENT -->
     <main class="grad-main">
 
-        <!-- HEADER + TRACKING SECTION (unchanged, pre-filled with demo ID) -->
+        <!-- HEADER + TRACKING -->
         <div class="dash-top-row">
-            <h1>Hello {{ name }}, here's your shipment overview</h1>
+
+            <h1>
+                Hello {{ name }}, here's your shipment overview
+            </h1>
+
             <form class="quick-track-form" method="GET" action="{{ url_for('shipments.track') }}">
+
                 <input type="text" name="tracking_id" placeholder="Enter Tracking ID" required>
-                <button type="submit">Track</button>
+
+                <button type="submit">
+                    Track
+                </button>
+
             </form>
+
         </div>
+
 
         <!-- SUMMARY CARDS -->
         <div class="info-row">
+
             <div class="info-card">
                 <div class="k">Total Shipments</div>
                 <div class="v">{{ total }}</div>
             </div>
+
             <div class="info-card">
                 <div class="k">In Transit</div>
                 <div class="v">{{ in_transit }}</div>
             </div>
+
             <div class="info-card">
                 <div class="k">Delivered</div>
                 <div class="v">{{ delivered }}</div>
             </div>
+
             <div class="info-card">
                 <div class="k">Pending</div>
                 <div class="v">{{ pending }}</div>
             </div>
+
         </div>
 
-        <!-- 1. QUICK ACTIONS -->
+
+        <!-- QUICK ACTIONS -->
         <div class="section-block">
-            <div class="section-title">Quick Actions</div>
-            <div class="qa-row">
-                <a href="{{ url_for('shipments.create_shipment') }}" class="qa-btn">➕ Create Shipment</a>
-                <a href="{{ url_for('shipments.track') }}" class="qa-btn">📍 Track Shipment</a>
-                <a href="{{ url_for('shipments.my_shipments') }}" class="qa-btn">📦 My Shipments</a>
+
+            <div class="section-title">
+                Quick Actions
             </div>
+
+            <div class="qa-row">
+
+                <a href="{{ url_for('shipments.create_shipment') }}" class="qa-btn">
+                    ➕ Create Shipment
+                </a>
+
+                <a href="{{ url_for('shipments.track') }}" class="qa-btn">
+                    📍 Track Shipment
+                </a>
+
+                <a href="{{ url_for('shipments.my_shipments') }}" class="qa-btn">
+                    📦 My Shipments
+                </a>
+
+            </div>
+
         </div>
+
 
         <!-- SHIPMENT STATUS OVERVIEW -->
         <div class="chart-widget">
-            <div class="w-title">Shipment Status Overview</div>
+
+            <div class="w-title">
+                Shipment Status Overview
+            </div>
+
             {% if progress_steps %}
+
             <div class="progress-tracker">
-                {% set done_count = progress_steps|selectattr('done')|list|length %}
+
+                {% set done_count = progress_steps
+                |selectattr('done')
+                |list
+                |length %}
+
                 <div class="ptrack-line">
+
                     <div class="ptrack-line-fill"
                         style="width: {{ (done_count / (progress_steps|length - 1) * 100) if progress_steps|length > 1 else 0 }}%;">
                     </div>
+
                 </div>
+
                 <div class="ptrack-steps">
+
                     {% for step in progress_steps %}
+
                     <div class="pstep {{ 'done' if step.done else ('active' if step.active else '') }}">
-                        <div class="pstep-dot">{{ '✓' if step.done else loop.index }}</div>
-                        <div class="pstep-label">{{ step.label }}</div>
+
+                        <div class="pstep-dot">
+                            {{ '✓' if step.done else loop.index }}
+                        </div>
+
+                        <div class="pstep-label">
+                            {{ step.label }}
+                        </div>
+
                     </div>
+
                     {% endfor %}
+
                 </div>
+
             </div>
+
             {% else %}
-            <div class="empty-note">No active shipment to show progress for yet.</div>
+
+            <div class="empty-note">
+                No active shipment to show progress for yet.
+            </div>
+
             {% endif %}
+
         </div>
+
 
         <!-- CURRENT SHIPMENT -->
         <div class="section-block">
-            <div class="section-title">Current Shipment</div>
+
+            <div class="section-title">
+                Current Shipment
+            </div>
+
             {% if current_shipment %}
+
             <div class="current-ship-card">
+
                 <div class="cs-row">
-                    <div class="cs-item"><span class="cs-k">Tracking ID</span><span class="cs-v mono">{{
-                            current_shipment.tracking_id }}</span></div>
-                    <div class="cs-item"><span class="cs-k">Status</span>
-                        {% if current_shipment.status == 'Delivered' %}<span class="pill delivered">{{
-                            current_shipment.status }}</span>
-                        {% elif current_shipment.status in ['Failed Delivery','RTO'] %}<span class="pill failed">{{
-                            current_shipment.status }}</span>
-                        {% elif current_shipment.status == 'Created' %}<span class="pill created">{{
-                            current_shipment.status }}</span>
-                        {% else %}<span class="pill transit">{{ current_shipment.status }}</span>{% endif %}
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Tracking ID
+                        </span>
+
+                        <span class="cs-v mono">
+                            {{ current_shipment.tracking_id }}
+                        </span>
+
                     </div>
-                    <div class="cs-item"><span class="cs-k">Current Location</span><span class="cs-v">{{
-                            current_location or 'Not yet updated' }}</span></div>
-                    <div class="cs-item"><span class="cs-k">Pickup Agent</span><span class="cs-v">{{ pickup_agent_name
-                            or 'Not assigned yet' }}</span></div>
-                    <div class="cs-item"><span class="cs-k">Delivery Agent</span><span class="cs-v">{{
-                            delivery_agent_name or 'Not assigned yet' }}</span></div>
+
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Status
+                        </span>
+
+                        {% if current_shipment.status == 'Delivered' %}
+
+                        <span class="pill delivered">
+                            {{ current_shipment.status }}
+                        </span>
+
+                        {% elif current_shipment.status in ['Failed Delivery','RTO'] %}
+
+                        <span class="pill failed">
+                            {{ current_shipment.status }}
+                        </span>
+
+                        {% elif current_shipment.status == 'Created' %}
+
+                        <span class="pill created">
+                            {{ current_shipment.status }}
+                        </span>
+
+                        {% else %}
+
+                        <span class="pill transit">
+                            {{ current_shipment.status }}
+                        </span>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Current Location
+                        </span>
+
+                        <span class="cs-v">
+                            {{ current_location or 'Not yet updated' }}
+                        </span>
+
+                    </div>
+
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Pickup Agent
+                        </span>
+
+                        <span class="cs-v">
+                            {{ pickup_agent_name or 'Not assigned yet' }}
+                        </span>
+
+                    </div>
+
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Delivery Agent
+                        </span>
+
+                        <span class="cs-v">
+                            {{ delivery_agent_name or 'Not assigned yet' }}
+                        </span>
+
+                    </div>
+
                 </div>
+
+
                 <a href="{{ url_for('shipments.track') }}?tracking_id={{ current_shipment.tracking_id }}"
-                    class="cta-btn">Track Shipment</a>
+                    class="cta-btn">
+
+                    Track Shipment
+
+                </a>
+
             </div>
+
             {% else %}
+
             <div class="cta-box">
-                <p>You don't have any shipments yet.</p>
-                <a href="{{ url_for('shipments.create_shipment') }}" class="cta-btn">➕ Create Your First Shipment</a>
+
+                <p>
+                    You don't have any shipments yet.
+                </p>
+
+                <a href="{{ url_for('shipments.create_shipment') }}" class="cta-btn">
+
+                    ➕ Create Your First Shipment
+
+                </a>
+
             </div>
+
             {% endif %}
+
         </div>
 
-        <!-- DELIVERY PROOF VIEW -->
+
+        <!-- DELIVERY PROOF -->
         <div class="dash-section" id="delivery-proof">
+
             <div class="sec-head">
-                <h3>Delivery Proof</h3>
+
+                <h3>
+                    Delivery Proof
+                </h3>
+
             </div>
+
             {% if delivery_proof %}
+
             <div class="proof-view-row">
-                <div class="proof-thumb">📷</div>
-                <div>
-                    <div class="cs-k">Tracking ID</div>
-                    <div class="cs-v mono">{{ delivery_proof.tracking_id }}</div>
-                    <div class="cs-k" style="margin-top:8px;">Delivered</div>
-                    <div class="cs-v">{{ delivery_proof.delivered_at.strftime('%b %d, %Y') if
-                        delivery_proof.delivered_at else '' }} — {{ delivery_proof.proof_type|title }} captured</div>
+
+                <div class="proof-thumb">
+                    📷
                 </div>
-                {% if delivery_proof.file_path %}<a href="{{ delivery_proof.file_path }}" class="link-btn">View Proof
-                    →</a>{% endif %}
+
+                <div>
+
+                    <div class="cs-k">
+                        Tracking ID
+                    </div>
+
+                    <div class="cs-v mono">
+                        {{ delivery_proof.tracking_id }}
+                    </div>
+
+                    <div class="cs-k" style="margin-top:8px;">
+
+                        Delivered
+
+                    </div>
+
+                    <div class="cs-v">
+
+                        {{ (delivery_proof.delivered_at | ist('%b %d, %Y')) if delivery_proof.delivered_at else '' }}
+                        — {{ delivery_proof.proof_type|title }} captured
+
+                    </div>
+
+                </div>
+
+                {% if delivery_proof.file_path %}
+
+                <a href="{{ delivery_proof.file_path }}" class="link-btn">
+
+                    View Proof →
+
+                </a>
+
+                {% endif %}
+
             </div>
+
             {% else %}
-            <div class="empty-note">No delivery proof available yet — this appears once a shipment is delivered.</div>
+
+            <div class="empty-note">
+
+                No delivery proof available yet — this appears once a shipment is delivered.
+
+            </div>
+
             {% endif %}
+
         </div>
+
 
         <!-- RECENT SHIPMENTS -->
         <div class="dash-section">
+
             <div class="sec-head">
-                <h3>Recent Shipments</h3>
+
+                <h3>
+                    Recent Shipments
+                </h3>
+
             </div>
+
             <div class="table-scroll">
+
                 {% if shipments %}
+
                 <table class="dash-table recent-table">
+
                     <tr>
+
                         <th>Tracking ID</th>
                         <th>To</th>
                         <th>Status</th>
                         <th>Created</th>
+
                     </tr>
+
                     {% for s in shipments %}
+
                     <tr>
-                        <td class="mono">{{ s.tracking_id }}</td>
-                        <td>{{ s.receiver_address }}</td>
-                        <td>
-                            {% if s.status == 'Delivered' %}<span class="pill delivered">{{ s.status }}</span>
-                            {% elif s.status in ['Failed Delivery','RTO'] %}<span class="pill failed">{{ s.status
-                                }}</span>
-                            {% elif s.status == 'Created' %}<span class="pill created">{{ s.status }}</span>
-                            {% else %}<span class="pill transit">{{ s.status }}</span>{% endif %}
+
+                        <td class="mono">
+                            {{ s.tracking_id }}
                         </td>
-                        <td>{{ s.created_at.strftime('%b %d, %Y') if s.created_at else '' }}</td>
+
+                        <td>
+                            {{ s.receiver_address }}
+                        </td>
+
+                        <td>
+
+                            {% if s.status == 'Delivered' %}
+
+                            <span class="pill delivered">
+                                {{ s.status }}
+                            </span>
+
+                            {% elif s.status in ['Failed Delivery','RTO'] %}
+
+                            <span class="pill failed">
+                                {{ s.status }}
+                            </span>
+
+                            {% elif s.status == 'Created' %}
+
+                            <span class="pill created">
+                                {{ s.status }}
+                            </span>
+
+                            {% else %}
+
+                            <span class="pill transit">
+                                {{ s.status }}
+                            </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            {{ (s.created_at | ist('%b %d, %Y')) if s.created_at else '' }}
+
+                        </td>
+
                     </tr>
+
                     {% endfor %}
+
                 </table>
+
                 {% else %}
-                <div class="empty-note">You haven't created any shipments yet.</div>
+
+                <div class="empty-note">
+
+                    You haven't created any shipments yet.
+
+                </div>
+
                 {% endif %}
+
             </div>
+
         </div>
+
 
         <!-- PAYMENT DUE -->
         {% if pending_payments %}
-        <div class="dash-section" style="border: 1px solid #E9C27A; background:#FFFBF2;">
+
+        <div class="dash-section payment-due-section">
+
             <div class="sec-head">
-                <h3>Payment Due</h3>
+
+                <h3>
+                    Payment Due
+                </h3>
+
             </div>
-            <table class="dash-table">
-                <tr>
-                    <th>Tracking ID</th>
-                    <th>Amount</th>
-                    <th>Action</th>
-                </tr>
-                {% for p in pending_payments %}
-                <tr>
-                    <td class="mono">{{ p.tracking_id }}</td>
-                    <td>₹{{ p.amount }}</td>
-                    <td><a href="{{ url_for('shipments.pay', tracking_id=p.tracking_id) }}" class="link-btn">Pay Now
-                            →</a></td>
-                </tr>
-                {% endfor %}
-            </table>
+
+            <div class="table-scroll">
+
+                <table class="dash-table">
+
+                    <tr>
+
+                        <th>Tracking ID</th>
+                        <th>Amount</th>
+                        <th>Action</th>
+
+                    </tr>
+
+                    {% for p in pending_payments %}
+
+                    <tr>
+
+                        <td class="mono">
+                            {{ p.tracking_id }}
+                        </td>
+
+                        <td>
+                            ₹{{ p.amount }}
+                        </td>
+
+                        <td>
+
+                            <a href="{{ url_for('shipments.pay', tracking_id=p.tracking_id) }}" class="link-btn">
+
+                                Pay Now →
+
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
         </div>
         {% endif %}
-
         <!-- RECENT NOTIFICATIONS -->
         <div class="dash-section" id="notifications">
             <div class="sec-head">
-                <h3>Recent Notifications</h3>
+                <h3>
+                    Recent Notifications
+                </h3>
             </div>
             {% if notifications %}
             <div class="notif-list">
@@ -217,16 +555,54 @@
                 <div class="notif-item">
                     <span class="notif-dot"></span>
                     {{ n.message }}
-                    {% if n.sent_at %}<br><span style="font-size:11px; color:var(--d-text-dim);">{{
-                        n.sent_at.strftime('%b %d, %Y %I:%M %p') }}</span>{% endif %}
+                    {% if n.sent_at %}
+                    <br>
+                    <span style="font-size:11px; color:var(--d-text-dim);">
+                        {{ n.sent_at | ist('%b %d, %Y %I:%M %p') }}
+                    </span>
+                    {% endif %}
                 </div>
+
                 {% endfor %}
             </div>
             {% else %}
-            <div class="empty-note">No notifications yet — you'll see updates here as your shipments move.</div>
+            <div class="empty-note">
+                No notifications yet — you'll see updates here as your shipments move.
+            </div>
             {% endif %}
         </div>
-
     </main>
 </div>
+
+<!-- MOBILE SIDEBAR JAVASCRIPT -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("customerSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) {
+            return;
+        }
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) {
+                closeSidebar();
+            }
+        });
+    });
+</script>
 {% endblock %}

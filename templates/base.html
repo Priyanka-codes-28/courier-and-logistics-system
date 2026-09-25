@@ -3,26 +3,77 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+        (function () {
+            var saved = localStorage.getItem("theme");
+            document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
+        })();
+    </script>
     <title>{% block title %}Courier & Logistics{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
-<body>
+<body class="{% if request.endpoint in ['auth.login', 'auth.register'] %}simple-nav-page{% endif %}">
     <nav class="navbar">
-        <div class="brand">📦 Courier &amp; Logistics</div>
-        <div class="nav-links">
-            {% if session.get('user_id') %}
-            <span>Hi, {{ session.get('user_name') }}</span>
-            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
-            {% else %}
-            <a href="{{ url_for('auth.login') }}">Login</a>
-            <a href="{{ url_for('auth.register') }}">Register</a>
-            {% endif %}
+
+        <!-- LEFT: BRAND -->
+        <div class="brand">
+            📦 <span>Courier &amp; Logistics</span>
         </div>
+
+        <!-- RIGHT: NAVIGATION -->
+        <div class="nav-links">
+
+            <!-- Back to Home ONLY on Register page -->
+            {% if request.endpoint == 'auth.register' %}
+            <a href="/" class="nav-home">
+                🏠 Back to Home
+            </a>
+            {% endif %}
+
+            {% if session.get('user_id') %}
+
+            <span>
+                Hi, {{ session.get('user_name') }}
+            </span>
+
+            <a href="{{ url_for('auth.dashboard') }}">
+                Dashboard
+            </a>
+
+            <a href="{{ url_for('auth.logout') }}">
+                Logout
+            </a>
+
+            {% else %}
+
+            {% if request.endpoint != 'auth.login' %}
+            <a href="{{ url_for('auth.login') }}">
+                Login
+            </a>
+            {% endif %}
+
+            {% if request.endpoint != 'auth.register' %}
+            <a href="{{ url_for('auth.register') }}">
+                Register
+            </a>
+            {% endif %}
+
+            {% endif %}
+
+            <button type="button" class="theme-toggle-btn">
+                ☀️ Light Mode
+            </button>
+
+        </div>
+
+        {% block navbar_extra %}{% endblock %}
+
     </nav>
 
-    <div class="container">
+    <div class="container {% block container_class %}{% endblock %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
@@ -33,6 +84,129 @@
 
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded", function () {
+
+            var root = document.documentElement;
+            var toggleButtons = document.querySelectorAll(".theme-toggle-btn");
+
+            function currentTheme() {
+                return root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+            }
+
+            function updateButtonLabels() {
+                var theme = currentTheme();
+                toggleButtons.forEach(function (btn) {
+                    btn.textContent = theme === "dark" ? "🌙 Dark Mode" : "☀️ Light Mode";
+                    btn.setAttribute("aria-label", theme === "dark" ? "Dark Mode active — click to switch to Light Mode" : "Light Mode active — click to switch to Dark Mode");
+                });
+            }
+
+            function setTheme(theme) {
+                root.setAttribute("data-theme", theme);
+                try { localStorage.setItem("theme", theme); } catch (e) { }
+                updateButtonLabels();
+            }
+
+            toggleButtons.forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    setTheme(currentTheme() === "dark" ? "light" : "dark");
+                });
+            });
+
+            updateButtonLabels();
+        });
+    </script>
+
+    <script>
+        /* =====================================================
+           MOBILE SIDEBAR DRAWER  (hamburger + off-canvas sidebar)
+           One shared script for every dashboard and module page.
+           It looks the elements up by their existing IDs
+           (mobileMenuBtn, sidebarCloseBtn, sidebarOverlay) and falls
+           back to the class names, so it also works on module pages.
+           Pages without a sidebar (login, register ...) exit early.
+        ===================================================== */
+        document.addEventListener("DOMContentLoaded", function () {
+
+            var MOBILE_QUERY = "(max-width: 768px)";
+            var root = document.documentElement;
+            var navbar = document.querySelector(".navbar");
+            var sidebar = document.querySelector(".grad-sidebar");
+            var menuBtn = document.getElementById("mobileMenuBtn") || document.querySelector(".mobile-menu-btn");
+            var closeBtn = document.getElementById("sidebarCloseBtn") || document.querySelector(".sidebar-close-btn");
+            var overlay = document.getElementById("sidebarOverlay") || document.querySelector(".sidebar-overlay");
+
+            if (!menuBtn || !sidebar || !overlay) return;
+
+            // never attach the listeners twice
+            if (menuBtn.getAttribute("data-drawer-ready")) return;
+            menuBtn.setAttribute("data-drawer-ready", "1");
+
+            // the hamburger always lives inside the top navbar
+            if (navbar && !navbar.contains(menuBtn)) navbar.appendChild(menuBtn);
+
+            // accessibility attributes
+            if (!menuBtn.getAttribute("aria-label")) menuBtn.setAttribute("aria-label", "Open navigation menu");
+            if (closeBtn && !closeBtn.getAttribute("aria-label")) closeBtn.setAttribute("aria-label", "Close navigation menu");
+            if (sidebar.id) menuBtn.setAttribute("aria-controls", sidebar.id);
+            menuBtn.setAttribute("aria-expanded", "false");
+            overlay.setAttribute("aria-hidden", "true");
+
+            var mq = window.matchMedia(MOBILE_QUERY);
+
+            function isOpen() {
+                return sidebar.classList.contains("mobile-open");
+            }
+
+            function setOpen(open, returnFocus) {
+                if (open && !mq.matches) return;            // drawer is mobile-only
+
+                sidebar.classList.toggle("mobile-open", open);
+                overlay.classList.toggle("active", open);
+                root.classList.toggle("drawer-open", open);  // locks page scroll (CSS)
+                menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+
+                if (open) {
+                    if (closeBtn) closeBtn.focus();
+                } else if (returnFocus) {
+                    menuBtn.focus();
+                }
+            }
+
+            menuBtn.addEventListener("click", function () { setOpen(true); });
+
+            if (closeBtn) {
+                closeBtn.addEventListener("click", function () { setOpen(false, true); });
+            }
+
+            overlay.addEventListener("click", function () { setOpen(false, true); });
+
+            // any link inside the sidebar closes it (covers #section links too)
+            sidebar.addEventListener("click", function (e) {
+                var link = e.target.closest ? e.target.closest("a") : null;
+                if (link) setOpen(false);
+            });
+
+            document.addEventListener("keydown", function (e) {
+                if ((e.key === "Escape" || e.key === "Esc") && isOpen()) setOpen(false, true);
+            });
+
+            // resizing / rotating up to a desktop width closes the drawer
+            function onBreakpointChange() {
+                if (!mq.matches) setOpen(false);
+            }
+            if (mq.addEventListener) mq.addEventListener("change", onBreakpointChange);
+            else if (mq.addListener) mq.addListener(onBreakpointChange);
+
+            // coming back with the browser Back button must not show an open drawer
+            window.addEventListener("pageshow", function (e) {
+                if (e.persisted) setOpen(false);
+            });
+        });
+    </script>
 </body>
 
 </html>

@@ -1,0 +1,21 @@
+{% extends "emails/base_email.html" %}
+{% from "_macros.html" import detail_table, status_pill %}
+
+{% block email_title %}Ready for Dispatch — {{ tracking_id }}{% endblock %}
+{% block preheader %}{{ tracking_id }} is ready for dispatch{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#1c2733; font-size:20px;">A shipment is ready for dispatch</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, the shipment below is ready for dispatch.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Status", status_pill(status)),
+("Receiver", receiver_name),
+("Delivery Address", receiver_address),
+("Package Type", package_type or "General"),
+("Weight", (weight ~ " kg") if weight else None),
+]) }}
+{% endblock %}

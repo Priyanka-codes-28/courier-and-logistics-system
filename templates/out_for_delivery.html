@@ -1,0 +1,18 @@
+{% extends "emails/base_email.html" %}
+{% from "emails/_macros.html" import detail_table %}
+
+{% block email_title %}Out for Delivery — {{ tracking_id }}{% endblock %}
+{% block preheader %}{{ tracking_id }} is out for delivery{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#1c2733; font-size:20px;">Your shipment is out for delivery</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, <strong>{{ agent_name }}</strong> is on the way with your shipment.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Delivery Agent", agent_name),
+("Delivery Address", receiver_address),
+]) }}
+{% endblock %}

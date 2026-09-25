@@ -1,0 +1,24 @@
+{% extends "emails/base_email.html" %}
+{% from "_macros.html" import detail_table, status_pill %}
+
+{% block email_title %}Delivery Update Required — {{ tracking_id }}{% endblock %}
+{% block preheader %}{{ tracking_id }} is now {{ status }}{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#b3261e; font-size:20px;">Delivery update required</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, a shipment assigned to you has been marked {{ status }}.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Status", status_pill(status, color="#b3261e")),
+("Receiver", receiver_name),
+("Delivery Address", receiver_address),
+("Remarks", remarks),
+]) }}
+
+<p style="margin:16px 0 0; color:#4a5568; font-size:13px; line-height:1.6;">
+    Please check your CourierOS dashboard for next steps.
+</p>
+{% endblock %}

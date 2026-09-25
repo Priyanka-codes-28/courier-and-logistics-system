@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
 from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings
 import os
 import secrets
 from werkzeug.utils import secure_filename
+import email_utils
+from timezone_utils import format_ist
 
 #create the shipment blueprint for shipment-related routes
 shipments_bp = Blueprint("shipments", __name__)
@@ -135,6 +137,20 @@ def create_shipment():
         new_shipment_for_billing = Shipment.find_by_tracking_id(tracking_id)
         fee = Payment.calculate_fee(weight_value)
         Payment.create(new_shipment_for_billing["id"], fee)
+
+        # Shipment creation confirmation 
+        customer = User.find_by_id(session["user_id"])
+        try:
+            email_utils.send_shipment_created_email(
+                to_email=customer["email"] if customer else None,
+                to_name=customer["name"] if customer else sender_name,
+                tracking_id=tracking_id,
+                sender_name=sender_name, sender_address=sender_address, sender_phone=sender_phone,
+                receiver_name=receiver_name, receiver_address=receiver_address, receiver_phone=receiver_phone,
+                package_type=package_type, status=new_shipment_for_billing["status"],
+            )
+        except Exception as e:
+            current_app.logger.error(f"[email_utils] shipment-created email failed for {tracking_id}: {e}")
 
         settings = SystemSettings.load()
         agent_id = DeliveryAgent.find_first_available() if settings.get("auto_assign_agents", True) else None
@@ -429,7 +445,9 @@ def tracking_location_api(tracking_id):
         "latitude": float(latest["latitude"]) if latest else None,
         "longitude": float(latest["longitude"]) if latest else None,
         "location_updated_at": latest["updated_at"].isoformat() if latest else None,
+        "location_updated_at_ist": format_ist(latest["updated_at"]) if latest else None,
         "last_updated_at": last_updated_at.isoformat() if last_updated_at else None,
+        "last_updated_at_ist": format_ist(last_updated_at),
         "pickup_agent_name": Shipment.get_agent_name_by_role(shipment["id"], "pickup"),
         "delivery_agent_name": Shipment.get_agent_name_by_role(shipment["id"], "delivery"),
         "origin_warehouse": warehouse_json(origin_warehouse),

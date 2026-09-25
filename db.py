@@ -15,6 +15,8 @@ def get_db():
             cursor_factory=psycopg2.extras.RealDictCursor,
         )
         g.db.autocommit = True
+        with g.db.cursor() as cur:
+            cur.execute("SET TIME ZONE 'UTC'")
     return g.db
 
 

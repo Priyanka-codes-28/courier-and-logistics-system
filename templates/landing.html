@@ -4,6 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            var saved = localStorage.getItem("theme");
+            document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
+        })();
+    </script>
     <title>CourierOS — Deliver Smarter. Deliver Better.</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
@@ -24,21 +30,22 @@
             <a href="#contact">Contact</a>
         </div>
         <div class="l-nav-right">
+            <button type="button" class="theme-toggle-btn l-theme-toggle">☀️ Light Mode</button>
             <a href="{{ url_for('auth.login') }}" class="login">Login</a>
             <a href="{{ url_for('auth.register') }}" class="signup">Sign Up</a>
         </div>
+
     </nav>
 
     <!-- HERO -->
     <section class="hero" id="home">
         <div>
             <h1>Deliver Smarter.<br><span>Deliver Better.</span></h1>
-            <p class="lead">Manage shipments, delivery executive management, routes, deliveries, and real-time tracking
-                from one centralized
+            <p class="lead">Manage shipments, drivers, routes, deliveries, and real-time tracking from one centralized
                 platform.</p>
             <div class="hero-actions">
                 <a href="{{ url_for('auth.register') }}" class="btn-primary">Get Started</a>
-                <a href="#track" class="btn-outline">Track Delivery</a>
+                <a href="{{ url_for('shipments.track') }}" class="btn-outline">Track Delivery</a>
             </div>
             <div class="trusted-by">Built for teams managing <span class="n">100+ deliveries</span> a day</div>
         </div>
@@ -50,10 +57,8 @@
                 <div class="dash-side">
                     <div class="item active">Dashboard</div>
                     <div class="item">Shipments</div>
-                    <div class="item">Delivery Executive</div>
+                    <div class="item">Drivers</div>
                     <div class="item">Warehouses</div>
-                    <div class="item">Live tracking</div>
-                    <div class="item">Notifications</div>
                     <div class="item">Analytics</div>
                     <div class="item">Reports</div>
                     <div class="item">Settings</div>
@@ -96,26 +101,6 @@
         </div>
     </section>
 
-    <section class="track-section" id="track">
-        <div class="track-content">
-            <span class="track-label">SHIPMENT TRACKING</span>
-            <h2>Track Your Shipment</h2>
-            <p>
-                Enter your Tracking ID to check the latest shipment status
-                and delivery progress.
-            </p>
-
-            <form class="tracking-form" action="#" method="GET">
-                <input type="text" name="tracking_id" placeholder="Enter Tracking ID" required>
-                <button type="submit" class="btn-primary">
-                    Track Shipment
-                </button>
-            </form>
-
-            <small>Example: CL20260826X7F2</small>
-        </div>
-    </section>
-
     <!-- KEY FEATURES -->
     <section class="features" id="features">
         <h2>Key Features</h2>
@@ -132,12 +117,12 @@
             </div>
             <div class="feature-card">
                 <div class="icon">🚚</div>
-                <h4>Delivery Executive Management</h4>
+                <h4>Driver Management</h4>
                 <p>Assign, monitor, and manage delivery agents and their availability across warehouses.</p>
             </div>
             <div class="feature-card">
                 <div class="icon">🧭</div>
-                <h4>Warehouse Management</h4>
+                <h4>Route Optimization</h4>
                 <p>Route shipments efficiently between origin and destination warehouses.</p>
             </div>
             <div class="feature-card">
@@ -169,7 +154,7 @@
                 <div class="desc">Match to an available agent</div>
             </div>
             <div class="how-arrow">&#8594;</div>
-            <div class="how-step alt">
+            <div class="how-step">
                 <div class="num">03</div>
                 <div class="lbl">Pickup</div>
                 <div class="desc">Agent collects the package</div>
@@ -181,7 +166,7 @@
                 <div class="desc">Live status through transit</div>
             </div>
             <div class="how-arrow">&#8594;</div>
-            <div class="how-step alt">
+            <div class="how-step">
                 <div class="num">05</div>
                 <div class="lbl">Deliver</div>
                 <div class="desc">Out for delivery to receiver</div>
@@ -244,8 +229,80 @@
         </div>
     </section>
 
+    <!-- TRACK SHIPMENT PREVIEW -->
+    <section class="track-preview" id="track">
+        <h2>Track Your Shipment</h2>
+        <p class="sub">Monitor your shipment location and delivery progress from pickup to doorstep.</p>
+
+        <form method="GET" action="{{ url_for('shipments.track') }}"
+            style="max-width:420px; margin:0 auto 34px; display:flex; gap:10px;">
+            <input type="text" name="tracking_id" placeholder="Enter Tracking ID, e.g. CL20260830X7F2" class="mono"
+                style="flex:1; width:auto; margin-top:0; box-sizing:border-box; padding:12px 14px; border:1px solid var(--line); border-radius:6px;">
+            <button type="submit" class="btn-primary" style="white-space:nowrap; width:auto; margin-top:0;">Track
+                Now</button>
+        </form>
+
+        <div class="track-card">
+            <div class="track-map">
+                <svg viewBox="0 0 600 340" xmlns="http://www.w3.org/2000/svg" class="map-svg">
+                    <defs>
+                        <pattern id="diamondGrid" width="46" height="46" patternUnits="userSpaceOnUse"
+                            patternTransform="rotate(0)">
+                            <path d="M23 0 L46 23 L23 46 L0 23 Z" fill="none" stroke="#D8D3C4" stroke-width="1" />
+                        </pattern>
+
+                    </defs>
+                    <rect width="600" height="340" fill="url(#diamondGrid)" />
+
+                    <!-- route line -->
+                    <line x1="80" y1="250" x2="500" y2="80" stroke="#F5A623" stroke-width="4" stroke-linecap="round" />
+
+                    <!-- warehouse pin -->
+                    <circle cx="80" cy="250" r="20" fill="#0B1F3A" opacity="0.12" />
+                    <circle cx="80" cy="250" r="9" fill="#0B1F3A" />
+                    <circle cx="80" cy="250" r="3" fill="#FFFFFF" />
+
+                    <!-- delivery executive pin (active/pulsing) -->
+                    <circle cx="290" cy="165" r="26" fill="#F5A623" opacity="0.18" />
+                    <circle cx="290" cy="165" r="11" fill="#F5A623" />
+                    <circle cx="290" cy="165" r="4" fill="#0B1F3A" />
+
+                    <!-- destination pin -->
+                    <circle cx="500" cy="80" r="20" fill="#1B6B6B" opacity="0.15" />
+                    <circle cx="500" cy="80" r="9" fill="#1B6B6B" />
+                    <circle cx="500" cy="80" r="3" fill="#FFFFFF" />
+                </svg>
+
+                <div class="pin-label" style="left:6%; top:76%;">Warehouse</div>
+                <div class="pin-label active" style="left:37%; top:52%;">Delivery Executive</div>
+                <div class="pin-label" style="left:73%; top:16%;">Destination</div>
+            </div>
+
+            <div class="track-info">
+                <div class="live-badge"><span class="dot"></span>LIVE</div>
+                <h3>Shipment In Transit</h3>
+                <div class="track-row">
+                    <span class="k">Tracking ID</span>
+                    <span class="v mono">CL20260826X7F2</span>
+                </div>
+                <div class="track-row">
+                    <span class="k">Current Location</span>
+                    <span class="v">Hyderabad</span>
+                </div>
+                <div class="track-row">
+                    <span class="k">Status</span>
+                    <span class="v status-tag">Out for Delivery</span>
+                </div>
+                <div class="track-row">
+                    <span class="k">Estimated Delivery</span>
+                    <span class="v">Today, 6:30 PM</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- CTA BAND -->
-    <section class="cta-band" id="track">
+    <section class="cta-band">
         <div>
             <h2>Ready to streamline your logistics operations?</h2>
             <p>Manage every delivery from pickup to completion.</p>
@@ -275,19 +332,52 @@
                 <h5>Features</h5>
                 <a href="#features">Shipment Management</a>
                 <a href="#features">Real-Time Tracking</a>
-                <a href="#features">Delivery Executive Management</a>
+                <a href="#features">Driver Management</a>
                 <a href="#features">Delivery Analytics</a>
             </div>
             <div class="footer-col">
                 <h5>Contact Us</h5>
                 <a href="mailto:support@courieros.com">support@courieros.com</a>
                 <a href="tel:+911234567890">+91 123 456 7890</a>
-                <a href="#">America</a>
+                <a href="#">Gachibowli, Hyderabad</a>
             </div>
         </div>
         <div class="footer-bottom">© 2026 CourierOS. All rights reserved.</div>
     </footer>
 
+    <script>
+        
+        document.addEventListener("DOMContentLoaded", function () {
+            var root = document.documentElement;
+            var toggleButtons = document.querySelectorAll(".theme-toggle-btn");
+
+            function currentTheme() {
+                return root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+            }
+
+            function updateButtonLabels() {
+                var theme = currentTheme();
+                toggleButtons.forEach(function (btn) {
+                    btn.textContent = theme === "dark" ? "🌙 Dark Mode" : "☀️ Light Mode";
+                    btn.setAttribute("aria-label", theme === "dark" ? "Dark Mode active — click to switch to Light Mode" : "Light Mode active — click to switch to Dark Mode");
+                });
+            }
+
+            function setTheme(theme) {
+                root.setAttribute("data-theme", theme);
+                try { localStorage.setItem("theme", theme); } catch (e) { }
+                updateButtonLabels();
+            }
+
+            toggleButtons.forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    setTheme(currentTheme() === "dark" ? "light" : "dark");
+                });
+            });
+
+            updateButtonLabels();
+        });
+    </script>
 </body>
 
 </html>

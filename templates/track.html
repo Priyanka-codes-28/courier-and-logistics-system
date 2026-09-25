@@ -4,405 +4,475 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-{% if shipment %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-{% endif %}
-<style>
-    /* ===== Live Tracking Map ===== */
-    .live-info-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 14px;
-        margin: 20px 0;
-    }
 
-    .live-info-cell {
-        background: #F7F5EE;
-        border: 1px solid #E2DFD3;
-        border-radius: 8px;
-        padding: 12px 14px;
-    }
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">
+    ☰
+</button>
 
-    .live-info-cell .li-k {
-        font-size: 11px;
-        color: #5C6B7A;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-        font-weight: 600;
-    }
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    .live-info-cell .li-v {
-        font-size: 14px;
-        color: #0B1F3A;
-        font-weight: 700;
-        margin-top: 4px;
-    }
+<div class="grad-shell">
 
-    #tracking-map {
-        height: 340px;
-        border-radius: 10px;
-        margin: 16px 0 22px;
-        border: 1px solid #E2DFD3;
-    }
+    <!-- LEFT SIDEBAR -->
+    <aside class="grad-sidebar" id="customerSidebar">
 
-    .route-legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        font-size: 12.5px;
-        color: #5C6B7A;
-        margin-bottom: 10px;
-    }
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button">
+            ✕
+        </button>
 
-    @media (max-width: 700px) {
-        .live-info-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-</style>
-<style>
-    .track-page {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 40px 5%;
-    }
-
-    .track-search-card {
-        background: #fff;
-        border: 1px solid var(--d-line, #E2DFD3);
-        border-radius: 14px;
-        padding: 26px 28px;
-        box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
-        margin-bottom: 24px;
-    }
-
-    .track-search-card h2 {
-        margin: 0 0 4px;
-        color: #0B1F3A;
-    }
-
-    .track-search-card p {
-        color: #5C6B7A;
-        font-size: 13.5px;
-        margin: 0 0 18px;
-    }
-
-    .track-search-form {
-        display: flex;
-        gap: 10px;
-    }
-
-    .track-search-form input {
-        flex: 1;
-        width: auto;
-        margin-top: 0;
-        box-sizing: border-box;
-        padding: 11px 14px;
-        border: 1px solid #E2DFD3;
-        border-radius: 7px;
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-        color: #0B1F3A;
-    }
-
-    .track-search-form button {
-        width: auto;
-        margin-top: 0;
-        box-sizing: border-box;
-        background: #0B1F3A;
-        color: white;
-        border: none;
-        padding: 0 22px;
-        border-radius: 7px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 14px;
-    }
-
-    .track-result-card {
-        background: #fff;
-        border: 1px solid var(--d-line, #E2DFD3);
-        border-radius: 14px;
-        padding: 28px;
-        box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
-    }
-
-    .track-result-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 22px;
-    }
-
-    .track-result-head .tid {
-        font-family: 'Courier New', monospace;
-        font-size: 18px;
-        font-weight: 700;
-        color: #0B1F3A;
-    }
-
-    .progress-track {
-        position: relative;
-        height: 6px;
-        background: #E2DFD3;
-        border-radius: 4px;
-        margin: 30px 0 34px;
-    }
-
-    .progress-fill {
-        position: absolute;
-        left: 0;
-        top: 0;
-        height: 100%;
-        background: #F5A623;
-        border-radius: 4px;
-    }
-
-    .progress-marker {
-        position: absolute;
-        top: 50%;
-        width: 18px;
-        height: 18px;
-        background: #0B1F3A;
-        border: 3px solid #F5A623;
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-    }
-
-    .timeline {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-    }
-
-    .timeline li {
-        display: flex;
-        gap: 14px;
-        padding-bottom: 20px;
-        position: relative;
-    }
-
-    .timeline li:not(:last-child)::before {
-        content: '';
-        position: absolute;
-        left: 7px;
-        top: 22px;
-        bottom: 0;
-        width: 2px;
-        background: #E2DFD3;
-    }
-
-    .timeline .tdot {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: #1B6B6B;
-        flex-shrink: 0;
-        margin-top: 2px;
-    }
-
-    .timeline .tbody b {
-        display: block;
-        color: #0B1F3A;
-        font-size: 14px;
-    }
-
-    .timeline .tbody span {
-        color: #5C6B7A;
-        font-size: 12.5px;
-    }
-</style>
-
-<div class="track-page">
-
-    <div class="track-search-card">
-        <h2>Track Your Shipment</h2>
-        <p>Enter your Tracking ID to see live status and delivery history.</p>
-        <form class="track-search-form" method="GET" action="{{ url_for('shipments.track') }}">
-            <input type="text" name="tracking_id" placeholder="e.g. CL20260830X7F2" value="{{ tracking_id or '' }}">
-            <button type="submit">Track</button>
-        </form>
-    </div>
-
-    {% if shipment %}
-    <div class="track-result-card">
-        <div class="track-result-head">
-            <div>
-                <div class="tid">{{ shipment.tracking_id }}</div>
-                <div style="color:#5C6B7A; font-size:13px; margin-top:4px;">To: {{ shipment.receiver_name }}, {{
-                    shipment.receiver_address }}</div>
-            </div>
-            <span
-                class="pill {{ 'delivered' if shipment.status == 'Delivered' else ('failed' if shipment.status in ['Failed Delivery','RTO'] else 'transit') }}">{{
-                shipment.status }}</span>
+        <div class="brand">
+            <span class="dot"></span>
+            CourierOS
         </div>
 
-        <div class="progress-track">
-            <div class="progress-fill" style="width: {{ progress }}%;"></div>
-            <div class="progress-marker" style="left: {{ progress }}%;"></div>
-        </div>
+        <nav class="grad-nav">
 
-        <!-- LIVE TRACKING (additive) -->
-        <div class="live-info-grid">
-            <div class="live-info-cell">
-                <div class="li-k">Current Location</div>
-                <div class="li-v" id="live-current-location">{{ live_location_text or 'Not available yet' }}</div>
-            </div>
-            <div class="live-info-cell">
-                <div class="li-k">ETA</div>
-                <div class="li-v" id="live-eta">{{ eta_label }}</div>
-            </div>
-            <div class="live-info-cell">
-                <div class="li-k">Last Updated</div>
-                <div class="li-v" id="live-updated">{{ last_updated_at.strftime('%b %d, %Y %I:%M %p') if last_updated_at
-                    else 'Not available' }}</div>
-            </div>
-            <div class="live-info-cell">
-                <div class="li-k">Assigned Agent</div>
-                <div class="li-v" id="live-agent">{{ delivery_agent_name or pickup_agent_name or 'Not yet assigned' }}
-                </div>
-            </div>
-        </div>
+            <a href="{{ url_for('auth.dashboard') }}">
+                Dashboard
+            </a>
 
-        <div class="route-legend">📍 Pickup &nbsp;→&nbsp; 🏭 Warehouse &nbsp;→&nbsp; 🚚 Delivery Agent &nbsp;→&nbsp; 📍
-            Destination</div>
-        <div id="tracking-map"></div>
+            <a href="{{ url_for('shipments.my_shipments') }}">
+                My Shipments
+            </a>
 
-        <h4 style="color:#0B1F3A; margin-bottom:14px;">Tracking History</h4>
-        <ul class="timeline">
-            {% for h in history|reverse %}
-            <li>
-                <div class="tdot"></div>
-                <div class="tbody">
-                    <b>{{ h.status }}</b>
-                    <span>{{ h.location or '' }}{% if h.remarks %} — {{ h.remarks }}{% endif %}</span><br>
-                    <span>{{ h.timestamp.strftime('%b %d, %Y %I:%M %p') if h.timestamp else '' }}</span>
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% elif tracking_id %}
-    <div class="track-result-card" style="text-align:center; color:#5C6B7A;">
-        No shipment found with that Tracking ID. Double-check and try again.
-    </div>
-    {% endif %}
+            <a href="{{ url_for('shipments.create_shipment') }}">
+                Create Shipment
+            </a>
 
-</div>
+            <a href="{{ url_for('shipments.track') }}" class="active">
+                Track Shipment
+            </a>
 
-{% if shipment %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-    (function () {
-        const trackingId = {{ shipment.tracking_id | tojson
-    }};
-    const pickupAddressText = {{ shipment.sender_address | tojson }};
-    const destinationAddressText = {{ shipment.receiver_address | tojson }};
-    const shipmentStatus = {{ shipment.status | tojson }};
-    const originWarehouse = {{ origin_warehouse_json | tojson }};
+            <a href="{{ url_for('auth.dashboard') }}#notifications">
+                Delivery Notifications
+            </a>
 
-    const map = L.map('tracking-map').setView([20.5937, 78.9629], 5); // default: India-wide view
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 18,
-    }).addTo(map);
+            <a href="{{ url_for('auth.dashboard') }}#delivery-proof">
+                Delivery Proof
+            </a>
 
-    let pickupMarker = null, warehouseMarker = null, agentMarker = null, destMarker = null;
-    let routeLine = null;
-    const bounds = [];
+            <a href="{{ url_for('auth.profile') }}">
+                Profile &amp; Account
+            </a>
 
-    function addToBounds(latlng) { bounds.push(latlng); if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] }); }
+            <a href="{{ url_for('auth.logout') }}">
+                Logout
+            </a>
 
-    async function geocode(address) {
-        if (!address) return null;
-        try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`);
-            const data = await res.json();
-            if (data && data.length) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-        } catch (e) { /* geocoding is best-effort; silently skip the pin */ }
-        return null;
-    }
+        </nav>
 
-    function pickupIcon(emoji) {
-        return L.divIcon({ html: `<div style="font-size:22px;">${emoji}</div>`, className: '', iconSize: [26, 26], iconAnchor: [13, 22] });
-    }
+    </aside>
 
-    async function placeStaticMarkers() {
-        const pickupLatLng = await geocode(pickupAddressText);
-        if (pickupLatLng) {
-            pickupMarker = L.marker(pickupLatLng, { icon: pickupIcon('📍') }).addTo(map).bindPopup('Pickup Location');
-            addToBounds(pickupLatLng);
-        }
+    <!-- MAIN CONTENT -->
+    <main class="grad-main">
+        {% if shipment %}
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        {% endif %}
+        <style>
+            /* ===== Live Tracking Map ===== */
+            .live-info-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 14px;
+                margin: 20px 0;
+            }
 
-        if (originWarehouse) {
-            const whLatLng = [originWarehouse.latitude, originWarehouse.longitude];
-            warehouseMarker = L.marker(whLatLng, { icon: pickupIcon('🏭') }).addTo(map).bindPopup(originWarehouse.name || 'Warehouse');
-            addToBounds(whLatLng);
-        }
+            .live-info-cell {
+                background: #F7F5EE;
+                border: 1px solid #E2DFD3;
+                border-radius: 8px;
+                padding: 12px 14px;
+            }
 
-        const destLatLng = await geocode(destinationAddressText);
-        if (destLatLng) {
-            destMarker = L.marker(destLatLng, { icon: pickupIcon('📍') }).addTo(map).bindPopup('Delivery Destination');
-            addToBounds(destLatLng);
-            window.__destLatLng = destLatLng;
-        }
-    }
+            .live-info-cell .li-k {
+                font-size: 11px;
+                color: #5C6B7A;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+                font-weight: 600;
+            }
 
-    function timeAgo(isoString) {
-        if (!isoString) return '—';
-        const seconds = Math.floor((Date.now() - new Date(isoString + 'Z')) / 1000);
-        if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
-        if (seconds < 86400) return Math.floor(seconds / 3600) + ' hr ago';
-        return Math.floor(seconds / 86400) + ' day(s) ago';
-    }
+            .live-info-cell .li-v {
+                font-size: 14px;
+                color: #0B1F3A;
+                font-weight: 700;
+                margin-top: 4px;
+            }
 
-    function formatLastUpdated(isoString) {
-        if (!isoString) return 'Not available';
-        const d = new Date(isoString);
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        let hours = d.getHours();
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12; if (hours === 0) hours = 12;
-        return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()} ${hours}:${minutes} ${ampm}`;
-    }
+            #tracking-map {
+                height: 340px;
+                border-radius: 10px;
+                margin: 16px 0 22px;
+                border: 1px solid #E2DFD3;
+            }
 
-    async function pollLocation() {
-        try {
-            const res = await fetch(`/api/tracking/${encodeURIComponent(trackingId)}/location`);
-            if (!res.ok) return;
-            const data = await res.json();
+            .route-legend {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                font-size: 12.5px;
+                color: #5C6B7A;
+                margin-bottom: 10px;
+            }
 
-            document.getElementById('live-current-location').textContent = data.current_location_text || 'Not available yet';
-            document.getElementById('live-eta').textContent = data.eta_label || 'Calculating...';
-            document.getElementById('live-updated').textContent = formatLastUpdated(data.last_updated_at);
-            document.getElementById('live-agent').textContent = data.delivery_agent_name || data.pickup_agent_name || 'Not yet assigned';
-
-            if (data.latitude != null && data.longitude != null) {
-                const agentLatLng = [data.latitude, data.longitude];
-                if (!agentMarker) {
-                    agentMarker = L.marker(agentLatLng, { icon: pickupIcon('🚚') }).addTo(map).bindPopup('Delivery Agent — live location');
-                } else {
-                    agentMarker.setLatLng(agentLatLng);
-                }
-                addToBounds(agentLatLng);
-
-                if (window.__destLatLng) {
-                    if (routeLine) map.removeLayer(routeLine);
-                    routeLine = L.polyline([agentLatLng, window.__destLatLng], { color: '#F5A623', dashArray: '6 6', weight: 3 }).addTo(map);
+            @media (max-width: 700px) {
+                .live-info-grid {
+                    grid-template-columns: repeat(2, 1fr);
                 }
             }
-        } catch (e) { /* polling failure is non-fatal; try again next interval */ }
-    }
+        </style>
+        <style>
+            .track-page {
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 40px 5%;
+            }
 
-    placeStaticMarkers().then(() => {
-        pollLocation();
-        if (shipmentStatus !== 'Delivered') {
-            setInterval(pollLocation, 15000); // poll every 15s until delivered
-        }
-    });
+            .track-search-card {
+                background: #fff;
+                border: 1px solid var(--d-line, #E2DFD3);
+                border-radius: 14px;
+                padding: 26px 28px;
+                box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
+                margin-bottom: 24px;
+            }
+
+            .track-search-card h2 {
+                margin: 0 0 4px;
+                color: #0B1F3A;
+            }
+
+            .track-search-card p {
+                color: #5C6B7A;
+                font-size: 13.5px;
+                margin: 0 0 18px;
+            }
+
+            .track-search-form {
+                display: flex;
+                gap: 10px;
+            }
+
+            .track-search-form input {
+                flex: 1;
+                width: auto;
+                margin-top: 0;
+                box-sizing: border-box;
+                padding: 11px 14px;
+                border: 1px solid #E2DFD3;
+                border-radius: 7px;
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                color: #0B1F3A;
+            }
+
+            .track-search-form button {
+                width: auto;
+                margin-top: 0;
+                box-sizing: border-box;
+                background: #0B1F3A;
+                color: white;
+                border: none;
+                padding: 0 22px;
+                border-radius: 7px;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 14px;
+            }
+
+            .track-result-card {
+                background: #fff;
+                border: 1px solid var(--d-line, #E2DFD3);
+                border-radius: 14px;
+                padding: 28px;
+                box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
+            }
+
+            .track-result-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-bottom: 22px;
+            }
+
+            .track-result-head .tid {
+                font-family: 'Courier New', monospace;
+                font-size: 18px;
+                font-weight: 700;
+                color: #0B1F3A;
+            }
+
+            .progress-track {
+                position: relative;
+                height: 6px;
+                background: #E2DFD3;
+                border-radius: 4px;
+                margin: 30px 0 34px;
+            }
+
+            .progress-fill {
+                position: absolute;
+                left: 0;
+                top: 0;
+                height: 100%;
+                background: #F5A623;
+                border-radius: 4px;
+            }
+
+            .progress-marker {
+                position: absolute;
+                top: 50%;
+                width: 18px;
+                height: 18px;
+                background: #0B1F3A;
+                border: 3px solid #F5A623;
+                border-radius: 50%;
+                transform: translate(-50%, -50%);
+            }
+
+            .timeline {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            .timeline li {
+                display: flex;
+                gap: 14px;
+                padding-bottom: 20px;
+                position: relative;
+            }
+
+            .timeline li:not(:last-child)::before {
+                content: '';
+                position: absolute;
+                left: 7px;
+                top: 22px;
+                bottom: 0;
+                width: 2px;
+                background: #E2DFD3;
+            }
+
+            .timeline .tdot {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #1B6B6B;
+                flex-shrink: 0;
+                margin-top: 2px;
+            }
+
+            .timeline .tbody b {
+                display: block;
+                color: #0B1F3A;
+                font-size: 14px;
+            }
+
+            .timeline .tbody span {
+                color: #5C6B7A;
+                font-size: 12.5px;
+            }
+        </style>
+
+        <div class="track-page">
+
+            <div class="track-search-card">
+                <h2>Track Your Shipment</h2>
+                <p>Enter your Tracking ID to see live status and delivery history.</p>
+                <form class="track-search-form" method="GET" action="{{ url_for('shipments.track') }}">
+                    <input type="text" name="tracking_id" placeholder="e.g. CL20260830X7F2"
+                        value="{{ tracking_id or '' }}">
+                    <button type="submit">Track</button>
+                </form>
+            </div>
+
+            {% if shipment %}
+            <div class="track-result-card">
+                <div class="track-result-head">
+                    <div>
+                        <div class="tid">{{ shipment.tracking_id }}</div>
+                        <div style="color:#5C6B7A; font-size:13px; margin-top:4px;">To: {{ shipment.receiver_name }}, {{
+                            shipment.receiver_address }}</div>
+                    </div>
+                    <span
+                        class="pill {{ 'delivered' if shipment.status == 'Delivered' else ('failed' if shipment.status in ['Failed Delivery','RTO'] else 'transit') }}">{{
+                        shipment.status }}</span>
+                </div>
+
+                <div class="progress-track">
+                    <div class="progress-fill" style="width: {{ progress }}%;"></div>
+                    <div class="progress-marker" style="left: {{ progress }}%;"></div>
+                </div>
+
+                <!-- LIVE TRACKING (additive) -->
+                <div class="live-info-grid">
+                    <div class="live-info-cell">
+                        <div class="li-k">Current Location</div>
+                        <div class="li-v" id="live-current-location">{{ live_location_text or 'Not available yet' }}
+                        </div>
+                    </div>
+                    <div class="live-info-cell">
+                        <div class="li-k">ETA</div>
+                        <div class="li-v" id="live-eta">{{ eta_label }}</div>
+                    </div>
+                    <div class="live-info-cell">
+                        <div class="li-k">Last Updated</div>
+                        <div class="li-v" id="live-updated">{{ (last_updated_at | ist('%b %d, %Y %I:%M %p')) if
+                            last_updated_at
+                            else 'Not available' }}</div>
+                    </div>
+                    <div class="live-info-cell">
+                        <div class="li-k">Assigned Agent</div>
+                        <div class="li-v" id="live-agent">{{ delivery_agent_name or pickup_agent_name or 'Not yet
+                            assigned' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="route-legend">📍 Pickup &nbsp;→&nbsp; 🏭 Warehouse &nbsp;→&nbsp; 🚚 Delivery Agent
+                    &nbsp;→&nbsp; 📍
+                    Destination</div>
+                <div id="tracking-map"></div>
+
+                <h4 style="color:#0B1F3A; margin-bottom:14px;">Tracking History</h4>
+                <ul class="timeline">
+                    {% for h in history|reverse %}
+                    <li>
+                        <div class="tdot"></div>
+                        <div class="tbody">
+                            <b>{{ h.status }}</b>
+                            <span>{{ h.location or '' }}{% if h.remarks %} — {{ h.remarks }}{% endif %}</span><br>
+                            <span>{{ (h.timestamp | ist('%b %d, %Y %I:%M %p')) if h.timestamp else '' }}</span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% elif tracking_id %}
+            <div class="track-result-card" style="text-align:center; color:#5C6B7A;">
+                No shipment found with that Tracking ID. Double-check and try again.
+            </div>
+            {% endif %}
+
+        </div>
+
+        {% if shipment %}
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            (function () {
+                const trackingId = {{ shipment.tracking_id | tojson
+            }};
+            const pickupAddressText = {{ shipment.sender_address | tojson }};
+            const destinationAddressText = {{ shipment.receiver_address | tojson }};
+            const shipmentStatus = {{ shipment.status | tojson }};
+            const originWarehouse = {{ origin_warehouse_json | tojson }};
+
+            const map = L.map('tracking-map').setView([20.5937, 78.9629], 5); // default: India-wide view
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 18,
+            }).addTo(map);
+
+            let pickupMarker = null, warehouseMarker = null, agentMarker = null, destMarker = null;
+            let routeLine = null;
+            const bounds = [];
+
+            function addToBounds(latlng) { bounds.push(latlng); if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] }); }
+
+            async function geocode(address) {
+                if (!address) return null;
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`);
+                    const data = await res.json();
+                    if (data && data.length) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+                } catch (e) { /* geocoding is best-effort; silently skip the pin */ }
+                return null;
+            }
+
+            function pickupIcon(emoji) {
+                return L.divIcon({ html: `<div style="font-size:22px;">${emoji}</div>`, className: '', iconSize: [26, 26], iconAnchor: [13, 22] });
+            }
+
+            async function placeStaticMarkers() {
+                const pickupLatLng = await geocode(pickupAddressText);
+                if (pickupLatLng) {
+                    pickupMarker = L.marker(pickupLatLng, { icon: pickupIcon('📍') }).addTo(map).bindPopup('Pickup Location');
+                    addToBounds(pickupLatLng);
+                }
+
+                if (originWarehouse) {
+                    const whLatLng = [originWarehouse.latitude, originWarehouse.longitude];
+                    warehouseMarker = L.marker(whLatLng, { icon: pickupIcon('🏭') }).addTo(map).bindPopup(originWarehouse.name || 'Warehouse');
+                    addToBounds(whLatLng);
+                }
+
+                const destLatLng = await geocode(destinationAddressText);
+                if (destLatLng) {
+                    destMarker = L.marker(destLatLng, { icon: pickupIcon('📍') }).addTo(map).bindPopup('Delivery Destination');
+                    addToBounds(destLatLng);
+                    window.__destLatLng = destLatLng;
+                }
+            }
+
+            function timeAgo(isoString) {
+                if (!isoString) return '—';
+                const seconds = Math.floor((Date.now() - new Date(isoString + 'Z')) / 1000);
+                if (seconds < 60) return 'Just now';
+                if (seconds < 3600) return Math.floor(seconds / 60) + ' min ago';
+                if (seconds < 86400) return Math.floor(seconds / 3600) + ' hr ago';
+                return Math.floor(seconds / 86400) + ' day(s) ago';
+            }
+
+            function formatLastUpdated(isoString) {
+                if (!isoString) return 'Not available';
+                const d = new Date(isoString);
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                let hours = d.getHours();
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12; if (hours === 0) hours = 12;
+                return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${d.getFullYear()} ${hours}:${minutes} ${ampm}`;
+            }
+
+            async function pollLocation() {
+                try {
+                    const res = await fetch(`/api/tracking/${encodeURIComponent(trackingId)}/location`);
+                    if (!res.ok) return;
+                    const data = await res.json();
+
+                    document.getElementById('live-current-location').textContent = data.current_location_text || 'Not available yet';
+                    document.getElementById('live-eta').textContent = data.eta_label || 'Calculating...';
+                    document.getElementById('live-updated').textContent = data.last_updated_at_ist || 'Not available';
+                    document.getElementById('live-agent').textContent = data.delivery_agent_name || data.pickup_agent_name || 'Not yet assigned';
+
+                    if (data.latitude != null && data.longitude != null) {
+                        const agentLatLng = [data.latitude, data.longitude];
+                        if (!agentMarker) {
+                            agentMarker = L.marker(agentLatLng, { icon: pickupIcon('🚚') }).addTo(map).bindPopup('Delivery Agent — live location');
+                        } else {
+                            agentMarker.setLatLng(agentLatLng);
+                        }
+                        addToBounds(agentLatLng);
+
+                        if (window.__destLatLng) {
+                            if (routeLine) map.removeLayer(routeLine);
+                            routeLine = L.polyline([agentLatLng, window.__destLatLng], { color: '#F5A623', dashArray: '6 6', weight: 3 }).addTo(map);
+                        }
+                    }
+                } catch (e) { /* polling failure is non-fatal; try again next interval */ }
+            }
+
+            placeStaticMarkers().then(() => {
+                pollLocation();
+                if (shipmentStatus !== 'Delivered') {
+                    setInterval(pollLocation, 15000); // poll every 15s until delivered
+                }
+            });
 }) ();
-</script>
-{% endif %}
+        </script>
+        {% endif %}
+    </main>
+</div>
 {% endblock %}

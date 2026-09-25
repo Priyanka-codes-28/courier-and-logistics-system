@@ -1,4 +1,4 @@
-/* ===== Design tokens ===== */
+/* Design tokens */
 :root {
     --ink: #0B1F3A;
     --ink-soft: #16305A;
@@ -9,6 +9,15 @@
     --teal: #1B6B6B;
     --line: #E2DFD3;
     --text-dim: #5C6B7A;
+}
+
+[data-theme="dark"] {
+    --ink: #E7EBF2;
+    --ink-soft: #C7D3E6;
+    --paper: #121826;
+    --paper-card: #1c2434;
+    --line: #3a4358;
+    --text-dim: #a8b2c4;
 }
 
 * {
@@ -870,5 +879,656 @@ h3 {
 
     .tracking-form button {
         width: 100%;
+    }
+}
+
+/* Theme Variables */
+:root {
+    --page-bg: #ffffff;
+    --section-bg: #f1efe6;
+    --card-bg: #ffffff;
+    --nav-bg: rgba(255, 255, 255, 0.96);
+    --primary-text: #0b1f3a;
+    --secondary-text: #5c6b7a;
+    --border-color: #e2dfd3;
+    --primary-button: #0b1f3a;
+    --primary-button-text: #ffffff;
+    --accent-color: #1b6b6b;
+    --input-bg: #ffffff;
+    --footer-bg: #0b1f3a;
+    --footer-text: #a9b6c6;
+}
+
+[data-theme="dark"] {
+    --page-bg: #0b1220;
+    --section-bg: #111b2e;
+    --card-bg: #162238;
+    --nav-bg: rgba(11, 18, 32, 0.97);
+    --primary-text: #f1f5ff;
+    --secondary-text: #b4c0d4;
+    --border-color: #34435d;
+    --primary-button: #2878e8;
+    --primary-button-text: #ffffff;
+    --accent-color: #35c6c0;
+    --input-bg: #101a2b;
+    --footer-bg: #070d19;
+    --footer-text: #b4c0d4;
+}
+
+/* Main Page */
+
+body.landing {
+    background: var(--page-bg);
+    color: var(--primary-text);
+    transition: background-color 0.25s ease,
+        color 0.25s ease;
+}
+
+/* Headings and Text */
+
+body.landing h1,
+body.landing h2,
+body.landing h3,
+body.landing h4,
+body.landing h5 {
+    color: var(--primary-text);
+}
+
+body.landing p {
+    color: var(--secondary-text);
+}
+
+/* Navigation */
+
+.l-nav {
+    background: var(--nav-bg);
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.25s ease;
+}
+
+.l-nav .logo {
+    color: var(--primary-text);
+}
+
+.l-nav-center a,
+.l-nav-right a.login {
+    color: var(--primary-text);
+}
+
+.l-nav-center a:hover {
+    color: var(--accent-color);
+}
+
+.l-nav-right a.signup {
+    background: var(--primary-button);
+    color: var(--primary-button-text);
+}
+
+.l-nav-right a.signup:hover {
+    opacity: 0.88;
+}
+
+/* Hero */
+
+.hero {
+    background: var(--page-bg);
+}
+
+.hero h1 {
+    color: var(--primary-text);
+}
+
+.hero h1 span {
+    color: var(--accent-color);
+}
+
+.hero p.lead {
+    color: var(--secondary-text);
+}
+
+.btn-primary {
+    background: var(--primary-button);
+    color: var(--primary-button-text);
+}
+
+.btn-primary:hover {
+    opacity: 0.88;
+}
+
+.btn-outline {
+    color: var(--primary-text);
+    border-color: var(--primary-text);
+}
+
+.btn-outline:hover {
+    background: var(--primary-button);
+    color: #ffffff;
+}
+
+/* Dashboard Mockup */
+
+.dash-mock {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    box-shadow: 0 25px 55px -25px rgba(0, 0, 0, 0.3);
+}
+
+.dash-mock-bar {
+    border-bottom-color: var(--border-color);
+}
+
+.dash-mock-bar span {
+    background: var(--border-color);
+}
+
+.dash-side {
+    background: #10264a;
+}
+
+.dash-side .item {
+    color: #c4d0e2;
+}
+
+.dash-side .item.active {
+    background: rgba(53, 198, 192, 0.16);
+    color: #35c6c0;
+}
+
+.dash-main {
+    background: var(--card-bg);
+}
+
+.dash-stat,
+.dash-chart {
+    border-color: var(--border-color);
+    background: var(--card-bg);
+}
+
+.dash-stat .k,
+.dash-chart .k {
+    color: var(--secondary-text);
+}
+
+.dash-stat .v,
+.dash-row .id {
+    color: var(--primary-text);
+}
+
+.dash-stat .v.up,
+.dash-row .status.done {
+    color: var(--accent-color);
+}
+
+.dash-row {
+    border-top-color: var(--border-color);
+}
+
+.dash-row .status.transit {
+    color: var(--amber);
+}
+
+/* Features */
+
+.features {
+    background: var(--page-bg);
+}
+
+.feature-card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.feature-card:hover {
+    border-color: var(--amber);
+}
+
+.feature-card .icon {
+    background: var(--primary-button);
+}
+
+.feature-card h4 {
+    color: var(--primary-text);
+}
+
+.feature-card p {
+    color: var(--secondary-text);
+}
+
+/* ===== How It Works ===== */
+
+.how {
+    background: var(--section-bg);
+}
+
+.how h2,
+.how-step .lbl {
+    color: var(--primary-text);
+}
+
+.how-step .num {
+    background: var(--card-bg);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.how-step:nth-child(even) .num,
+.how-step.alt .num {
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+.how-step .desc,
+.how-arrow {
+    color: var(--secondary-text);
+}
+
+/* Why Choose Us */
+
+.why {
+    background: var(--page-bg);
+}
+
+.why h2,
+.why-item h5 {
+    color: var(--primary-text);
+}
+
+.why-item p {
+    color: var(--secondary-text);
+}
+
+.why-item .icon {
+    background: rgba(53, 198, 192, 0.12);
+    color: var(--accent-color);
+}
+
+/* Track Preview */
+
+.track-preview {
+    background: var(--page-bg);
+}
+
+.track-card {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.track-map {
+    background: var(--section-bg);
+}
+
+.track-info {
+    background: var(--card-bg);
+    border-left-color: var(--border-color);
+}
+
+.pin-label {
+    background: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--primary-text);
+}
+
+.pin-label.active {
+    color: var(--amber);
+}
+
+.live-badge {
+    background: var(--section-bg);
+    color: var(--primary-text);
+}
+
+.track-info h3 {
+    color: var(--primary-text);
+}
+
+.track-row {
+    border-top-color: var(--border-color);
+}
+
+.track-row .k {
+    color: var(--secondary-text);
+}
+
+.track-row .v {
+    color: var(--primary-text);
+}
+
+.track-row .v.status-tag {
+    color: var(--amber);
+}
+
+/* CTA Section */
+
+.cta-band {
+    background: var(--footer-bg);
+}
+
+.cta-band h2 {
+    color: #ffffff;
+}
+
+.cta-band p {
+    color: var(--footer-text);
+}
+
+.cta-band .btn-primary {
+    background: var(--amber);
+    color: #0b1f3a;
+}
+
+/* Footer */
+
+.l-footer {
+    background: var(--footer-bg);
+    color: var(--footer-text);
+}
+
+.footer-brand .logo,
+.footer-col h5 {
+    color: #ffffff;
+}
+
+.footer-brand p,
+.footer-col a {
+    color: var(--footer-text);
+}
+
+.footer-col a:hover {
+    color: var(--amber);
+}
+
+.footer-social span {
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.footer-bottom {
+    border-top-color: rgba(255, 255, 255, 0.15);
+    color: var(--footer-text);
+}
+
+/* ===== Tracking Section ===== */
+
+.track-section {
+    background: var(--section-bg);
+}
+
+.track-label {
+    color: var(--amber);
+}
+
+.track-content h2 {
+    color: var(--primary-text);
+}
+
+.track-content p,
+.track-content small {
+    color: var(--secondary-text);
+}
+
+.tracking-form {
+    background: var(--input-bg);
+    border-color: var(--border-color);
+}
+
+.tracking-form input {
+    background: transparent;
+    color: var(--primary-text);
+}
+
+.tracking-form input::placeholder {
+    color: var(--secondary-text);
+}
+
+/* Dark Mode Transitions */
+
+.l-nav,
+.hero,
+.features,
+.how,
+.why,
+.track-preview,
+.track-section,
+.dash-mock,
+.dash-main,
+.dash-stat,
+.dash-chart,
+.feature-card,
+.track-card,
+.track-info,
+.tracking-form,
+.l-footer {
+    transition: background-color 0.25s ease,
+        border-color 0.25s ease,
+        color 0.25s ease;
+}
+
+/* RESPONSIVE DESIGN */
+
+/* Tablet */
+
+@media screen and (max-width: 900px) {
+
+    .hero {
+        grid-template-columns: 1fr;
+        gap: 35px;
+        padding: 55px 6% 35px;
+    }
+
+    .hero h1 {
+        font-size: 40px;
+    }
+
+    .dash-body {
+        grid-template-columns: 130px 1fr;
+    }
+
+    .cta-band {
+        margin-left: 5%;
+        margin-right: 5%;
+        padding: 40px 30px;
+    }
+}
+
+/* ===== Mobile ===== */
+
+@media screen and (max-width: 560px) {
+
+    .l-nav {
+        padding: 14px 5%;
+    }
+
+    .l-nav .logo {
+        font-size: 16px;
+    }
+
+    .l-nav-right {
+        gap: 8px;
+    }
+
+    .l-nav-right a.login {
+        font-size: 12px;
+    }
+
+    .l-nav-right a.signup {
+        padding: 8px 11px;
+        font-size: 12px;
+    }
+
+    .hero {
+        padding: 35px 5% 25px;
+        gap: 25px;
+    }
+
+    .hero h1 {
+        font-size: 32px;
+    }
+
+    .hero p.lead {
+        font-size: 14px;
+    }
+
+    .hero-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .hero-actions a {
+        text-align: center;
+        width: 100%;
+    }
+
+    .dash-body {
+        grid-template-columns: 80px 1fr;
+        min-height: 280px;
+    }
+
+    .dash-side {
+        padding: 10px 6px;
+    }
+
+    .dash-side .item {
+        font-size: 10px;
+        padding: 8px 5px;
+    }
+
+    .dash-main {
+        padding: 10px;
+    }
+
+    .dash-stats {
+        gap: 5px;
+    }
+
+    .dash-stat {
+        padding: 7px;
+    }
+
+    .dash-stat .k {
+        font-size: 9px;
+    }
+
+    .dash-stat .v {
+        font-size: 14px;
+    }
+
+    .dash-chart {
+        padding: 8px;
+    }
+
+    .dash-row {
+        font-size: 9px;
+    }
+
+    .features,
+    .why,
+    .track-preview {
+        padding: 55px 5% 45px;
+    }
+
+    .features h2,
+    .how h2,
+    .why h2,
+    .track-preview h2,
+    .track-content h2 {
+        font-size: 26px;
+    }
+
+    .feature-grid,
+    .why-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .how {
+        padding: 55px 5%;
+    }
+
+    .how-track {
+        flex-direction: column;
+        align-items: center;
+        gap: 25px;
+    }
+
+    .how-step {
+        width: 100%;
+    }
+
+    .cta-band {
+        margin: 0 5% 50px;
+        padding: 35px 20px;
+        text-align: center;
+    }
+
+    .cta-band h2 {
+        font-size: 23px;
+    }
+
+    .footer-grid {
+        grid-template-columns: 1fr;
+        gap: 25px;
+    }
+
+    .l-footer {
+        padding: 45px 5% 25px;
+    }
+
+    .track-section {
+        padding: 55px 5%;
+    }
+
+    .tracking-form {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .tracking-form input,
+    .tracking-form button {
+        width: 100%;
+    }
+}
+
+/* ===== Small Mobile ===== */
+
+@media screen and (max-width: 400px) {
+
+    .l-nav {
+        padding: 12px;
+    }
+
+    .l-nav .logo {
+        font-size: 14px;
+    }
+
+    .l-nav-right a.login {
+        font-size: 11px;
+    }
+
+    .l-nav-right a.signup {
+        padding: 7px 9px;
+        font-size: 11px;
+    }
+
+    .hero h1 {
+        font-size: 28px;
+    }
+
+    .dash-body {
+        grid-template-columns: 65px 1fr;
+    }
+
+    .dash-side .item {
+        font-size: 9px;
+        padding: 7px 3px;
+    }
+
+    .dash-stat .v {
+        font-size: 12px;
+    }
+
+    .dash-row {
+        font-size: 8px;
+    }
+
+    .cta-band h2 {
+        font-size: 20px;
     }
 }

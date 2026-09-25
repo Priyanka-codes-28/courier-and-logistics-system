@@ -4,11 +4,21 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">
+    ☰
+</button>
 
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="grad-shell">
 
     <!-- GRADIENT SIDEBAR -->
-    <aside class="grad-sidebar">
+    <aside class="grad-sidebar" id="warehouseSidebar">
+        <!-- MOBILE CLOSE BUTTON -->
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button">
+            ✕
+        </button>
         <div class="brand"><span class="dot"></span>CourierOS</div>
         <nav class="grad-nav">
             <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>

@@ -1,0 +1,15 @@
+{% extends "emails/base_email.html" %}
+
+{% block email_title %}Welcome to CourierOS{% endblock %}
+{% block preheader %}Your CourierOS account is ready{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 12px; color:#1c2733; font-size:20px;">Welcome, {{ name or 'there' }}!</h2>
+<p style="margin:0 0 16px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Your CourierOS account has been created successfully. You can now create shipments,
+    track deliveries in real time, and manage everything from your dashboard.
+</p>
+<p style="margin:0; color:#4a5568; font-size:14px; line-height:1.6;">
+    Thanks for choosing CourierOS for your courier and logistics needs.
+</p>
+{% endblock %}

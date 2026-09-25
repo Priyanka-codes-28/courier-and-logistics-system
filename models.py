@@ -1,7 +1,9 @@
 import secrets
 from datetime import datetime, timedelta
+from flask import current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db
+import email_utils
 class User:
     """Handles all DB operations for the users table."""
     @staticmethod
@@ -40,6 +42,49 @@ class User:
         with db.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE role = %s ORDER BY id LIMIT 1", (role,))
             return cur.fetchone()
+    # Google OAuth 2.0 / OpenID Connect ("Continue with Google")
+    @staticmethod
+    def find_by_google_id(google_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE google_id = %s", (google_id,))
+            return cur.fetchone()
+
+    @staticmethod
+    def create_google_user(name, email, google_id, profile_image=None, role="customer"):
+        unusable_password_hash = generate_password_hash(secrets.token_urlsafe(32))
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """INSERT INTO users (name, email, phone, password_hash, role, google_id, profile_image)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                (name, email, None, unusable_password_hash, role, google_id, profile_image),
+            )
+            return cur.fetchone()["id"]
+    @staticmethod
+    def link_google_id(user_id, google_id, profile_image=None):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET google_id = %s, profile_image = COALESCE(profile_image, %s) WHERE id = %s",
+                (google_id, profile_image, user_id),
+            )
+
+    @staticmethod
+    def find_or_create_google_user(google_id, email, name, profile_image=None):
+        
+        existing = User.find_by_google_id(google_id)
+        if existing:
+            return existing
+
+        existing = User.find_by_email(email)
+        if existing:
+            if not existing.get("google_id"):
+                User.link_google_id(existing["id"], google_id, profile_image)
+            return User.find_by_id(existing["id"])
+
+        user_id = User.create_google_user(name, email, google_id, profile_image, role="customer")
+        return User.find_by_id(user_id)
 
     @staticmethod
     def find_any():
@@ -130,33 +175,56 @@ class User:
         with db.cursor() as cur:
             cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
-    # Password reset
+    # ---------- Password reset ----------
 
     @staticmethod
-    def set_reset_token(email):
-        """Generates a reset token valid for 1 hour and stores it against the user."""
+    def set_reset_otp(email):
+        
         db = get_db()
-        token = secrets.token_urlsafe(32)
-        expiry = datetime.now() + timedelta(hours=1)
+        otp = "".join(secrets.choice("0123456789") for _ in range(6))
+        otp_hash = generate_password_hash(otp)
+        expiry = datetime.now() + timedelta(minutes=5)
         with db.cursor() as cur:
             cur.execute(
-                """UPDATE users SET reset_token = %s, reset_token_expiry = %s
+                """UPDATE users
+                   SET reset_token = %s, reset_token_expiry = %s, reset_otp_attempts = 0
                    WHERE email = %s""",
-                (token, expiry, email),
+                (otp_hash, expiry, email),
             )
-        return token
+        return otp
 
     @staticmethod
-    def find_by_reset_token(token):
+    def get_otp_reset_record(email):
+        """Row containing the hashed OTP, its expiry, and the current
+        attempt count for this email — used to verify a submitted OTP."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
-                """SELECT * FROM users
-                   WHERE reset_token = %s AND reset_token_expiry > %s""",
-                (token, datetime.now()),
+                "SELECT id, email, reset_token, reset_token_expiry, reset_otp_attempts FROM users WHERE email = %s",
+                (email,),
             )
             return cur.fetchone()
 
+    @staticmethod
+    def increment_otp_attempts(email):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET reset_otp_attempts = reset_otp_attempts + 1 WHERE email = %s",
+                (email,),
+            )
+
+    @staticmethod
+    def invalidate_reset_otp(email):
+        """Clears the OTP fields — called both on successful verification
+        (OTP must not be reusable) and when the attempt limit is hit
+        (forces the user to request a brand new OTP)."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET reset_token = NULL, reset_token_expiry = NULL, reset_otp_attempts = 0 WHERE email = %s",
+                (email,),
+            )
     @staticmethod
     def reset_password(user_id, new_password):
         db = get_db()
@@ -285,12 +353,44 @@ class Shipment:
     def update_status(shipment_id, new_status, location=None, remarks=None, updated_by=None):
         db = get_db()
         with db.cursor() as cur:
+            
+            cur.execute("SELECT status FROM shipments WHERE id = %s", (shipment_id,))
+            row = cur.fetchone()
+            previous_status = row["status"] if row else None
+
             cur.execute("UPDATE shipments SET status = %s WHERE id = %s", (new_status, shipment_id))
             cur.execute(
                 """INSERT INTO shipment_status_history (shipment_id, status, location, remarks, updated_by)
                    VALUES (%s, %s, %s, %s, %s)""",
                 (shipment_id, new_status, location, remarks, updated_by),
             )
+
+        if previous_status != new_status:
+            try:
+                _notify_shipment_status_change(shipment_id, new_status)
+            except Exception as e:
+                try:
+                    current_app.logger.error(
+                        f"[email_utils] status-change email failed for shipment {shipment_id} "
+                        f"-> {new_status}: {e}"
+                    )
+                except Exception:
+                    pass
+            # Agent / warehouse / admin notifications — additive, alongside the
+            # customer notification above, never in place of it. Same choke
+            # point, same previous-status dedup guard, own try/except so a
+            # failure here can never affect the customer email or the status
+            # write itself.
+            try:
+                _notify_role_based_status_change(shipment_id, new_status, remarks=remarks)
+            except Exception as e:
+                try:
+                    current_app.logger.error(
+                        f"[email_utils] role-based status-change email failed for shipment "
+                        f"{shipment_id} -> {new_status}: {e}"
+                    )
+                except Exception:
+                    pass
 
     @staticmethod
     def progress_percent(status):
@@ -493,7 +593,6 @@ class Shipment:
                 shipment_id=shipment_id,
                 message="New final delivery automatically assigned to you.",
             )
-
         if settings.get("in_app_notifications_enabled", True):
             shipment_row = Shipment.find_by_id(shipment_id)
             warehouse_id = None
@@ -732,7 +831,157 @@ class Shipment:
     def eta_label(status):
         return Shipment.ETA_BY_STATUS.get(status, "Calculating...")
 
+# Customer email notifications for shipment status changes.
 
+def _notify_shipment_status_change(shipment_id, new_status):
+    shipment = Shipment.find_by_id(shipment_id)
+    if not shipment:
+        return
+
+    customer = User.find_by_id(shipment["sender_id"])
+    if not customer or not customer.get("email"):
+        return
+
+    to_email = customer["email"]
+    to_name = customer["name"]
+    tracking_id = shipment["tracking_id"]
+
+    if new_status == "Awaiting Pickup":
+        agent_name = Shipment.get_agent_name_by_role(shipment_id, "pickup") or "Our team"
+        email_utils.send_pickup_assigned_email(
+            to_email, to_name, tracking_id, agent_name,
+            pickup_address=shipment.get("sender_address"),
+        )
+        return
+
+    if new_status == "Out for Delivery":
+        agent_name = Shipment.get_agent_name_by_role(shipment_id, "delivery") or "Our delivery team"
+        email_utils.send_out_for_delivery_email(
+            to_email, to_name, tracking_id, agent_name,
+            receiver_address=shipment.get("receiver_address"),
+        )
+        return
+
+    if new_status == "Delivered":
+        proof = DeliveryProof.find_by_shipment(shipment_id)
+        delivered_at = Shipment.get_last_update_timestamp(shipment_id)
+        email_utils.send_delivery_completed_email(
+            to_email, to_name, tracking_id,
+            delivered_at=delivered_at, proof=proof,
+        )
+        return
+
+    if new_status in ("Failed Delivery", "RTO"):
+        email_utils.send_failed_delivery_email(to_email, to_name, tracking_id, new_status)
+        return
+
+    if new_status in ("Picked Up", "In Transit", "Arrived at Warehouse", "Processing",
+                       "Ready for Dispatch", "Agent Assigned"):
+        email_utils.send_status_update_email(to_email, to_name, tracking_id, new_status)
+        return
+
+
+def _notify_role_based_status_change(shipment_id, new_status, remarks=None):
+    shipment = Shipment.find_by_id(shipment_id)
+    if not shipment:
+        return
+    tracking_id = shipment["tracking_id"]
+
+    def _agent_user(role):
+        agent_id = Shipment.get_agent_id_by_role(shipment_id, role)
+        if not agent_id:
+            return None
+        agent_user_id = DeliveryAgent.get_user_id(agent_id)
+        return User.find_by_id(agent_user_id) if agent_user_id else None
+
+    if new_status == "Awaiting Pickup":
+        agent_user = _agent_user("pickup")
+        if agent_user and agent_user.get("email"):
+            email_utils.send_agent_pickup_assigned_email(
+                agent_user["email"], agent_user["name"], tracking_id,
+                sender_name=shipment.get("sender_name"), sender_address=shipment.get("sender_address"),
+                receiver_name=shipment.get("receiver_name"), receiver_address=shipment.get("receiver_address"),
+                package_type=shipment.get("package_type"), weight=shipment.get("weight"),
+                status=new_status,
+            )
+        return
+
+    if new_status == "Agent Assigned":
+        agent_user = _agent_user("delivery")
+        if agent_user and agent_user.get("email"):
+            email_utils.send_agent_delivery_assigned_email(
+                agent_user["email"], agent_user["name"], tracking_id,
+                sender_name=shipment.get("sender_name"), receiver_name=shipment.get("receiver_name"),
+                receiver_address=shipment.get("receiver_address"),
+                package_type=shipment.get("package_type"), weight=shipment.get("weight"),
+                status=new_status,
+            )
+
+        warehouse_staff = User.find_first_by_role("warehouse_staff")
+        if warehouse_staff and warehouse_staff.get("email"):
+            email_utils.send_warehouse_delivery_assigned_email(
+                warehouse_staff["email"], warehouse_staff["name"], tracking_id,
+                agent_name=(agent_user["name"] if agent_user else "An agent"),
+                receiver_name=shipment.get("receiver_name"), receiver_address=shipment.get("receiver_address"),
+                status=new_status,
+            )
+        return
+
+    if new_status in ("Failed Delivery", "RTO"):
+        agent_user = _agent_user("delivery")
+        if agent_user and agent_user.get("email"):
+            email_utils.send_agent_failed_delivery_email(
+                agent_user["email"], agent_user["name"], tracking_id,
+                receiver_name=shipment.get("receiver_name"), receiver_address=shipment.get("receiver_address"),
+                status=new_status, remarks=remarks,
+            )
+
+        admin_user = User.find_first_by_role("admin")
+        if admin_user and admin_user.get("email"):
+            email_utils.send_admin_alert_email(
+                admin_user["email"], admin_user["name"],
+                subject_line=f"Failed Delivery / RTO — {tracking_id}",
+                tracking_id=tracking_id,
+                sender_name=shipment.get("sender_name"), receiver_name=shipment.get("receiver_name"),
+                status=new_status, remarks=remarks,
+                extra_info=(f"Assigned delivery agent: {agent_user['name']}" if agent_user else "No delivery agent was on record for this shipment."),
+            )
+        return
+
+    if new_status == "Arrived at Warehouse":
+        warehouse_staff = User.find_first_by_role("warehouse_staff")
+        if warehouse_staff and warehouse_staff.get("email"):
+            email_utils.send_warehouse_shipment_arrived_email(
+                warehouse_staff["email"], warehouse_staff["name"], tracking_id,
+                sender_name=shipment.get("sender_name"), receiver_name=shipment.get("receiver_name"),
+                package_type=shipment.get("package_type"), weight=shipment.get("weight"),
+                status=new_status,
+            )
+        return
+
+    if new_status == "Processing":
+        warehouse_staff = User.find_first_by_role("warehouse_staff")
+        if warehouse_staff and warehouse_staff.get("email"):
+            email_utils.send_warehouse_processing_email(
+                warehouse_staff["email"], warehouse_staff["name"], tracking_id,
+                sender_name=shipment.get("sender_name"), receiver_name=shipment.get("receiver_name"),
+                package_type=shipment.get("package_type"), weight=shipment.get("weight"),
+                status=new_status,
+            )
+        return
+
+    if new_status == "Ready for Dispatch":
+        warehouse_staff = User.find_first_by_role("warehouse_staff")
+        if warehouse_staff and warehouse_staff.get("email"):
+            email_utils.send_warehouse_ready_for_dispatch_email(
+                warehouse_staff["email"], warehouse_staff["name"], tracking_id,
+                receiver_name=shipment.get("receiver_name"), receiver_address=shipment.get("receiver_address"),
+                package_type=shipment.get("package_type"), weight=shipment.get("weight"),
+                status=new_status,
+            )
+        return
+
+    
 class DeliveryAgent:
 
     @staticmethod

@@ -2,3 +2,6 @@ flask
 psycopg2-binary
 werkzeug
 gunicorn
+requests
+authlib
+tzdata

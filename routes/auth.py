@@ -1,10 +1,57 @@
 import re
+import requests
+from datetime import datetime
 from functools import wraps
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
+from werkzeug.security import check_password_hash
 from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings
+import email_utils
+import google_oauth
 
 # BLUEPRINT
 auth_bp = Blueprint("auth", __name__)
+# Brute-force protection: after this many wrong OTP attempts, the OTP
+# is invalidated and the user must request a brand new one.
+MAX_OTP_ATTEMPTS = 5
+def _send_otp_email(to_email, otp):
+    subject = "CourierOS Password Reset OTP"
+    body = (
+        f"Your CourierOS password reset OTP is: {otp}\n\n"
+        f"This code expires in 5 minutes. If you didn't request a "
+        f"password reset, you can safely ignore this email."
+    )
+
+    payload = {
+        "sender": {
+            "name": current_app.config["BREVO_SENDER_NAME"],
+            "email": current_app.config["BREVO_SENDER_EMAIL"],
+        },
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "textContent": body,
+    }
+    headers = {
+        "api-key": current_app.config["BREVO_API_KEY"],
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    try:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+        if response.status_code in (200, 201):
+            return True
+        current_app.logger.error(
+            f"Brevo API error sending OTP email: {response.status_code} {response.text}"
+        )
+        return False
+    except requests.RequestException as e:
+        current_app.logger.error(f"Failed to reach Brevo API: {e}")
+        return False
 
 #INPUT VALIDATION
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -203,6 +250,14 @@ def register():
             flash("An account with this email already exists.", "danger")
             return redirect(url_for("auth.register"))
         User.create(name, email, phone, password, role="customer")
+
+        # Welcome email — never allowed to block registration if Brevo is
+        # down or misconfigured; email_utils logs any failure on its own.
+        try:
+            email_utils.send_welcome_email(email, name)
+        except Exception as e:
+            current_app.logger.error(f"[email_utils] welcome email failed for {email}: {e}")
+
         flash("Registration successful. Please log in.", "success")
         return redirect(url_for("auth.login"))
 
@@ -235,6 +290,75 @@ def login():
 
     return render_template("login.html")
 
+# GOOGLE SIGN IN / SIGN UP
+@auth_bp.route("/login/google")
+def google_login():
+    if not google_oauth.GOOGLE_OAUTH_CONFIGURED:
+        flash("Google sign-in isn't configured on this server yet. Please use your email and password.", "danger")
+        return redirect(url_for("auth.login"))
+
+    redirect_uri = url_for("auth.google_callback", _external=True)
+    return google_oauth.oauth.google.authorize_redirect(redirect_uri, prompt="select_account")
+
+
+@auth_bp.route("/login/google/callback")
+def google_callback():
+    if not google_oauth.GOOGLE_OAUTH_CONFIGURED:
+        flash("Google sign-in isn't configured on this server yet. Please use your email and password.", "danger")
+        return redirect(url_for("auth.login"))
+
+    try:
+        token = google_oauth.oauth.google.authorize_access_token()
+    except Exception as e:
+        current_app.logger.error(f"[google_oauth] authorize_access_token failed: {e}")
+        flash("Google sign-in was cancelled or could not be completed. Please try again.", "danger")
+        return redirect(url_for("auth.login"))
+    userinfo = token.get("userinfo")
+    if not userinfo:
+        try:
+            userinfo = google_oauth.oauth.google.userinfo(token=token)
+        except Exception as e:
+            current_app.logger.error(f"[google_oauth] userinfo fetch failed: {e}")
+            flash("We couldn't verify your Google account. Please try again.", "danger")
+            return redirect(url_for("auth.login"))
+
+    google_id = userinfo.get("sub")
+    email = (userinfo.get("email") or "").strip().lower()
+    email_verified = userinfo.get("email_verified", False)
+    name = (userinfo.get("name") or (email.split("@")[0] if email else "Google User")).strip()
+    picture = userinfo.get("picture")
+
+    if not google_id or not email:
+        flash("Google didn't return the account information we need. Please try again.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if not email_verified:
+        flash("Your Google email address isn't verified. Please verify it with Google and try again.", "danger")
+        return redirect(url_for("auth.login"))
+
+    try:
+        user = User.find_or_create_google_user(google_id, email, name, picture)
+    except Exception as e:
+        current_app.logger.error(f"[google_oauth] account lookup/creation failed for {email}: {e}")
+        flash("We couldn't complete Google sign-in right now. Please try again, or use your email and password.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if not user:
+        flash("We couldn't complete Google sign-in right now. Please try again.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if user.get("status") == "inactive":
+        flash("Your account has been deactivated. Please contact an administrator.", "danger")
+        return redirect(url_for("auth.login"))
+
+    session["user_id"] = user["id"]
+    session["user_name"] = user["name"]
+    session["user_email"] = user["email"]
+    session["user_role"] = user["role"]
+
+    flash(f"Welcome, {user['name']}!", "success")
+    return redirect(url_for("auth.dashboard"))
+
 #LOGOUT
 @auth_bp.route("/logout")
 def logout():
@@ -242,30 +366,75 @@ def logout():
     flash("You have been logged out.", "success")
     return redirect(url_for("auth.login"))
 
-#FORGOT PASSWORD
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         user = User.find_by_email(email)
-        
-        if user:
-            token = User.set_reset_token(email)
-            reset_link = url_for("auth.reset_password", token=token, _external=True)
-            flash(f"Reset link (for testing, since email isn't configured yet): {reset_link}", "success")
-        else:
-            flash("If an account exists with that email, a reset link has been generated.", "success")
 
-        return redirect(url_for("auth.forgot_password"))
+        if user:
+            otp = User.set_reset_otp(email)
+            email_sent = _send_otp_email(email, otp)
+            if not email_sent:
+                flash("We couldn't send the OTP email right now. Please try again in a moment.", "danger")
+                return redirect(url_for("auth.forgot_password"))
+            
+        session["otp_reset_email"] = email
+        flash("If an account exists with that email, a 6-digit OTP has been sent.", "success")
+        return redirect(url_for("auth.verify_otp"))
 
     return render_template("forgot_password.html")
 
-#RESET PASSWORD
-@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
-    user = User.find_by_reset_token(token)
-    if not user:
-        flash("This reset link is invalid or has expired. Please request a new one.", "danger")
+
+@auth_bp.route("/forgot-password/verify-otp", methods=["GET", "POST"])
+def verify_otp():
+    """Step 2: the user enters the 6-digit code from their email."""
+    email = session.get("otp_reset_email")
+    if not email:
+        flash("Please start the password reset process again.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    if request.method == "POST":
+        submitted_otp = request.form.get("otp", "").strip()
+        record = User.get_otp_reset_record(email)
+
+        generic_error = "Invalid or expired OTP. Please try again or request a new code."
+
+        if not record or not record["reset_token"]:
+            flash(generic_error, "danger")
+            return redirect(url_for("auth.verify_otp"))
+
+        if record["reset_otp_attempts"] >= MAX_OTP_ATTEMPTS:
+            User.invalidate_reset_otp(email)
+            flash("Too many incorrect attempts. Please request a new OTP.", "danger")
+            return redirect(url_for("auth.forgot_password"))
+
+        if not record["reset_token_expiry"] or record["reset_token_expiry"] < datetime.now():
+            User.invalidate_reset_otp(email)
+            flash("This OTP has expired. Please request a new one.", "danger")
+            return redirect(url_for("auth.forgot_password"))
+
+        if not check_password_hash(record["reset_token"], submitted_otp):
+            User.increment_otp_attempts(email)
+            flash(generic_error, "danger")
+            return redirect(url_for("auth.verify_otp"))
+
+        # Correct OTP — invalidate it immediately so it can never be
+        # reused, then mark this session as verified for the next step.
+        User.invalidate_reset_otp(email)
+        session.pop("otp_reset_email", None)
+        session["otp_verified_email"] = email
+        return redirect(url_for("auth.reset_password"))
+
+    return render_template("verify_otp.html")
+
+
+@auth_bp.route("/forgot-password/reset", methods=["GET", "POST"])
+def reset_password():
+    
+    email = session.get("otp_verified_email")
+    if not email:
+        flash("Please verify your OTP before resetting your password.", "danger")
         return redirect(url_for("auth.forgot_password"))
 
     if request.method == "POST":
@@ -274,13 +443,25 @@ def reset_password(token):
 
         if not password or password != confirm_password:
             flash("Passwords do not match.", "danger")
-            return redirect(url_for("auth.reset_password", token=token))
+            return redirect(url_for("auth.reset_password"))
+
+        if len(password) < 6:
+            flash("Password must be at least 6 characters long.", "danger")
+            return redirect(url_for("auth.reset_password"))
+
+        user = User.find_by_email(email)
+        if not user:
+            # Shouldn't happen (email existed earlier in this same flow),
+            # but fail safely rather than crash if it somehow does.
+            flash("Something went wrong. Please start again.", "danger")
+            return redirect(url_for("auth.forgot_password"))
 
         User.reset_password(user["id"], password)
+        session.pop("otp_verified_email", None)
         flash("Your password has been reset. Please log in.", "success")
         return redirect(url_for("auth.login"))
 
-    return render_template("reset_password.html", token=token)
+    return render_template("reset_password.html")
 
 #PROFILE & ACCOUNT MANAGEMENT
 @auth_bp.route("/profile", methods=["GET", "POST"])

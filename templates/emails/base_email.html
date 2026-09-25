@@ -1,0 +1,57 @@
+        <!DOCTYPE html>
+        <html lang="en">
+
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{% block email_title %}CourierOS{% endblock %}</title>
+        </head>
+
+        <body style="margin:0; padding:0; background-color:#f4f5f7; font-family: Arial, Helvetica, sans-serif;">
+
+            <span
+                style="display:none; font-size:1px; color:#f4f5f7; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">
+                {% block preheader %}{% endblock %}
+            </span>
+
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                style="background-color:#f4f5f7; padding:24px 0;">
+                <tr>
+                    <td align="center">
+
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                            style="max-width:560px; background-color:#ffffff; border-radius:10px; overflow:hidden; border:1px solid #e3e6eb;">
+
+                            {# ---------- header ---------- #}
+                            <tr>
+                                <td style="background-color:#1e3a5f; padding:22px 28px;">
+                                    <span style="color:#ffffff; font-size:20px; font-weight:bold;">&#128230;
+                                        CourierOS</span>
+                                </td>
+                            </tr>
+
+                            {# ---------- body ---------- #}
+                            <tr>
+                                <td style="padding:28px;">
+                                    {% block body %}{% endblock %}
+                                </td>
+                            </tr>
+
+                            {# ---------- footer ---------- #}
+                            <tr>
+                                <td style="padding:18px 28px; background-color:#f9fafb; border-top:1px solid #e3e6eb;">
+                                    <p style="margin:0; font-size:12px; color:#8a94a6; line-height:1.5;">
+                                        {% block footer_note %}This is an automated message from CourierOS — please
+                                        don't reply directly to this email.{% endblock %}
+                                    </p>
+                                </td>
+                            </tr>
+
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+        </body>
+
+        </html>

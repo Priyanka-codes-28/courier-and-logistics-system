@@ -1,0 +1,19 @@
+{% extends "emails/base_email.html" %}
+{% from "emails/_macros.html" import detail_table, status_pill %}
+
+{% block email_title %}{{ 'Return to Origin' if is_rto else 'Delivery Attempt Failed' }} — {{ tracking_id }}{% endblock
+%}
+{% block preheader %}{{ tracking_id }}: {{ status }}{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#b3261e; font-size:20px;">{{ 'Return to Origin' if is_rto else 'Delivery attempt
+    failed' }}</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, {{ message }} Our team will be in touch about next steps.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Status", status_pill(status, color="#b3261e")),
+]) }}
+{% endblock %}

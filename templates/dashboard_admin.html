@@ -4,11 +4,24 @@
 
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="adminMenuBtn" type="button" aria-label="Open menu">
+    ☰
+</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="adminSidebarOverlay">
+</div>
 
 <div class="grad-shell">
 
     <!-- GRADIENT SIDEBAR -->
-    <aside class="grad-sidebar">
+    <aside class="grad-sidebar" id="adminSidebar">
+
+        <!-- MOBILE CLOSE BUTTON -->
+        <button class="sidebar-close-btn" id="adminCloseBtn" type="button" aria-label="Close menu">
+            ✕
+        </button>
         <div class="brand"><span class="dot"></span>CourierOS</div>
         <nav class="grad-nav">
             <div class="item active">Dashboard</div>
@@ -20,6 +33,7 @@
             <a href="#notifications-log">Notifications Log</a>
             <a href="#system-settings">System Settings</a>
             <a href="{{ url_for('auth.profile') }}">Profile &amp; Account</a>
+
             <a href="{{ url_for('auth.logout') }}">Logout</a>
         </nav>
     </aside>
@@ -215,7 +229,7 @@
                             {% elif s.status == 'Created' %}<span class="pill created">{{ s.status }}</span>
                             {% else %}<span class="pill transit">{{ s.status }}</span>{% endif %}
                         </td>
-                        <td>{{ s.created_at.strftime('%b %d, %Y') if s.created_at else '' }}</td>
+                        <td>{{ (s.created_at | ist('%b %d, %Y')) if s.created_at else '' }}</td>
                     </tr>
                     {% endfor %}
                 </table>
@@ -263,20 +277,22 @@
                 <h3>Notifications Log</h3>
             </div>
             {% if notifications_log %}
-            <table class="dash-table">
-                <tr>
-                    <th>Recipient</th>
-                    <th>Message</th>
-                    <th>Date &amp; Time</th>
-                </tr>
-                {% for n in notifications_log %}
-                <tr>
-                    <td>{{ n.recipient_name }}</td>
-                    <td>{{ n.message }}</td>
-                    <td>{{ n.sent_at.strftime('%b %d, %Y, %I:%M %p') if n.sent_at else '—' }}</td>
-                </tr>
-                {% endfor %}
-            </table>
+            <div class="notification-log-scroll">
+                <table class="dash-table notification-log-table">
+                    <tr>
+                        <th>Recipient</th>
+                        <th>Message</th>
+                        <th>Date &amp; Time</th>
+                    </tr>
+                    {% for n in notifications_log %}
+                    <tr>
+                        <td>{{ n.recipient_name }}</td>
+                        <td>{{ n.message }}</td>
+                        <td>{{ (n.sent_at | ist('%b %d, %Y, %I:%M %p')) if n.sent_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
             {% else %}
             <div class="empty-note">No notifications sent yet.</div>
             {% endif %}
@@ -295,10 +311,6 @@
             </div>
         </div>
 
-        <!-- SYSTEM SETTINGS (now fully persisted in PostgreSQL via SystemSettings /
-         POST /admin/system-settings/save — replaces the old non-functional
-         mock, which called a saveSettingsDemo() function that didn't even
-         exist anywhere in the codebase.) -->
         <style>
             /* Scoped to System Settings only — doesn't touch dashboard.css */
             .settings-grid {
@@ -542,6 +554,47 @@
 
     </main>
 </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+        const menuBtn = document.getElementById("adminMenuBtn");
+        const closeBtn = document.getElementById("adminCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("adminSidebarOverlay");
+
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) {
+            return;
+        }
+
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+
+        menuBtn.addEventListener("click", openSidebar);
+
+        closeBtn.addEventListener("click", closeSidebar);
+
+        overlay.addEventListener("click", closeSidebar);
+
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) {
+                closeSidebar();
+            }
+        });
+
+    });
+</script>
+
 {% endblock %}

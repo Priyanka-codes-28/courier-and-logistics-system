@@ -1,0 +1,25 @@
+{% extends "emails/base_email.html" %}
+{% from "_macros.html" import detail_table, status_pill %}
+
+{% block email_title %}CourierOS Admin Alert{% endblock %}
+{% block preheader %}{{ tracking_id or "System" }}: needs review{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#b3261e; font-size:20px;">Admin alert</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, this shipment needs your review.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Status", status_pill(status, color="#b3261e") if status else None),
+("Sender", sender_name),
+("Receiver", receiver_name),
+("Remarks", remarks),
+("Details", extra_info),
+]) }}
+
+<p style="margin:16px 0 0; color:#4a5568; font-size:13px; line-height:1.6;">
+    Please review this in the CourierOS admin dashboard.
+</p>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "emails/base_email.html" %}
+{% from "_macros.html" import detail_table, status_pill %}
+
+{% block email_title %}New Pickup Assignment — {{ tracking_id }}{% endblock %}
+{% block preheader %}You've been assigned to pick up {{ tracking_id }}{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#1c2733; font-size:20px;">New pickup assignment</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, you've been assigned to pick up a shipment.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("Status", status_pill(status)),
+("Sender", sender_name),
+("Pickup Address", sender_address),
+("Receiver", receiver_name),
+("Delivery Address", receiver_address),
+("Package Type", package_type or "General"),
+("Weight", (weight ~ " kg") if weight else None),
+]) }}
+
+<p style="margin:16px 0 0; color:#4a5568; font-size:13px; line-height:1.6;">
+    Please check your CourierOS dashboard for full pickup details.
+</p>
+{% endblock %}

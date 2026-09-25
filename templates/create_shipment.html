@@ -1,49 +1,210 @@
 {% extends "base.html" %}
+
 {% block title %}Create Shipment{% endblock %}
-{% block container_class %}auth-narrow{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
 {% block content %}
-<div class="form-card">
-    <div class="form-icon">📦</div>
-    <h2>Create a Shipment</h2>
-    <p class="form-subtitle">Enter sender and receiver details. We'll generate a Tracking ID once it's booked.</p>
 
-    <form method="POST" action="{{ url_for('shipments.create_shipment') }}">
-        <label>Sender Name</label>
-        <input type="text" name="sender_name" placeholder="e.g. Priyanka Manuboti"
-            value="{{ sender.name if sender else '' }}" required>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 
-        <label>Sender Phone</label>
-        <input type="text" name="sender_phone" placeholder="10-digit mobile number"
-            value="{{ sender.phone if sender else '' }}" required>
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation menu">
+    ☰
+</button>
 
-        <label>Pickup Address</label>
-        <input type="text" name="sender_address" placeholder="Full pickup address" required>
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-        <hr style="margin:20px 0; border:none; border-top:1px solid #eee;">
 
-        <label>Receiver Name</label>
-        <input type="text" name="receiver_name" placeholder="e.g. Rahul Sharma" required>
+<!-- COURIEROS LAYOUT -->
+<div class="grad-shell">
 
-        <label>Receiver Phone</label>
-        <input type="text" name="receiver_phone" placeholder="10-digit mobile number" required>
+    <!-- LEFT NAVIGATION SIDEBAR -->
+    <aside class="grad-sidebar" id="customerSidebar">
 
-        <label>Delivery Address</label>
-        <input type="text" name="receiver_address" placeholder="Full delivery address" required>
+        <!-- MOBILE CLOSE BUTTON -->
+        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button" aria-label="Close navigation menu">
+            ✕
+        </button>
 
-        <hr style="margin:20px 0; border:none; border-top:1px solid #eee;">
 
-        <label>Package Type</label>
-        <input type="text" name="package_type" placeholder="e.g. Documents, Electronics, Clothing">
+        <!-- SIDEBAR BRAND -->
+        <div class="brand">
+            <span class="dot"></span>
+            CourierOS
+        </div>
 
-        <label>Package Description</label>
-        <input type="text" name="package_description" placeholder="e.g. 1 laptop, fragile">
 
-        <label>Package Weight (kg)</label>
-        <input type="number" step="0.1" name="weight" placeholder="e.g. 2.5">
+        <!-- SIDEBAR NAVIGATION -->
+        <nav class="grad-nav">
 
-        <button type="submit">Create Shipment</button>
-    </form>
+            <a href="{{ url_for('auth.dashboard') }}">
+                Dashboard
+            </a>
 
-    <p class="form-footer-link"><a href="{{ url_for('shipments.my_shipments') }}">← Back to My Shipments</a></p>
+            <a href="{{ url_for('shipments.my_shipments') }}">
+                My Shipments
+            </a>
+
+            <a href="{{ url_for('shipments.create_shipment') }}" class="active">
+                Create Shipment
+            </a>
+
+            <a href="{{ url_for('shipments.track') }}">
+                Track Shipment
+            </a>
+
+            <a href="{{ url_for('auth.dashboard') }}#notifications">
+                Delivery Notifications
+            </a>
+
+            <a href="{{ url_for('auth.dashboard') }}#delivery-proof">
+                Delivery Proof
+            </a>
+
+            <a href="{{ url_for('auth.profile') }}">
+                Profile &amp; Account
+            </a>
+
+            <a href="{{ url_for('auth.logout') }}">
+                Logout
+            </a>
+
+        </nav>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="grad-main">
+
+        <div class="form-card">
+
+            <!-- FORM ICON -->
+            <div class="form-icon">
+                📦
+            </div>
+
+
+            <!-- TITLE -->
+            <h2>
+                Create a Shipment
+            </h2>
+
+
+            <p class="form-subtitle">
+                Enter sender and receiver details.
+                We'll generate a Tracking ID once it's booked.
+            </p>
+
+
+            <!-- CREATE SHIPMENT FORM -->
+            <form method="POST" action="{{ url_for('shipments.create_shipment') }}">
+
+
+                <!-- SENDER DETAILS -->
+                <label>
+                    Sender Name
+                </label>
+
+                <input type="text" name="sender_name" placeholder="e.g. Priyanka Manuboti"
+                    value="{{ sender.name if sender else '' }}" required>
+
+
+                <label>
+                    Sender Phone
+                </label>
+
+                <input type="text" name="sender_phone" placeholder="10-digit mobile number"
+                    value="{{ sender.phone if sender else '' }}" required>
+
+
+                <label>
+                    Pickup Address
+                </label>
+
+                <input type="text" name="sender_address" placeholder="Full pickup address" required>
+
+
+                <hr style="
+                    margin:20px 0;
+                    border:none;
+                    border-top:1px solid #eee;
+                ">
+
+
+                <!-- RECEIVER DETAILS -->
+                <label>
+                    Receiver Name
+                </label>
+
+                <input type="text" name="receiver_name" placeholder="e.g. Rahul Sharma" required>
+
+
+                <label>
+                    Receiver Phone
+                </label>
+
+                <input type="text" name="receiver_phone" placeholder="10-digit mobile number" required>
+
+
+                <label>
+                    Delivery Address
+                </label>
+
+                <input type="text" name="receiver_address" placeholder="Full delivery address" required>
+
+
+                <hr style="
+                    margin:20px 0;
+                    border:none;
+                    border-top:1px solid #eee;
+                ">
+
+
+                <!-- PACKAGE DETAILS -->
+                <label>
+                    Package Type
+                </label>
+
+                <input type="text" name="package_type" placeholder="e.g. Documents, Electronics, Clothing">
+
+
+                <label>
+                    Package Description
+                </label>
+
+                <input type="text" name="package_description" placeholder="e.g. 1 laptop, fragile">
+
+
+                <label>
+                    Package Weight (kg)
+                </label>
+
+                <input type="number" step="0.1" name="weight" placeholder="e.g. 2.5">
+
+
+                <!-- SUBMIT -->
+                <button type="submit">
+                    Create Shipment
+                </button>
+
+            </form>
+
+
+            <!-- BACK LINK -->
+            <p class="form-footer-link">
+
+                <a href="{{ url_for('shipments.my_shipments') }}">
+                    ← Back to My Shipments
+                </a>
+
+            </p>
+
+        </div>
+
+    </main>
+
 </div>
+
 {% endblock %}
