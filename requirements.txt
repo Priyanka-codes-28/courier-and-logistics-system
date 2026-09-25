@@ -3,5 +3,6 @@ psycopg2-binary
 werkzeug
 gunicorn
 requests
+python-dotenv
 authlib
 tzdata
