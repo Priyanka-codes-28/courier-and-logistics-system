@@ -19,7 +19,14 @@ class Config:
     #Google Authentication
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
-    GOOGLE_DISCOVERY_URL = os.environ.get("GOOGLE_REDIRECT_URL", "https://accounts.google.com/.well-known/openid-configuration")
+    # Google OpenID Connect discovery URL
+    GOOGLE_DISCOVERY_URL = (
+        "https://accounts.google.com/.well-known/openid-configuration"
+    )
+
+    # Google OAuth callback URL
+    GOOGLE_REDIRECT_URL = os.environ.get("GOOGLE_REDIRECT_URL")
+
     
     UPLOAD_FOLDER = os.path.join("static", "uploads")
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024
