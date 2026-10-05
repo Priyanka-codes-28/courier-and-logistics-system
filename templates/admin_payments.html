@@ -1,0 +1,100 @@
+{% from "_pagination.html" import render_pagination %}
+{% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% block title %}Payment History{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">
+    ☰
+</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="grad-shell">
+
+    {{ admin_sidebar('payments') }}
+
+    <main class="grad-main">
+        <h1>Payment History</h1>
+        <p class="page-sub">All transactions across the system.</p>
+
+        <div class="info-row admin-6col">
+            <div class="info-card">
+                <div class="k">Total Revenue</div>
+                <div class="v">₹{{ total_revenue }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Total Transactions</div>
+                <div class="v">{{ pagination.total }}</div>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Transactions</h3>
+            </div>
+            {% if payments_list %}
+            <div class="table-scroll">
+                <table class="dash-table">
+                    <tr>
+                        <th>Tracking ID</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                        <th>Paid At</th>
+                    </tr>
+                    {% for p in payments_list %}
+                    <tr>
+                        <td class="mono">{{ p.tracking_id }}</td>
+                        <td>{{ p.customer_name }}</td>
+                        <td>₹{{ p.amount }}</td>
+                        <td>{{ p.payment_method or '—' }}</td>
+                        <td>
+                            {% if p.status == 'paid' %}<span class="pill delivered">Paid</span>
+                            {% else %}<span class="pill pending">Pending</span>{% endif %}
+                        </td>
+                        <td>{{ (p.paid_at | ist('%b %d, %Y, %I:%M %p')) if p.paid_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-note">No payments recorded yet.</div>
+            {% endif %}
+            {{ render_pagination(pagination, 'auth.admin_payments') }}
+        </div>
+    </main>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

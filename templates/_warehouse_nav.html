@@ -1,0 +1,44 @@
+{# Warehouse sidebar. Usage:
+{% from "_warehouse_nav.html" import wh_sidebar %}
+{{ wh_sidebar('incoming', unread_notification_count, name) }}
+active = dashboard | incoming | outgoing | assign | update | inventory |
+details | notifications | profile
+close_id (default "sidebarCloseBtn") is the 4th argument. #}
+{% from "_sidebar.html" import render_sidebar %}
+{% macro wh_sidebar(active, unread=0, name=none, close_id='sidebarCloseBtn') %}
+{{ render_sidebar(
+portal='Warehouse Portal',
+brand='cube',
+groups=[
+('Main', [
+('dashboard', 'home', 'Dashboard', url_for('auth.dashboard')),
+]),
+('Shipments', [
+('incoming', 'incoming', 'Incoming', url_for('auth.warehouse_incoming')),
+('outgoing', 'outgoing', 'Outgoing', url_for('auth.warehouse_outgoing')),
+('assign', 'assign', 'Assign Agent', url_for('auth.warehouse_assign_agent')),
+('update', 'status', 'Update Status', url_for('auth.warehouse_update_status')),
+]),
+('Warehouse', [
+('inventory', 'inventory', 'Inventory', url_for('auth.warehouse_inventory')),
+('details', 'building', 'Warehouse Details', url_for('auth.warehouse_details')),
+]),
+('Communication', [
+('notifications', 'bell', 'Notifications', url_for('auth.warehouse_notifications')),
+]),
+('Account', [
+('profile', 'user', 'Profile', url_for('auth.profile')),
+('logout', 'logout', 'Logout', url_for('auth.logout')),
+]),
+],
+active=active,
+aside_id='warehouseSidebar',
+close_id=close_id,
+user_name=name or 'Warehouse Staff',
+user_sub='Logged in',
+profile_href=url_for('auth.profile'),
+unread=unread,
+badges={'incoming': incoming_shipment_count(), 'outgoing': outgoing_shipment_count(), 'inventory':
+inventory_shipment_count()},
+badge_colors={'incoming': 'red', 'outgoing': 'green', 'inventory': 'orange'}) }}
+{% endmacro %}

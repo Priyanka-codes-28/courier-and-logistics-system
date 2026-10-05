@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
-from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings
+from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings, get_pagination
 import os
 import secrets
 from werkzeug.utils import secure_filename
@@ -19,6 +19,59 @@ def login_required_role(*roles):
     if roles and session.get("user_role") not in roles:
         return False
     return True
+
+
+def _customer_delivery_code(shipment):
+    """The ONLY place the plaintext code is produced: for the shipment's own
+    customer, while the shipment is Out for Delivery. Everyone else gets None."""
+    if not shipment or session.get("user_id") != shipment.get("sender_id"):
+        return None
+    if shipment.get("status") != "Out for Delivery":
+        return None
+    return Shipment.get_delivery_code_view(shipment["id"], include_code=True)
+
+
+def _agent_delivery_code_state(shipment):
+    """State only (never the code), and only for the assigned delivery agent."""
+    if not shipment or session.get("user_role") != "delivery_agent":
+        return None
+    agent = DeliveryAgent.find_by_user_id(session["user_id"])
+    if not agent or Shipment.get_agent_id_by_role(shipment["id"], "delivery") != agent["id"]:
+        return None
+    return Shipment.get_delivery_code_view(shipment["id"], include_code=False)
+
+
+def _email_delivery_code(shipment):
+    
+    try:
+        view = Shipment.get_delivery_code_view(shipment["id"], include_code=True)
+        if not view or view["state"] != "active" or not view["code"]:
+            return False
+        customer = User.find_by_id(shipment["sender_id"])
+        if not customer or not customer.get("email"):
+            current_app.logger.warning("[delivery-code] no customer email on file for %s",
+                                       shipment.get("tracking_id"))
+            return False
+        sent = email_utils.send_delivery_code_email(
+            customer["email"], customer.get("name"), shipment["tracking_id"],
+            view["code"], view["expires_at_ist"],
+        )
+        if not sent:
+            current_app.logger.warning("[delivery-code] verification email was not sent for %s",
+                                       shipment.get("tracking_id"))
+        return bool(sent)
+    except Exception as e:
+        current_app.logger.error("[delivery-code] verification email failed for %s (%s)",
+                                 shipment.get("tracking_id"), type(e).__name__)
+        return False
+
+
+@shipments_bp.record_once
+def _register_delivery_code_helpers(state):
+    g = state.app.jinja_env.globals
+    g["customer_delivery_code"] = _customer_delivery_code
+    g["delivery_code_state"] = _agent_delivery_code_state
+
 
 #display the payment page for a shipment
 @shipments_bp.route("/payments/<tracking_id>/pay", methods=["GET", "POST"])
@@ -177,16 +230,84 @@ def create_shipment():
     sender = User.find_by_id(session["user_id"])
     return render_template("create_shipment.html", sender=sender)
 
-#display the customer's shipments
+#display the customer's shipments (5 per page)
 @shipments_bp.route("/shipments/my")
 def my_shipments():
     if "user_id" not in session:
         flash("Please log in to view your shipments.", "danger")
         return redirect(url_for("auth.login"))
 
-    shipments = Shipment.list_by_sender(session["user_id"])
-    return render_template("my_shipments.html", shipments=shipments)
+    page_size = 5
+    page = request.args.get("page", 1, type=int)
+    total = Shipment.count_by_sender(session["user_id"])
+    pagination = get_pagination(total, page, page_size)   # offset = (page - 1) * page_size
+    shipments = Shipment.list_by_sender(
+        session["user_id"], limit=page_size, offset=pagination["offset"]
+    )
+    return render_template("my_shipments.html", shipments=shipments, pagination=pagination)
 
+
+#display the customer's notifications (5 per page)
+@shipments_bp.route("/notifications")
+def my_notifications():
+    if "user_id" not in session:
+        flash("Please log in to view your notifications.", "danger")
+        return redirect(url_for("auth.login"))
+
+    page_size = 5
+    page = request.args.get("page", 1, type=int)
+    total = Notification.count_for_user(session["user_id"])
+    pagination = get_pagination(total, page, page_size)
+    notifications = Notification.list_for_user(
+        session["user_id"], limit=page_size, offset=pagination["offset"]
+    )
+    return render_template("my_notifications.html", notifications=notifications, pagination=pagination)
+
+
+#display the customer's delivery proofs (5 per page)
+@shipments_bp.route("/delivery-proof")
+def my_delivery_proofs():
+    if "user_id" not in session:
+        flash("Please log in to view your delivery proofs.", "danger")
+        return redirect(url_for("auth.login"))
+
+    page_size = 5
+    page = request.args.get("page", 1, type=int)
+    total = DeliveryProof.count_for_sender(session["user_id"])
+    pagination = get_pagination(total, page, page_size)
+    proofs = DeliveryProof.list_for_sender(
+        session["user_id"], limit=page_size, offset=pagination["offset"]
+    )
+    return render_template("my_delivery_proofs.html", proofs=proofs, pagination=pagination)
+
+
+#display the customer's payments: pending (Pay Now) + paid history (5 per page each)
+@shipments_bp.route("/payments")
+def my_payments():
+    if "user_id" not in session:
+        flash("Please log in to view your payments.", "danger")
+        return redirect(url_for("auth.login"))
+
+    page_size = 5
+    uid = session["user_id"]
+
+    # Payment Due: 5 per page (?pending_page=)
+    pending_total = Payment.count_pending_for_sender(uid)
+    pending_pages = max(1, -(-pending_total // page_size))
+    pending_page = min(max(request.args.get("pending_page", 1, type=int), 1), pending_pages)
+    pending = Payment.list_pending_for_sender(uid, limit=page_size, offset=(pending_page - 1) * page_size)
+
+    # Payment history: 5 per page (?paid_page=)
+    paid_total = Payment.count_paid_for_sender(uid)
+    paid_pages = max(1, -(-paid_total // page_size))
+    paid_page = min(max(request.args.get("paid_page", 1, type=int), 1), paid_pages)
+    paid = Payment.list_paid_for_sender(uid, limit=page_size, offset=(paid_page - 1) * page_size)
+
+    return render_template(
+        "my_payments.html",
+        pending_payments=pending, pending_page=pending_page, pending_pages=pending_pages,
+        payments=paid, paid_page=paid_page, paid_pages=paid_pages,
+    )
 #track a shipment using its tracking id
 @shipments_bp.route("/track", methods=["GET", "POST"])
 def track():
@@ -203,6 +324,7 @@ def track():
     if tracking_id:
         shipment = Shipment.find_by_tracking_id(tracking_id)
         if shipment:
+            shipment = {k: v for k, v in shipment.items() if k != "delivery_code_nonce"}
             history = Shipment.get_status_history(shipment["id"])
             
             live_location_text = Shipment.get_latest_location(shipment["id"])
@@ -263,6 +385,11 @@ def update_status(tracking_id):
             )
             return redirect(url_for("shipments.update_status", tracking_id=tracking_id))
 
+        if chosen_status == "Delivered" and not shipment.get("delivery_code_verified"):
+            Shipment.ensure_delivery_code(shipment["id"])   # covers shipments already Out for Delivery
+            flash("Delivery can only be completed with 'Verify Delivery' using the customer's code.", "danger")
+            return redirect(url_for("shipments.update_status", tracking_id=tracking_id))
+
         Shipment.update_status(
             shipment["id"], chosen_status,
             location=location or f"Status updated to {chosen_status}",
@@ -288,6 +415,25 @@ def update_status(tracking_id):
                     f"Shipment {tracking_id} is Ready for Dispatch, but no delivery agent is available right now — it will be assigned automatically as soon as one is free.",
                     "success",
                 )
+
+        elif chosen_status == "Out for Delivery":
+            created = Shipment.ensure_delivery_code(shipment["id"])   # no-op if a code already exists
+            try:
+                code_ready = Shipment.delivery_code_is_ready(shipment["id"])
+            except Exception:
+                current_app.logger.exception("[delivery-code] could not prepare a code for %s", tracking_id)
+                code_ready = False
+            if not code_ready:
+                flash("Status updated, but the delivery verification code could not be prepared. "
+                      "It will be created when the customer opens their dashboard, or use 'Send new code'.", "danger")
+            elif created:
+                if SystemSettings.load().get("in_app_notifications_enabled", True):
+                    Notification.create(
+                        user_id=shipment["sender_id"], shipment_id=shipment["id"],
+                        message=f"Your delivery verification code for {tracking_id} is ready. "
+                                "Open your dashboard to view it and share it with the delivery agent on arrival.",
+                    )
+                _email_delivery_code(shipment)   # only for a NEW code; failure never blocks the update
 
         elif chosen_status in ("Delivered", "Failed Delivery", "RTO"):
 
@@ -483,3 +629,122 @@ def submit_proof(tracking_id):
     DeliveryProof.create(shipment["id"], agent["id"], proof_type="photo", file_path=file_path)
     flash(f"Delivery proof submitted for {tracking_id}.", "success")
     return redirect(url_for("auth.dashboard") + "#delivery-proof")
+
+
+#verify the customer's delivery code and complete the delivery
+@shipments_bp.route("/shipments/<tracking_id>/verify-delivery", methods=["POST"])
+def verify_delivery(tracking_id):
+    if not login_required_role("delivery_agent"):
+        flash("You don't have permission to verify deliveries.", "danger")
+        return redirect(url_for("auth.login"))
+    back = url_for("auth.dashboard") + "#delivery-proof"
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    if not shipment:
+        flash("Shipment not found.", "danger")
+        return redirect(back)
+
+    agent = DeliveryAgent.get_or_create(session["user_id"])
+    if Shipment.get_agent_id_by_role(shipment["id"], "delivery") != agent["id"]:
+        flash("You can only verify deliveries assigned to you.", "danger")
+        return redirect(back)
+    if shipment["status"] != "Out for Delivery":
+        flash("This shipment is not out for delivery.", "danger")
+        return redirect(back)
+
+    entered = request.form.get("code", "").strip()
+    if not (entered.isascii() and entered.isdigit() and len(entered) == 6):
+        flash("Please enter the 6-digit verification code.", "danger")
+        return redirect(back)
+
+    try:
+        result, attempts_left = Shipment.check_delivery_code(shipment["id"], entered)
+    except Exception:
+        current_app.logger.exception("[delivery-code] verification error for %s", tracking_id)
+        flash("Verification is temporarily unavailable. Please try again.", "danger")
+        return redirect(back)
+
+    if result == "invalid":
+        current_app.logger.info("[delivery-code] verification failed for %s (%s attempt(s) left)",
+                                tracking_id, attempts_left)
+        if attempts_left == 0:
+            current_app.logger.warning("[delivery-code] code locked for %s", tracking_id)
+            flash("Too many incorrect attempts. Request a new code.", "danger")
+        else:
+            flash(f"Invalid verification code. {attempts_left} attempt(s) left.", "danger")
+        return redirect(back)
+    if result != "ok":
+        if result in ("locked", "expired"):
+            current_app.logger.warning("[delivery-code] verification rejected for %s: %s", tracking_id, result)
+        msg = {"locked": "Too many incorrect attempts. Request a new code.",
+               "expired": "This code has expired. Request a new code.",
+               "none": "No verification code exists yet. Request one.",
+               "verified": "This delivery has already been verified."}.get(
+                   result, "The code could not be verified. Please try again.")
+        flash(msg, "danger")
+        return redirect(back)
+
+    # only reached when the code is correct
+    Shipment.update_status(
+        shipment["id"], "Delivered",
+        location="Delivered to customer",
+        remarks="Delivery verified by customer code",
+        updated_by=session["user_id"],
+    )
+    Shipment.sync_assignment_status(shipment["id"], "Delivered")
+    DeliveryAgent.set_free_by_agent_id(agent["id"])
+    Shipment.try_assign_waiting_shipments()
+
+    settings = SystemSettings.load()
+    if settings.get("in_app_notifications_enabled", True) and settings.get("status_change_notifications_enabled", True):
+        Notification.create(
+            user_id=shipment["sender_id"], shipment_id=shipment["id"],
+            message=f"Your shipment {shipment['tracking_id']} is now Delivered.",
+        )
+    current_app.logger.info("[delivery-code] verification succeeded for %s", tracking_id)
+    flash("Delivery verified. Please upload the delivery proof.", "success")
+    return redirect(back)
+
+
+#issue a new code when the old one is locked or expired
+@shipments_bp.route("/shipments/<tracking_id>/regenerate-delivery-code", methods=["POST"])
+def regenerate_delivery_code(tracking_id):
+    if not login_required_role("delivery_agent"):
+        flash("You don't have permission to do that.", "danger")
+        return redirect(url_for("auth.login"))
+    back = url_for("auth.dashboard") + "#delivery-proof"
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    agent = DeliveryAgent.get_or_create(session["user_id"])
+    if not shipment or Shipment.get_agent_id_by_role(shipment["id"], "delivery") != agent["id"]:
+        flash("You can only do this for shipments assigned to you.", "danger")
+        return redirect(back)
+    if shipment["status"] != "Out for Delivery":
+        flash("This shipment is not out for delivery.", "danger")
+        return redirect(back)
+
+    view = Shipment.get_delivery_code_view(shipment["id"])
+    if view and view["state"] == "none":
+        done = Shipment.ensure_delivery_code(shipment["id"])
+    else:
+        done = Shipment.regenerate_delivery_code(shipment["id"])
+
+    if done:
+        try:
+            code_ready = Shipment.delivery_code_is_ready(shipment["id"])
+        except Exception:
+            current_app.logger.exception("[delivery-code] could not prepare regenerated code for %s", tracking_id)
+            code_ready = False
+        if code_ready:
+            Notification.create(
+                user_id=shipment["sender_id"], shipment_id=shipment["id"],
+                message=f"A new delivery verification code for {shipment['tracking_id']} is available on your dashboard.",
+            )
+            current_app.logger.info("[delivery-code] code regenerated for %s", tracking_id)
+            _email_delivery_code(shipment)       # emails the NEW code only
+            flash("A new code was sent to the customer's dashboard.", "success")
+        else:
+            flash("The new code could not be prepared. Please try again.", "danger")
+    else:
+        flash("A new code can't be issued right now (limit reached or code still valid).", "danger")
+    return redirect(back)

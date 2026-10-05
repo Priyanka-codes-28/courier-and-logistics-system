@@ -641,8 +641,8 @@ h3 {
 
 /* ===== CTA band ===== */
 .cta-band {
-    background: var(--ink);
-    color: white;
+    background: #0B1F3A;
+    color: #ffffff;
     margin: 0 6% 80px;
     border-radius: 14px;
     padding: 50px 50px;
@@ -653,7 +653,7 @@ h3 {
 }
 
 .cta-band h2 {
-    color: white;
+    color: ffffff;
     font-size: 27px;
     margin-bottom: 8px;
 }
@@ -1203,8 +1203,10 @@ body.landing p {
     background: var(--footer-bg);
 }
 
-.cta-band h2 {
+body.landing .cta-band h2 {
     color: #ffffff;
+    font-size: 27px;
+    margin-bottom: 8px;
 }
 
 .cta-band p {

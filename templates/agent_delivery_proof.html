@@ -1,0 +1,53 @@
+{% extends "agent_base.html" %}
+{% set agent_active = 'delivery_proof' %}
+{% block title %}Upload Delivery Proof{% endblock %}
+{% block ag_heading %}Upload Delivery Proof{% endblock %}
+{% block ag_sub %}Submit proof of delivery for your current shipment.{% endblock %}
+{% block ag_body %}
+<div class="section-block" id="delivery-proof">
+    <div class="section-title">Delivery Proof</div>
+    {% if current_shipment %}
+    {% set dc = delivery_code_state(current_shipment) %}
+    {% if current_shipment.status == 'Out for Delivery' and dc %}
+    <div class="current-ship-card" id="verify-delivery">
+        <div class="section-title">Delivery Verification</div>
+        {% if dc.state == 'active' %}
+        <form method="POST"
+            action="{{ url_for('shipments.verify_delivery', tracking_id=current_shipment.tracking_id) }}">
+            <label class="form-label" for="vcode">Enter the 6-digit code provided by the customer</label>
+            <input type="text" id="vcode" name="code" class="proof-input vc-input" inputmode="numeric"
+                pattern="[0-9]{6}" maxlength="6" placeholder="______" autocomplete="off" required>
+            <small>{{ dc.attempts_left }} attempt(s) left</small>
+            <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Verify Delivery</button>
+        </form>
+        {% else %}
+        <p>{{ {'locked': 'Too many incorrect attempts. Request a new code.', 'expired': 'This code has expired. Request
+            a new code.', 'none': 'No verification code exists yet. Request one.', 'verified': 'This delivery has been
+            verified.'}.get(dc.state, '') }}</p>
+        {% if dc.state == 'none' or dc.can_regenerate %}
+        <form method="POST"
+            action="{{ url_for('shipments.regenerate_delivery_code', tracking_id=current_shipment.tracking_id) }}">
+            <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Send new code to
+                customer</button>
+        </form>
+        {% elif dc.state != 'verified' %}<p>Maximum new codes reached. Please contact admin.</p>{% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+    <div class="current-ship-card">
+        <form method="POST" action="{{ url_for('shipments.submit_proof', tracking_id=current_shipment.tracking_id) }}"
+            enctype="multipart/form-data">
+            <label class="form-label">Tracking ID</label>
+            <input type="text" class="proof-input" value="{{ current_shipment.tracking_id }}" readonly>
+            <label class="form-label">Receiver Name</label>
+            <input type="text" class="proof-input" value="{{ current_shipment.receiver_name }}" readonly>
+            <label class="form-label">Upload Delivery Photo</label>
+            <input type="file" name="photo" class="proof-input" accept="image/*">
+            <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Submit Delivery Proof</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="empty-note">No active shipment to submit delivery proof for.</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{# Admin sidebar. Usage:
+{% from "_admin_nav.html" import admin_sidebar %}
+{{ admin_sidebar('shipments') }}
+active = dashboard | shipments | warehouses | agents | users | payments |
+reports | notifications | settings | profile
+close_id (default "sidebarCloseBtn") and name (default "Admin") are optional. #}
+{% from "_sidebar.html" import render_sidebar %}
+{% macro admin_sidebar(active, close_id='sidebarCloseBtn', name=none) %}
+{{ render_sidebar(
+portal='Admin Portal',
+brand='cube',
+groups=[
+('Main', [
+('dashboard', 'home', 'Dashboard', url_for('auth.dashboard')),
+('shipments', 'box', 'All Shipments', url_for('auth.manage_shipments')),
+('warehouses', 'building', 'Warehouses', url_for('auth.manage_warehouses')),
+('agents', 'driver', 'Delivery Agents', url_for('auth.manage_users', role='delivery_agent')),
+('users', 'users', 'Users', url_for('auth.manage_users')),
+]),
+('Finance', [
+('payments', 'card', 'Payments', url_for('auth.admin_payments')),
+]),
+('Analytics', [
+('reports', 'chart', 'Reports', url_for('auth.admin_reports')),
+]),
+('Communication', [
+('notifications', 'bell', 'Notifications', url_for('auth.admin_notifications')),
+]),
+('Settings', [
+('settings', 'gear', 'System Settings', url_for('auth.admin_system_settings')),
+]),
+('Account', [
+('profile', 'user', 'Profile', url_for('auth.profile')),
+('logout', 'logout', 'Logout', url_for('auth.logout')),
+]),
+],
+active=active,
+aside_id='adminSidebar',
+close_id=close_id,
+user_name=name or 'Admin',
+user_sub='Administrator',
+profile_href=url_for('auth.profile')) }}
+{% endmacro %}

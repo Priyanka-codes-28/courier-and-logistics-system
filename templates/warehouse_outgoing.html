@@ -1,0 +1,48 @@
+{% extends "warehouse_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set wh_active = 'outgoing' %}
+{% block title %}Outgoing Shipments{% endblock %}
+{% block wh_heading %}Outgoing Shipments{% endblock %}
+{% block wh_sub %}Shipments ready to leave the warehouse — waiting for an agent or already assigned.{% endblock %}
+{% block wh_body %}
+<div class="dash-section">
+    <div class="sec-head">
+        <h3>Ready for Dispatch / Agent Assigned</h3>
+    </div>
+    {% if shipments %}
+    <div class="table-scroll">
+        <table class="dash-table recent-table">
+            <tr>
+                <th>Tracking ID</th>
+                <th>Receiver</th>
+                <th>Package</th>
+                <th>Status</th>
+                <th>Delivery Agent</th>
+                <th>Action</th>
+            </tr>
+            {% for s in shipments %}
+            <tr>
+                <td class="mono">{{ s.tracking_id }}</td>
+                <td>{{ s.receiver_name }}</td>
+                <td>{{ s.package_type or '—' }}</td>
+                <td>
+                    {% if s.status == 'Agent Assigned' %}
+                    <span class="pill transit">Agent Assigned</span>
+                    {% else %}
+                    <span class="pill created">Waiting for available agent</span>
+                    {% endif %}
+                </td>
+                <td>{{ s.delivery_agent_name or '—' }}</td>
+                <td>
+                    <a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}" class="link-btn">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-note">No outgoing shipments right now.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.warehouse_outgoing') }}
+</div>
+{% endblock %}

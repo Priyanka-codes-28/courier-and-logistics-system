@@ -255,3 +255,19 @@ def send_admin_alert_email(to_email, to_name, subject_line, tracking_id=None, se
         tracking_id=tracking_id, sender_name=sender_name, receiver_name=receiver_name,
         status=status, remarks=remarks, extra_info=extra_info,
     )
+
+def send_delivery_code_email(to_email, to_name, tracking_id, code, expires_text):
+    subject = f"Your delivery verification code \u2014 {tracking_id}"
+    text = (
+        f"CourierOS\n\n"
+        f"Shipment: {tracking_id}\n"
+        f"Delivery verification code: {code}\n"
+        f"Valid until: {expires_text}\n\n"
+        f"Your shipment is out for delivery. Please share this verification code with the "
+        f"delivery agent when your shipment arrives.\n\n"
+        f"Do not share this code with anyone other than the delivery agent handling your shipment."
+    )
+    return _send_rendered(
+        "delivery_code.html", to_email, to_name, subject, text_content=text,
+        tracking_id=tracking_id, code=str(code), expires_text=expires_text,
+    )

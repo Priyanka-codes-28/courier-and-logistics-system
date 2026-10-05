@@ -1,0 +1,39 @@
+{# Customer sidebar. Usage:
+{% from "_customer_nav.html" import customer_sidebar %}
+{{ customer_sidebar('dashboard') }}
+active = dashboard | shipments | create | track | payments | proof | notifications | profile
+Optional: unread (badge on Notifications), name. #}
+{% from "_sidebar.html" import render_sidebar %}
+{% macro customer_sidebar(active, unread=0, name=none) %}
+{{ render_sidebar(
+portal='Customer Portal',
+brand='cube',
+groups=[
+('Main', [
+('dashboard', 'home', 'Dashboard', url_for('auth.dashboard')),
+]),
+('Shipments', [
+('shipments', 'box', 'My Shipments', url_for('shipments.my_shipments')),
+('create', 'plus', 'Create Shipment', url_for('shipments.create_shipment')),
+('track', 'pin', 'Track Shipment', url_for('shipments.track')),
+]),
+('Services', [
+('payments', 'card', 'Payments', url_for('shipments.my_payments') + '#payment-due'),
+('proof', 'proof', 'Delivery Proof', url_for('auth.customer_delivery_proof')),
+]),
+('Communication', [
+('notifications', 'bell', 'Notifications', url_for('auth.customer_notifications')),
+]),
+('Account', [
+('profile', 'user', 'Profile', url_for('auth.profile')),
+('logout', 'logout', 'Logout', url_for('auth.logout')),
+]),
+],
+active=active,
+aside_id='customerSidebar',
+close_id='sidebarCloseBtn',
+user_name=name or session.get('user_name') or 'Customer',
+user_sub='Logged in',
+profile_href=url_for('auth.profile'),
+unread=unread) }}
+{% endmacro %}

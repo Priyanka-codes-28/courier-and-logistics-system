@@ -1,10 +1,18 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% from "_warehouse_nav.html" import wh_sidebar %}
 
 {% block title %}Warehouse Dashboard{% endblock %}
 
 {% block container_class %}dash-wide{% endblock %}
 
 {% block content %}
+<style>
+    /* Hide the green login/success flash bar on the admin dashboard */
+    .container .alert-success {
+        display: none;
+    }
+</style>
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 
@@ -20,79 +28,11 @@
 
 <div class="grad-shell">
 
-    <!-- ================= SIDEBAR ================= -->
-
-    <aside class="grad-sidebar" id="warehouseSidebar">
-
-        <!-- CLOSE BUTTON -->
-        <button class="sidebar-close-btn" id="warehouseCloseBtn" type="button" aria-label="Close navigation">
-            ✕
-        </button>
+    <!-- SIDEBAR -->
+    {{ wh_sidebar('dashboard', unread_notification_count, name, 'warehouseCloseBtn') }}
 
 
-        <!-- BRAND -->
-        <div class="brand">
-            <span class="dot"></span>
-            CourierOS
-        </div>
-
-
-        <!-- NAVIGATION -->
-        <nav class="grad-nav">
-
-            <div class="item active">
-                Dashboard
-            </div>
-
-            <a href="#incoming-table">
-                Incoming Shipments
-            </a>
-
-            <a href="#outgoing-table">
-                Outgoing Shipments
-            </a>
-
-            <a href="#assign-agent-card">
-                Assign Delivery Agent
-            </a>
-
-            <a href="#warehouse-inventory">
-                Warehouse Inventory
-            </a>
-
-            <a href="#update-shipment-card">
-                Update Shipment Status
-            </a>
-
-            <a href="#warehouse-details">
-                Warehouse Details
-            </a>
-
-            <a href="{{ url_for('auth.warehouse_notifications') }}">
-                Notifications
-
-                {% if unread_notification_count and unread_notification_count > 0 %}
-                <span class="wh-nav-badge">
-                    {{ unread_notification_count }}
-                </span>
-                {% endif %}
-
-            </a>
-
-            <a href="{{ url_for('auth.profile') }}">
-                Profile
-            </a>
-
-            <a href="{{ url_for('auth.logout') }}">
-                Logout
-            </a>
-
-        </nav>
-
-    </aside>
-
-
-    <!-- ================= PAGE STYLES ================= -->
+    <!-- PAGE STYLES -->
 
     <style>
         .wh-nav-badge {
@@ -149,7 +89,7 @@
     </style>
 
 
-    <!-- ================= MAIN CONTENT ================= -->
+    <!-- MAIN CONTENT -->
 
     <main class="grad-main">
 
@@ -177,7 +117,7 @@
         </p>
 
 
-        <!-- ================= SUMMARY CARDS ================= -->
+        <!-- SUMMARY CARDS -->
 
         <div class="info-row">
 
@@ -189,6 +129,19 @@
 
                 <div class="v">
                     {{ incoming|length }}
+                </div>
+
+            </div>
+
+
+            <div class="info-card">
+
+                <div class="k">
+                    Outgoing Shipments
+                </div>
+
+                <div class="v">
+                    {{ outgoing_all|length }}
                 </div>
 
             </div>
@@ -269,7 +222,7 @@
         </div>
 
 
-        <!-- ================= QUICK ACTIONS ================= -->
+        <!-- QUICK ACTIONS -->
 
         <div class="section-block">
 
@@ -280,28 +233,28 @@
 
             <div class="qa-row">
 
-                <a href="#incoming-table" class="qa-btn">
+                <a href="{{ url_for('auth.warehouse_incoming') }}" class="qa-btn">
 
                     📥 Incoming Shipments
 
                 </a>
 
 
-                <a href="#outgoing-table" class="qa-btn">
+                <a href="{{ url_for('auth.warehouse_outgoing') }}" class="qa-btn">
 
                     📤 Outgoing Shipments
 
                 </a>
 
 
-                <a href="#assign-agent-card" class="qa-btn">
+                <a href="{{ url_for('auth.warehouse_assign_agent') }}" class="qa-btn">
 
                     🚚 Assign Agent
 
                 </a>
 
 
-                <a href="#update-shipment-card" class="qa-btn">
+                <a href="{{ url_for('auth.warehouse_update_status') }}" class="qa-btn">
 
                     🔄 Update Shipment
 
@@ -319,7 +272,7 @@
         </div>
 
 
-        <!-- ================= INCOMING SHIPMENTS ================= -->
+        <!-- INCOMING SHIPMENTS -->
 
         <div class="dash-section" id="incoming-table">
 
@@ -328,6 +281,8 @@
                 <h3>
                     Incoming Shipments — In Transit
                 </h3>
+
+                <a href="{{ url_for('auth.warehouse_incoming') }}" class="link-btn">Open Full Incoming Shipments →</a>
 
             </div>
 
@@ -349,7 +304,7 @@
 
                     {% if incoming %}
 
-                    {% for s in incoming %}
+                    {% for s in incoming_page_items %}
 
                     <tr>
 
@@ -431,18 +386,23 @@
 
             </div>
 
+            {{ render_pagination(incoming_pagination, 'auth.warehouse_dashboard', {'outgoing_page':
+            outgoing_pagination.page}, 'incoming_page') }}
+
         </div>
 
 
-        <!-- ================= OUTGOING SHIPMENTS ================= -->
+        <!-- OUTGOING SHIPMENTS -->
 
         <div class="dash-section" id="outgoing-table">
 
             <div class="sec-head">
 
                 <h3>
-                    Outgoing Shipments — Waiting for Auto-Assignment
+                    Outgoing Shipments — Ready for Dispatch / Agent Assigned
                 </h3>
+
+                <a href="{{ url_for('auth.warehouse_outgoing') }}" class="link-btn">Open Full Outgoing Shipments →</a>
 
             </div>
 
@@ -461,9 +421,9 @@
                     </tr>
 
 
-                    {% if outgoing_unassigned %}
+                    {% if outgoing_all %}
 
-                    {% for s in outgoing_unassigned %}
+                    {% for s in outgoing_page_items %}
 
                     <tr>
 
@@ -484,9 +444,15 @@
 
                         <td>
 
+                            {% if s.status == 'Agent Assigned' %}
+                            <span class="pill transit">
+                                Agent Assigned{% if s.delivery_agent_name %} — {{ s.delivery_agent_name }}{% endif %}
+                            </span>
+                            {% else %}
                             <span class="pill created">
                                 Waiting for available agent
                             </span>
+                            {% endif %}
 
                         </td>
 
@@ -501,8 +467,7 @@
 
                         <td colspan="4" class="empty-note">
 
-                            No shipments currently waiting
-                            for an agent.
+                            No outgoing shipments right now.
 
                         </td>
 
@@ -521,10 +486,13 @@
 
             </div>
 
+            {{ render_pagination(outgoing_pagination, 'auth.warehouse_dashboard', {'incoming_page':
+            incoming_pagination.page}, 'outgoing_page') }}
+
         </div>
 
 
-        <!-- ================= WAREHOUSE ACTIVITY ================= -->
+        <!-- WAREHOUSE ACTIVITY -->
 
         <div class="section-block">
 
@@ -591,7 +559,7 @@
         </div>
 
 
-        <!-- ================= ASSIGN DELIVERY AGENT ================= -->
+        <!-- ASSIGN DELIVERY AGENT -->
 
         <div class="section-block" id="assign-agent-card">
 
@@ -676,7 +644,7 @@
         </div>
 
 
-        <!-- ================= UPDATE SHIPMENT ================= -->
+        <!-- UPDATE SHIPMENT -->
 
         <div class="section-block" id="update-shipment-card">
 
@@ -713,7 +681,7 @@
         </div>
 
 
-        <!-- ================= WAREHOUSE INVENTORY ================= -->
+        <!-- WAREHOUSE INVENTORY -->
 
         <div class="dash-section" id="warehouse-inventory">
 
@@ -722,6 +690,8 @@
                 <h3>
                     Warehouse Inventory View
                 </h3>
+
+                <a href="{{ url_for('auth.warehouse_inventory') }}" class="link-btn">Open Full Warehouse Inventory →</a>
 
             </div>
 
@@ -796,7 +766,7 @@
         </div>
 
 
-        <!-- ================= WAREHOUSE DETAILS ================= -->
+        <!---- WAREHOUSE DETAILS ---->
 
         <div class="section-block" id="warehouse-details">
 
@@ -848,7 +818,7 @@
             {% endif %}
         </div>
 
-        <!-- DELIVERY AGENT AVAILABILITY (real data) -->
+        <!-- DELIVERY AGENT AVAILABILITY -->
         <div class="dash-section">
             <div class="sec-head">
                 <h3>Delivery Agents</h3>
@@ -889,7 +859,7 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
 
-        // ================= MOBILE SIDEBAR =================
+        // MOBILE SIDEBAR
 
         const menuBtn = document.getElementById("warehouseMenuBtn");
         const closeBtn = document.getElementById("warehouseCloseBtn");
@@ -929,7 +899,7 @@
     });
 
 
-    // ================= WAREHOUSE SEARCH =================
+    // WAREHOUSE SEARCH 
 
     function filterWarehouseTables() {
 

@@ -1,0 +1,81 @@
+{% macro pager_style() %}
+<style>
+    .cust-pager {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 14px;
+        font-size: 13px;
+    }
+
+    .cust-pager a,
+    .cust-pager .pg {
+        min-width: 34px;
+        padding: 6px 10px;
+        text-align: center;
+        border: 1px solid rgba(128, 128, 128, .35);
+        border-radius: 8px;
+        color: inherit;
+        text-decoration: none;
+        line-height: 1.2;
+    }
+
+    .cust-pager a:hover {
+        background: rgba(128, 128, 128, .15);
+    }
+
+    .cust-pager .pg.current {
+        font-weight: 700;
+        border-color: currentColor;
+        background: rgba(128, 128, 128, .22);
+    }
+
+    .cust-pager .pg.disabled {
+        opacity: .4;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .cust-pager .pg-info {
+        flex-basis: 100%;
+        text-align: center;
+        opacity: .7;
+        font-size: 12px;
+    }
+</style>
+{% endmacro %}
+
+{% macro pager(p, param, anchor='') %}
+{% if p and p.total > 0 %}
+{% set args = request.args.to_dict() %}
+<nav class="cust-pager" aria-label="Pagination">
+    {% if p.has_prev %}
+    {% set _ = args.update({param: p.prev_page}) %}
+    <a href="{{ url_for(request.endpoint, **args) }}{{ anchor }}" rel="prev">&lsaquo; Previous</a>
+    {% else %}
+    <span class="pg disabled" aria-disabled="true">&lsaquo; Previous</span>
+    {% endif %}
+
+    {% for n in p.page_numbers %}
+    {% if n == p.page %}
+    <span class="pg current" aria-current="page">{{ n }}</span>
+    {% else %}
+    {% set _ = args.update({param: n}) %}
+    <a href="{{ url_for(request.endpoint, **args) }}{{ anchor }}">{{ n }}</a>
+    {% endif %}
+    {% endfor %}
+
+    {% if p.has_next %}
+    {% set _ = args.update({param: p.next_page}) %}
+    <a href="{{ url_for(request.endpoint, **args) }}{{ anchor }}" rel="next">Next &rsaquo;</a>
+    {% else %}
+    <span class="pg disabled" aria-disabled="true">Next &rsaquo;</span>
+    {% endif %}
+
+    <div class="pg-info">Page {{ p.page }} of {{ p.total_pages }} &middot; {{ p.total }} record{{ '' if p.total == 1
+        else 's' }}</div>
+</nav>
+{% endif %}
+{% endmacro %}

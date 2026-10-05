@@ -1,0 +1,40 @@
+{# Delivery agent sidebar. Usage:
+{% from "_agent_nav.html" import agent_sidebar %}
+{{ agent_sidebar('assigned', unread_notification_count, name) }}
+active = dashboard | assigned | update_status | update_location |
+delivery_proof | history | availability | notifications | profile #}
+{% from "_sidebar.html" import render_sidebar %}
+{% macro agent_sidebar(active, unread=0, name=none) %}
+{{ render_sidebar(
+portal='Delivery Agent Portal',
+brand='truck',
+groups=[
+('Main', [
+('dashboard', 'home', 'Dashboard', url_for('auth.dashboard')),
+]),
+('Deliveries', [
+('assigned', 'box', 'Assigned Shipments', url_for('auth.agent_assigned_shipments')),
+('update_status', 'status', 'Update Status', url_for('auth.agent_update_status')),
+('update_location', 'pin', 'Update Location', url_for('auth.agent_update_location')),
+('delivery_proof', 'proof', 'Delivery Proof', url_for('auth.agent_delivery_proof')),
+('history', 'history', 'Delivery History', url_for('auth.agent_delivery_history')),
+]),
+('Availability', [
+('availability', 'clock', 'Availability', url_for('auth.agent_availability')),
+]),
+('Communication', [
+('notifications', 'bell', 'Notifications', url_for('auth.agent_notifications')),
+]),
+('Account', [
+('profile', 'user', 'Profile', url_for('auth.profile')),
+('logout', 'logout', 'Logout', url_for('auth.logout')),
+]),
+],
+active=active,
+aside_id='agentSidebar',
+close_id='agentCloseBtn',
+user_name=name or 'Delivery Agent',
+user_sub='Logged in',
+profile_href=url_for('auth.profile'),
+unread=unread) }}
+{% endmacro %}

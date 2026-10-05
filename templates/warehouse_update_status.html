@@ -1,0 +1,17 @@
+{% extends "warehouse_base.html" %}
+{% set wh_active = 'update' %}
+{% block title %}Update Shipment Status{% endblock %}
+{% block wh_heading %}Update Shipment Status{% endblock %}
+{% block wh_sub %}Enter a tracking ID to open its status-update page.{% endblock %}
+{% block wh_body %}
+<div class="section-block">
+    <div class="section-title">Update Shipment</div>
+    <div class="current-ship-card">
+        <form method="GET" action="{{ url_for('shipments.goto_update_status') }}">
+            <label class="form-label">Tracking ID</label>
+            <input type="text" name="tracking_id" class="proof-input" placeholder="e.g. CL20260830X7F2" required>
+            <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Go to Update Status</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

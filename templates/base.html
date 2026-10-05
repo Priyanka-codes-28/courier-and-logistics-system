@@ -6,32 +6,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <script>
-        (function () {
-            var saved = localStorage.getItem("theme");
-            document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
-        })();
+        document.documentElement.setAttribute("data-theme", "light");
     </script>
+
     <title>{% block title %}Courier & Logistics{% endblock %}</title>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body class="{% if request.endpoint in ['auth.login', 'auth.register'] %}simple-nav-page{% endif %}">
+
+    <! NAVBAR >
     <nav class="navbar">
 
         <!-- LEFT: BRAND -->
         <div class="brand">
-            📦 <span>Courier &amp; Logistics</span>
+            <span>Courier &amp; Logistics</span>
         </div>
+
 
         <!-- RIGHT: NAVIGATION -->
         <div class="nav-links">
 
             <!-- Back to Home ONLY on Register page -->
             {% if request.endpoint == 'auth.register' %}
+
             <a href="/" class="nav-home">
-                🏠 Back to Home
+                Back to Home
             </a>
+
             {% endif %}
+
 
             {% if session.get('user_id') %}
 
@@ -47,24 +52,33 @@
                 Logout
             </a>
 
+
             {% else %}
 
             {% if request.endpoint != 'auth.login' %}
+
             <a href="{{ url_for('auth.login') }}">
                 Login
             </a>
+
             {% endif %}
 
+
             {% if request.endpoint != 'auth.register' %}
+
             <a href="{{ url_for('auth.register') }}">
                 Register
             </a>
-            {% endif %}
 
             {% endif %}
 
-            <button type="button" class="theme-toggle-btn">
-                ☀️ Light Mode
+            {% endif %}
+
+            <!-- THEME BUTTON -->
+            <button type="button" class="theme-toggle-btn" aria-label="Switch to Dark Mode">
+
+                Dark Mode
+
             </button>
 
         </div>
@@ -73,140 +87,480 @@
 
     </nav>
 
+
+    <!-- MAIN CONTAINER -->
+
     <div class="container {% block container_class %}{% endblock %}">
+
+        <!-- FLASH MESSAGES -->
+
         {% with messages = get_flashed_messages(with_categories=true) %}
+
         {% if messages %}
+
         {% for category, message in messages %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
+
+        <div class="alert alert-{{ category }}">
+            {{ message }}
+        </div>
+
         {% endfor %}
+
         {% endif %}
+
         {% endwith %}
 
+
         {% block content %}{% endblock %}
+
     </div>
+
+
+
+    <!-- =====================================================
+         THEME SWITCH
+         ONLY ONE THEME SCRIPT
+    ====================================================== -->
 
     <script>
 
         document.addEventListener("DOMContentLoaded", function () {
 
-            var root = document.documentElement;
-            var toggleButtons = document.querySelectorAll(".theme-toggle-btn");
+            const root = document.documentElement;
 
-            function currentTheme() {
-                return root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+            const toggleButtons =
+                document.querySelectorAll(".theme-toggle-btn");
+
+
+            /* -----------------------------------------
+               GET CURRENT THEME
+            ----------------------------------------- */
+
+            function getCurrentTheme() {
+
+                return root.getAttribute("data-theme") === "dark"
+                    ? "dark"
+                    : "light";
+
             }
+
+
+            /* -----------------------------------------
+               UPDATE BUTTON
+            ----------------------------------------- */
 
             function updateButtonLabels() {
-                var theme = currentTheme();
-                toggleButtons.forEach(function (btn) {
-                    btn.textContent = theme === "dark" ? "🌙 Dark Mode" : "☀️ Light Mode";
-                    btn.setAttribute("aria-label", theme === "dark" ? "Dark Mode active — click to switch to Light Mode" : "Light Mode active — click to switch to Dark Mode");
+
+                const theme = getCurrentTheme();
+
+
+                toggleButtons.forEach(function (button) {
+
+                    if (theme === "dark") {
+
+                        button.textContent = " Light Mode";
+
+                        button.setAttribute(
+                            "aria-label",
+                            "Switch to Light Mode"
+                        );
+
+                    }
+
+                    else {
+
+                        button.textContent = " Dark Mode";
+
+                        button.setAttribute(
+                            "aria-label",
+                            "Switch to Dark Mode"
+                        );
+
+                    }
+
                 });
+
             }
+
+
+            /* -----------------------------------------
+               SET THEME
+            ----------------------------------------- */
 
             function setTheme(theme) {
-                root.setAttribute("data-theme", theme);
-                try { localStorage.setItem("theme", theme); } catch (e) { }
+
+                root.setAttribute(
+                    "data-theme",
+                    theme
+                );
+
                 updateButtonLabels();
+
             }
 
-            toggleButtons.forEach(function (btn) {
-                btn.addEventListener("click", function () {
-                    setTheme(currentTheme() === "dark" ? "light" : "dark");
+
+            /* -----------------------------------------
+               BUTTON CLICK
+            ----------------------------------------- */
+
+            toggleButtons.forEach(function (button) {
+
+                button.addEventListener("click", function () {
+
+                    const currentTheme =
+                        getCurrentTheme();
+
+
+                    if (currentTheme === "dark") {
+
+                        setTheme("light");
+
+                    }
+
+                    else {
+
+                        setTheme("dark");
+
+                    }
+
                 });
+
             });
 
+
+            /* -----------------------------------------
+               INITIAL BUTTON STATE
+            ----------------------------------------- */
+
             updateButtonLabels();
+
         });
+
     </script>
 
+
+
+    <!-- =====================================================
+         MOBILE SIDEBAR DRAWER
+    ====================================================== -->
+
     <script>
-        /* =====================================================
-           MOBILE SIDEBAR DRAWER  (hamburger + off-canvas sidebar)
-           One shared script for every dashboard and module page.
-           It looks the elements up by their existing IDs
-           (mobileMenuBtn, sidebarCloseBtn, sidebarOverlay) and falls
-           back to the class names, so it also works on module pages.
-           Pages without a sidebar (login, register ...) exit early.
-        ===================================================== */
+
         document.addEventListener("DOMContentLoaded", function () {
 
             var MOBILE_QUERY = "(max-width: 768px)";
+
             var root = document.documentElement;
-            var navbar = document.querySelector(".navbar");
-            var sidebar = document.querySelector(".grad-sidebar");
-            var menuBtn = document.getElementById("mobileMenuBtn") || document.querySelector(".mobile-menu-btn");
-            var closeBtn = document.getElementById("sidebarCloseBtn") || document.querySelector(".sidebar-close-btn");
-            var overlay = document.getElementById("sidebarOverlay") || document.querySelector(".sidebar-overlay");
 
-            if (!menuBtn || !sidebar || !overlay) return;
+            var navbar =
+                document.querySelector(".navbar");
 
-            // never attach the listeners twice
-            if (menuBtn.getAttribute("data-drawer-ready")) return;
-            menuBtn.setAttribute("data-drawer-ready", "1");
+            var sidebar =
+                document.querySelector(".grad-sidebar");
 
-            // the hamburger always lives inside the top navbar
-            if (navbar && !navbar.contains(menuBtn)) navbar.appendChild(menuBtn);
+            var menuBtn =
+                document.getElementById("mobileMenuBtn") ||
+                document.querySelector(".mobile-menu-btn");
 
-            // accessibility attributes
-            if (!menuBtn.getAttribute("aria-label")) menuBtn.setAttribute("aria-label", "Open navigation menu");
-            if (closeBtn && !closeBtn.getAttribute("aria-label")) closeBtn.setAttribute("aria-label", "Close navigation menu");
-            if (sidebar.id) menuBtn.setAttribute("aria-controls", sidebar.id);
-            menuBtn.setAttribute("aria-expanded", "false");
-            overlay.setAttribute("aria-hidden", "true");
+            var closeBtn =
+                document.getElementById("sidebarCloseBtn") ||
+                document.querySelector(".sidebar-close-btn");
 
-            var mq = window.matchMedia(MOBILE_QUERY);
+            var overlay =
+                document.getElementById("sidebarOverlay") ||
+                document.querySelector(".sidebar-overlay");
+
+
+            if (!menuBtn || !sidebar || !overlay) {
+                return;
+            }
+
+
+            /* -----------------------------------------
+               PREVENT DUPLICATE EVENT LISTENERS
+            ----------------------------------------- */
+
+            if (menuBtn.getAttribute("data-drawer-ready")) {
+                return;
+            }
+
+            menuBtn.setAttribute(
+                "data-drawer-ready",
+                "1"
+            );
+
+
+            /* -----------------------------------------
+               MOVE HAMBURGER INTO NAVBAR
+            ----------------------------------------- */
+
+            if (
+                navbar &&
+                !navbar.contains(menuBtn)
+            ) {
+
+                navbar.appendChild(menuBtn);
+
+            }
+
+
+            /* -----------------------------------------
+               ACCESSIBILITY
+            ----------------------------------------- */
+
+            if (!menuBtn.getAttribute("aria-label")) {
+
+                menuBtn.setAttribute(
+                    "aria-label",
+                    "Open navigation menu"
+                );
+
+            }
+
+
+            if (
+                closeBtn &&
+                !closeBtn.getAttribute("aria-label")
+            ) {
+
+                closeBtn.setAttribute(
+                    "aria-label",
+                    "Close navigation menu"
+                );
+
+            }
+
+
+            if (sidebar.id) {
+
+                menuBtn.setAttribute(
+                    "aria-controls",
+                    sidebar.id
+                );
+
+            }
+
+
+            menuBtn.setAttribute(
+                "aria-expanded",
+                "false"
+            );
+
+            overlay.setAttribute(
+                "aria-hidden",
+                "true"
+            );
+
+
+            var mq =
+                window.matchMedia(MOBILE_QUERY);
+
+
+            /* -----------------------------------------
+               CHECK SIDEBAR STATUS
+            ----------------------------------------- */
 
             function isOpen() {
-                return sidebar.classList.contains("mobile-open");
+
+                return sidebar.classList.contains(
+                    "mobile-open"
+                );
+
             }
 
-            function setOpen(open, returnFocus) {
-                if (open && !mq.matches) return;            // drawer is mobile-only
 
-                sidebar.classList.toggle("mobile-open", open);
-                overlay.classList.toggle("active", open);
-                root.classList.toggle("drawer-open", open);  // locks page scroll (CSS)
-                menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+            /* -----------------------------------------
+               OPEN / CLOSE SIDEBAR
+            ----------------------------------------- */
+
+            function setOpen(
+                open,
+                returnFocus
+            ) {
+
+                if (
+                    open &&
+                    !mq.matches
+                ) {
+
+                    return;
+
+                }
+
+
+                sidebar.classList.toggle(
+                    "mobile-open",
+                    open
+                );
+
+                overlay.classList.toggle(
+                    "active",
+                    open
+                );
+
+                root.classList.toggle(
+                    "drawer-open",
+                    open
+                );
+
+
+                menuBtn.setAttribute(
+                    "aria-expanded",
+                    open ? "true" : "false"
+                );
+
 
                 if (open) {
-                    if (closeBtn) closeBtn.focus();
-                } else if (returnFocus) {
-                    menuBtn.focus();
+
+                    if (closeBtn) {
+                        closeBtn.focus();
+                    }
+
                 }
+
+                else if (returnFocus) {
+
+                    menuBtn.focus();
+
+                }
+
             }
 
-            menuBtn.addEventListener("click", function () { setOpen(true); });
+
+            /* HAMBURGER CLICK */
+
+            menuBtn.addEventListener(
+                "click",
+                function () {
+
+                    setOpen(true);
+
+                }
+            );
+
+
+            /* CLOSE BUTTON */
 
             if (closeBtn) {
-                closeBtn.addEventListener("click", function () { setOpen(false, true); });
+
+                closeBtn.addEventListener(
+                    "click",
+                    function () {
+
+                        setOpen(
+                            false,
+                            true
+                        );
+
+                    }
+                );
+
             }
 
-            overlay.addEventListener("click", function () { setOpen(false, true); });
+            /* OVERLAY CLICK */
+            overlay.addEventListener(
+                "click",
+                function () {
 
-            // any link inside the sidebar closes it (covers #section links too)
-            sidebar.addEventListener("click", function (e) {
-                var link = e.target.closest ? e.target.closest("a") : null;
-                if (link) setOpen(false);
-            });
+                    setOpen(
+                        false,
+                        true
+                    );
 
-            document.addEventListener("keydown", function (e) {
-                if ((e.key === "Escape" || e.key === "Esc") && isOpen()) setOpen(false, true);
-            });
+                }
+            );
 
-            // resizing / rotating up to a desktop width closes the drawer
+            /* SIDEBAR LINK CLICK */
+            sidebar.addEventListener(
+                "click",
+                function (e) {
+
+                    var link =
+                        e.target.closest
+                            ? e.target.closest("a")
+                            : null;
+
+
+                    if (link) {
+
+                        setOpen(false);
+
+                    }
+
+                }
+            );
+
+            /* ESC KEY */
+            document.addEventListener(
+                "keydown",
+                function (e) {
+
+                    if (
+                        (e.key === "Escape" ||
+                            e.key === "Esc") &&
+                        isOpen()
+                    ) {
+
+                        setOpen(
+                            false,
+                            true
+                        );
+
+                    }
+
+                }
+            );
+
+
+            /* RESPONSIVE BREAKPOINT */
             function onBreakpointChange() {
-                if (!mq.matches) setOpen(false);
-            }
-            if (mq.addEventListener) mq.addEventListener("change", onBreakpointChange);
-            else if (mq.addListener) mq.addListener(onBreakpointChange);
 
-            // coming back with the browser Back button must not show an open drawer
-            window.addEventListener("pageshow", function (e) {
-                if (e.persisted) setOpen(false);
-            });
+                if (!mq.matches) {
+
+                    setOpen(false);
+
+                }
+
+            }
+
+
+            if (mq.addEventListener) {
+
+                mq.addEventListener(
+                    "change",
+                    onBreakpointChange
+                );
+
+            }
+
+            else if (mq.addListener) {
+
+                mq.addListener(
+                    onBreakpointChange
+                );
+
+            }
+
+
+            /* BROWSER BACK BUTTON */
+
+            window.addEventListener(
+                "pageshow",
+                function (e) {
+
+                    if (e.persisted) {
+
+                        setOpen(false);
+
+                    }
+
+                }
+            );
+
         });
+
     </script>
+
 </body>
 
 </html>

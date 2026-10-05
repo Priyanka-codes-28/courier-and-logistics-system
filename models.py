@@ -1,8 +1,31 @@
 import secrets
+import hmac
+import hashlib
+import os
 from datetime import datetime, timedelta
 from flask import current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db
+
+def get_pagination(total, page, per_page):
+    
+    total = total or 0
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page or 1, total_pages))
+    offset = (page - 1) * per_page
+    return {
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+        "offset": offset,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+        "prev_page": page - 1,
+        "next_page": page + 1,
+        "page_numbers": list(range(max(1, page - 2), min(total_pages, page + 2) + 1)),
+    }
+
 import email_utils
 class User:
     """Handles all DB operations for the users table."""
@@ -114,26 +137,39 @@ class User:
             return cur.fetchall()
 
     @staticmethod
-    def list_for_management(search=None, role=None, status=None):
-        db = get_db()
-        query = "SELECT id, name, email, phone, role, status, created_at FROM users WHERE 1=1"
+    def _management_filters(search=None, role=None, status=None):
+        where = " WHERE 1=1"
         params = []
-
         if search:
-            query += " AND (name ILIKE %s OR email ILIKE %s)"
+            where += " AND (name ILIKE %s OR email ILIKE %s)"
             like = f"%{search}%"
             params.extend([like, like])
         if role:
-            query += " AND role = %s"
+            where += " AND role = %s"
             params.append(role)
         if status:
-            query += " AND status = %s"
+            where += " AND status = %s"
             params.append(status)
+        return where, params
 
-        query += " ORDER BY created_at DESC"
+    @staticmethod
+    def list_for_management(search=None, role=None, status=None, limit=10, offset=0):
+        db = get_db()
+        where, params = User._management_filters(search, role, status)
+        query = "SELECT id, name, email, phone, role, status, created_at FROM users" + where
+        query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        with db.cursor() as cur:
+            cur.execute(query, tuple(params) + (limit, offset))
+            return cur.fetchall()
+
+    @staticmethod
+    def count_for_management(search=None, role=None, status=None):
+        db = get_db()
+        where, params = User._management_filters(search, role, status)
+        query = "SELECT COUNT(*) AS total FROM users" + where
         with db.cursor() as cur:
             cur.execute(query, tuple(params))
-            return cur.fetchall()
+            return cur.fetchone()["total"]
 
     @staticmethod
     def update_details(user_id, name, email, phone, role):
@@ -216,9 +252,6 @@ class User:
 
     @staticmethod
     def invalidate_reset_otp(email):
-        """Clears the OTP fields — called both on successful verification
-        (OTP must not be reusable) and when the attempt limit is hit
-        (forces the user to request a brand new OTP)."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -250,16 +283,35 @@ STATUS_FLOW = [
 
 EXCEPTION_STATUSES = ["Failed Delivery", "RTO"]
 
+# Delivery verification code settings
+DELIVERY_CODE_MAX_ATTEMPTS = 5
+DELIVERY_CODE_VALID_HOURS = 12          
+DELIVERY_CODE_MAX_REGENERATIONS = 3
+
+
+def _delivery_code_secret():
+    secret = (os.environ.get("DELIVERY_CODE_SECRET")
+              or current_app.config.get("DELIVERY_CODE_SECRET")
+              or current_app.secret_key)
+    if not secret:
+        raise RuntimeError("DELIVERY_CODE_SECRET or SECRET_KEY must be configured")
+    return secret.encode() if isinstance(secret, str) else secret
+
+
+def _derive_delivery_code(shipment_id, nonce):
+    digest = hmac.new(
+        _delivery_code_secret(),
+        f"delivery-code:v1:{shipment_id}:{nonce}".encode(),
+        hashlib.sha256,
+    ).digest()
+    return f"{int.from_bytes(digest[:8], 'big') % 1_000_000:06d}"
+
 
 class Shipment:
     """Handles all DB operations for the shipments table and its status history."""
 
     @staticmethod
     def generate_tracking_id():
-        """Format: <prefix> + YYYYMMDD + 4 random uppercase alphanumeric
-        chars, e.g. CL20260830X7F2. The prefix now comes from the admin's
-        Tracking ID Format setting (default 'CLYYYYMMDDXXXX' -> prefix
-        'CL', identical to the original hardcoded behavior)."""
         settings = SystemSettings.load()
         fmt = (settings.get("tracking_id_format") or "CLYYYYMMDDXXXX").strip()
         prefix = fmt.split("YYYY")[0] if "YYYY" in fmt else fmt
@@ -312,14 +364,23 @@ class Shipment:
             return cur.fetchone()
 
     @staticmethod
-    def list_by_sender(sender_id):
+    def list_by_sender(sender_id, limit=None, offset=None):
+        db = get_db()
+        query = "SELECT * FROM shipments WHERE sender_id = %s ORDER BY created_at DESC"
+        params = [sender_id]
+        if limit is not None:
+            query += " LIMIT %s OFFSET %s"
+            params.extend([limit, offset or 0])
+        with db.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+    @staticmethod
+    def count_by_sender(sender_id):
         db = get_db()
         with db.cursor() as cur:
-            cur.execute(
-                "SELECT * FROM shipments WHERE sender_id = %s ORDER BY created_at DESC",
-                (sender_id,),
-            )
-            return cur.fetchall()
+            cur.execute("SELECT COUNT(*) AS total FROM shipments WHERE sender_id = %s", (sender_id,))
+            return cur.fetchone()["total"]
 
     @staticmethod
     def list_all(limit=50):
@@ -376,11 +437,6 @@ class Shipment:
                     )
                 except Exception:
                     pass
-            # Agent / warehouse / admin notifications — additive, alongside the
-            # customer notification above, never in place of it. Same choke
-            # point, same previous-status dedup guard, own try/except so a
-            # failure here can never affect the customer email or the status
-            # write itself.
             try:
                 _notify_role_based_status_change(shipment_id, new_status, remarks=remarks)
             except Exception as e:
@@ -391,6 +447,139 @@ class Shipment:
                     )
                 except Exception:
                     pass
+
+    @staticmethod
+    def ensure_delivery_code(shipment_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE shipments
+                   SET delivery_code_nonce = %s, delivery_code_verified = FALSE,
+                       delivery_code_attempts = 0,
+                       delivery_code_expires_at = NOW() + (%s::int * INTERVAL '1 hour')
+                   WHERE id = %s AND delivery_code_nonce IS NULL
+                     AND delivery_code_verified = FALSE
+                   RETURNING id""",
+                (secrets.token_hex(16), DELIVERY_CODE_VALID_HOURS, shipment_id),
+            )
+            return cur.fetchone() is not None
+    @staticmethod
+    def delivery_code_is_ready(shipment_id):
+        view = Shipment.get_delivery_code_view(shipment_id, include_code=True)
+        return bool(view and view["state"] == "active"
+                    and view["code"] and len(view["code"]) == 6 and view["code"].isdigit())
+
+    @staticmethod
+    def list_out_for_delivery_for_sender(sender_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT id, tracking_id, receiver_name, status, sender_id
+                   FROM shipments
+                   WHERE sender_id = %s AND status = 'Out for Delivery'
+                   ORDER BY created_at DESC""",
+                (sender_id,),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def regenerate_delivery_code(shipment_id):
+       
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE shipments
+                   SET delivery_code_nonce = %s, delivery_code_attempts = 0,
+                       delivery_code_regenerations = delivery_code_regenerations + 1,
+                       delivery_code_expires_at = NOW() + (%s::int * INTERVAL '1 hour')
+                   WHERE id = %s AND status = 'Out for Delivery'
+                     AND delivery_code_nonce IS NOT NULL
+                     AND delivery_code_verified = FALSE
+                     AND delivery_code_regenerations < %s
+                     AND (delivery_code_attempts >= %s OR delivery_code_expires_at <= NOW())
+                   RETURNING id""",
+                (secrets.token_hex(16), DELIVERY_CODE_VALID_HOURS, shipment_id,
+                 DELIVERY_CODE_MAX_REGENERATIONS, DELIVERY_CODE_MAX_ATTEMPTS),
+            )
+            return cur.fetchone() is not None
+
+    @staticmethod
+    def get_delivery_code_view(shipment_id, include_code=False):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT delivery_code_nonce AS nonce, delivery_code_verified AS verified,
+                          delivery_code_attempts AS attempts,
+                          delivery_code_regenerations AS regens,
+                          (delivery_code_expires_at IS NOT NULL
+                           AND delivery_code_expires_at <= NOW()) AS expired,
+                          to_char(delivery_code_expires_at AT TIME ZONE 'Asia/Kolkata',
+                                  'DD Mon YYYY, HH12:MI AM') AS expires_text
+                   FROM shipments WHERE id = %s""",
+                (shipment_id,),
+            )
+            r = cur.fetchone()
+        if not r:
+            return None
+        if r["verified"]:
+            state = "verified"
+        elif not r["nonce"]:
+            state = "none"
+        elif r["attempts"] >= DELIVERY_CODE_MAX_ATTEMPTS:
+            state = "locked"
+        elif r["expired"]:
+            state = "expired"
+        else:
+            state = "active"
+        code = None
+        if include_code and state == "active":
+            code = _derive_delivery_code(shipment_id, r["nonce"])
+        return {
+            "state": state,
+            "code": code,
+            "attempts_left": max(0, DELIVERY_CODE_MAX_ATTEMPTS - r["attempts"]),
+            "expires_at_ist": r["expires_text"],
+            "can_regenerate": state in ("locked", "expired")
+                              and r["regens"] < DELIVERY_CODE_MAX_REGENERATIONS,
+        }
+
+    @staticmethod
+    def check_delivery_code(shipment_id, entered_code):
+        
+        if not (isinstance(entered_code, str) and entered_code.isascii()
+                and entered_code.isdigit() and len(entered_code) == 6):
+            return "invalid", 0
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE shipments
+                   SET delivery_code_attempts = delivery_code_attempts + 1
+                   WHERE id = %s AND delivery_code_nonce IS NOT NULL
+                     AND delivery_code_verified = FALSE
+                     AND delivery_code_attempts < %s
+                     AND delivery_code_expires_at > NOW()
+                   RETURNING delivery_code_nonce, delivery_code_attempts""",
+                (shipment_id, DELIVERY_CODE_MAX_ATTEMPTS),
+            )
+            row = cur.fetchone()
+            if row:
+                expected = _derive_delivery_code(shipment_id, row["delivery_code_nonce"])
+                if hmac.compare_digest(expected, entered_code):
+                    cur.execute(
+                        """UPDATE shipments
+                           SET delivery_code_verified = TRUE, delivery_code_verified_at = NOW()
+                           WHERE id = %s AND delivery_code_verified = FALSE
+                             AND delivery_code_nonce = %s
+                           RETURNING id""",
+                        (shipment_id, row["delivery_code_nonce"]),
+                    )
+                    if cur.fetchone():
+                        return "ok", 0
+                    return "stale", 0
+                return "invalid", max(0, DELIVERY_CODE_MAX_ATTEMPTS - row["delivery_code_attempts"])
+        view = Shipment.get_delivery_code_view(shipment_id)
+        state = view["state"] if view else "none"
+        return ("stale" if state == "active" else state), 0
 
     @staticmethod
     def progress_percent(status):
@@ -419,7 +608,21 @@ class Shipment:
             return True
 
         return requested_status == Shipment.next_status(current_status)
+    
+    @staticmethod
+    def list_out_for_delivery_for_sender(sender_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT id, tracking_id, receiver_name, status, sender_id
+                   FROM shipments
+                   WHERE sender_id = %s AND status = 'Out for Delivery'
+                   ORDER BY created_at DESC""",
+                (sender_id,),
+            )
+            return cur.fetchall()
 
+    
     @staticmethod
     def list_assigned_to_agent(agent_id):
         
@@ -438,6 +641,7 @@ class Shipment:
                 (agent_id,),
             )
             return cur.fetchall()
+    
 
     @staticmethod
     def list_at_warehouse(warehouse_id, status=None):
@@ -477,20 +681,90 @@ class Shipment:
 
     @staticmethod
     def unassigned_at_warehouse(warehouse_id):
-        
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT s.* FROM shipments s
-                   WHERE s.origin_warehouse_id = %s AND s.status = 'Ready for Dispatch'
+                   WHERE (s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s)
+                   AND s.status = 'Ready for Dispatch'
                    AND NOT EXISTS (
                        SELECT 1 FROM shipment_assignments sa
                        WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
                    )
                    ORDER BY s.created_at ASC""",
-                (warehouse_id,),
+                (warehouse_id, warehouse_id),
             )
             return cur.fetchall()
+
+    @staticmethod
+    def list_outgoing_at_warehouse(warehouse_id):
+        """Outgoing = Ready for Dispatch (waiting for agent) or Agent Assigned."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT s.*,
+                          (SELECT u.name FROM shipment_assignments sa
+                             JOIN delivery_agents da ON da.id = sa.agent_id
+                             JOIN users u ON u.id = da.user_id
+                            WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                            ORDER BY sa.assigned_at DESC LIMIT 1) AS delivery_agent_name
+                   FROM shipments s
+                   WHERE (s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s)
+                   AND s.status IN ('Ready for Dispatch', 'Agent Assigned')
+                   ORDER BY s.created_at ASC""",
+                (warehouse_id, warehouse_id),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def list_inventory_at_warehouse(warehouse_id):
+        """Inventory = held or being processed in the warehouse."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT s.* FROM shipments s
+                   WHERE (s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s)
+                   AND s.status IN ('Arrived at Warehouse', 'Processing')
+                   ORDER BY s.created_at ASC""",
+                (warehouse_id, warehouse_id),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def count_incoming_at_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS c FROM shipments
+                   WHERE (origin_warehouse_id = %s OR destination_warehouse_id = %s)
+                   AND status = 'In Transit'""",
+                (warehouse_id, warehouse_id),
+            )
+            return cur.fetchone()["c"]
+
+    @staticmethod
+    def count_outgoing_at_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS c FROM shipments s
+                   WHERE (s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s)
+                   AND s.status IN ('Ready for Dispatch', 'Agent Assigned')""",
+                (warehouse_id, warehouse_id),
+            )
+            return cur.fetchone()["c"]
+
+    @staticmethod
+    def count_inventory_at_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS c FROM shipments s
+                   WHERE (s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s)
+                   AND s.status IN ('Arrived at Warehouse', 'Processing')""",
+                (warehouse_id, warehouse_id),
+            )
+            return cur.fetchone()["c"]
 
     @staticmethod
     def create_assignment(shipment_id, agent_id, agent_role="pickup"):
@@ -504,8 +778,6 @@ class Shipment:
 
     @staticmethod
     def get_agent_name_by_role(shipment_id, agent_role):
-        """Real agent name for a specific role on this shipment, or None
-        if that role hasn't been assigned yet."""
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
@@ -681,15 +953,15 @@ class Shipment:
             return cur.fetchall()
 
     @staticmethod
-    def list_all_with_sender(limit=10):
+    def list_all_with_sender(limit=10, offset=0):
     
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT s.*, u.name AS customer_name FROM shipments s
                    JOIN users u ON u.id = s.sender_id
-                   ORDER BY s.created_at DESC LIMIT %s""",
-                (limit,),
+                   ORDER BY s.created_at DESC LIMIT %s OFFSET %s""",
+                (limit, offset),
             )
             return cur.fetchall()
 
@@ -756,7 +1028,9 @@ class Shipment:
             )
             row = cur.fetchone()
             return row["name"] if row else None
+    
 
+    
     @staticmethod
     def get_current_for_agent(agent_id):
         
@@ -782,7 +1056,7 @@ class Shipment:
             return cur.fetchone()
 
     @staticmethod
-    def list_delivery_history_for_agent(agent_id, limit=10):
+    def list_delivery_history_for_agent(agent_id, limit=10, offset=0):
         """Completed and failed deliveries handled by this agent."""
         db = get_db()
         with db.cursor() as cur:
@@ -793,10 +1067,22 @@ class Shipment:
                    FROM shipments s
                    JOIN shipment_assignments sa ON sa.shipment_id = s.id
                    WHERE sa.agent_id = %s AND s.status IN ('Delivered', 'Failed Delivery', 'RTO')
-                   ORDER BY finished_at DESC LIMIT %s""",
-                (agent_id, limit),
+                   ORDER BY finished_at DESC LIMIT %s OFFSET %s""",
+                (agent_id, limit, offset),
             )
             return cur.fetchall()
+
+    @staticmethod
+    def count_delivery_history_for_agent(agent_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS total FROM shipments s
+                   JOIN shipment_assignments sa ON sa.shipment_id = s.id
+                   WHERE sa.agent_id = %s AND s.status IN ('Delivered', 'Failed Delivery', 'RTO')""",
+                (agent_id,),
+            )
+            return cur.fetchone()["total"]
 
     @staticmethod
     def update_location_only(shipment_id, location, updated_by):
@@ -810,7 +1096,6 @@ class Shipment:
                    VALUES (%s, %s, %s, %s)""",
                 (shipment_id, current_status, location, updated_by),
             )
-
     # Live Tracking Map
     ETA_BY_STATUS = {
         "Created": "Pending pickup assignment",
@@ -1199,6 +1484,27 @@ class DeliveryAgent:
             cur.execute("SELECT COUNT(*) AS c FROM delivery_agents WHERE is_available = FALSE")
             return cur.fetchone()["c"]
 
+    @staticmethod
+    def list_performance():
+        """One row per delivery-agent user with assignment counts (agent-wise performance)."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT u.id AS user_id, da.id AS agent_id, u.name, u.email, u.phone, u.status,
+                          COALESCE(da.is_available, FALSE) AS is_available,
+                          COUNT(sa.id) AS total_assigned,
+                          COUNT(sa.id) FILTER (WHERE sa.status = 'delivered') AS delivered,
+                          COUNT(sa.id) FILTER (WHERE sa.status = 'failed') AS failed,
+                          COUNT(sa.id) FILTER (WHERE sa.status IN ('assigned', 'picked_up')) AS active
+                   FROM users u
+                   LEFT JOIN delivery_agents da ON da.user_id = u.id
+                   LEFT JOIN shipment_assignments sa ON sa.agent_id = da.id
+                   WHERE u.role = 'delivery_agent'
+                   GROUP BY u.id, da.id
+                   ORDER BY delivered DESC, u.name"""
+            )
+            return cur.fetchall()
+
 
 class Warehouse:
     @staticmethod
@@ -1224,20 +1530,68 @@ class Warehouse:
             return cur.fetchone()["c"]
 
     @staticmethod
-    def list_all_with_counts():
-        
+    def list_all_with_counts(limit=None, offset=None):
+        db = get_db()
+        query = """SELECT w.id, w.name, w.address, w.city, w.contact_number,
+                          (SELECT COUNT(*) FROM shipments s
+                            WHERE s.origin_warehouse_id = w.id
+                               OR s.destination_warehouse_id = w.id) AS shipment_count,
+                          (SELECT COUNT(*) FROM delivery_agents da
+                            WHERE da.warehouse_id = w.id) AS agent_count
+                   FROM warehouses w
+                   ORDER BY w.name"""
+        params = []
+        if limit is not None:
+            query += " LIMIT %s OFFSET %s"
+            params.extend([limit, offset or 0])
+        with db.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+    # ---------- Admin: add / edit / remove ----------
+    @staticmethod
+    def create(name, address, city, contact_number):
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
-                """SELECT w.id, w.name,
-                          COUNT(s.id) AS shipment_count
-                   FROM warehouses w
-                   LEFT JOIN shipments s
-                     ON s.origin_warehouse_id = w.id OR s.destination_warehouse_id = w.id
-                   GROUP BY w.id, w.name
-                   ORDER BY w.name"""
+                """INSERT INTO warehouses (name, address, city, contact_number)
+                   VALUES (%s, %s, %s, %s) RETURNING id""",
+                (name, address, city, contact_number),
             )
-            return cur.fetchall()
+            return cur.fetchone()["id"]
+
+    @staticmethod
+    def update(warehouse_id, name, address, city, contact_number):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE warehouses
+                   SET name = %s, address = %s, city = %s, contact_number = %s
+                   WHERE id = %s""",
+                (name, address, city, contact_number, warehouse_id),
+            )
+
+    @staticmethod
+    def dependency_counts(warehouse_id):
+        """How many shipments / delivery agents still point at this warehouse."""
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT
+                       (SELECT COUNT(*) FROM shipments
+                         WHERE origin_warehouse_id = %s OR destination_warehouse_id = %s) AS shipments,
+                       (SELECT COUNT(*) FROM delivery_agents WHERE warehouse_id = %s) AS agents""",
+                (warehouse_id, warehouse_id, warehouse_id),
+            )
+            return cur.fetchone()
+
+    @staticmethod
+    def delete(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            # keep old notifications, just detach them from the removed warehouse
+            cur.execute("UPDATE notifications SET warehouse_id = NULL WHERE warehouse_id = %s", (warehouse_id,))
+            cur.execute("DELETE FROM warehouses WHERE id = %s", (warehouse_id,))
 
 
 class Notification:
@@ -1254,20 +1608,27 @@ class Notification:
             )
 
     @staticmethod
-    def list_for_user(user_id, limit=5):
+    def list_for_user(user_id, limit=5, offset=0):
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT n.*, s.tracking_id FROM notifications n
                    LEFT JOIN shipments s ON s.id = n.shipment_id
                    WHERE n.user_id = %s
-                   ORDER BY n.sent_at DESC LIMIT %s""",
-                (user_id, limit),
+                   ORDER BY n.sent_at DESC, n.id DESC LIMIT %s OFFSET %s""",
+                (user_id, limit, offset),
             )
             return cur.fetchall()
 
     @staticmethod
-    def list_all_recent(limit=5):
+    def count_for_user(user_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS total FROM notifications WHERE user_id = %s", (user_id,))
+            return cur.fetchone()["total"]
+        
+    @staticmethod
+    def list_all_recent(limit=5, offset=0):
         
         db = get_db()
         with db.cursor() as cur:
@@ -1275,23 +1636,30 @@ class Notification:
                 """SELECT n.message, n.sent_at, u.name AS recipient_name
                    FROM notifications n
                    JOIN users u ON u.id = n.user_id
-                   ORDER BY n.sent_at DESC LIMIT %s""",
-                (limit,),
+                   ORDER BY n.sent_at DESC LIMIT %s OFFSET %s""",
+                (limit, offset),
             )
             return cur.fetchall()
+
+    @staticmethod
+    def count_all():
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS total FROM notifications")
+            return cur.fetchone()["total"]
 
     # Warehouse Notifications
 
     @staticmethod
-    def list_for_warehouse(warehouse_id, limit=50):
+    def list_for_warehouse(warehouse_id, limit=50, offset=0):
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT n.*, s.tracking_id FROM notifications n
-                   LEFT JOIN shipments s ON s.id = n.shipment_id
-                   WHERE n.warehouse_id = %s
-                   ORDER BY n.sent_at DESC LIMIT %s""",
-                (warehouse_id, limit),
+                    LEFT JOIN shipments s ON s.id = n.shipment_id
+                    WHERE n.warehouse_id = %s
+                    ORDER BY n.sent_at DESC LIMIT %s OFFSET %s""",
+                (warehouse_id, limit, offset),
             )
             return cur.fetchall()
 
@@ -1357,7 +1725,32 @@ class DeliveryProof:
                 (sender_id,),
             )
             return cur.fetchone()
+    
+    @staticmethod
+    def list_for_sender(sender_id, limit=5, offset=0):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT dp.*, s.tracking_id, s.receiver_name FROM delivery_proof dp
+                   JOIN shipments s ON s.id = dp.shipment_id
+                   WHERE s.sender_id = %s
+                   ORDER BY dp.delivered_at DESC, dp.shipment_id DESC LIMIT %s OFFSET %s""",
+                (sender_id, limit, offset),
+            )
+            return cur.fetchall()
 
+    @staticmethod
+    def count_for_sender(sender_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS total FROM delivery_proof dp
+                   JOIN shipments s ON s.id = dp.shipment_id
+                   WHERE s.sender_id = %s""",
+                (sender_id,),
+            )
+            return cur.fetchone()["total"]
+    
     @staticmethod
     def create(shipment_id, agent_id, proof_type="photo", file_path=None):
         db = get_db()
@@ -1414,7 +1807,18 @@ class WarehouseActivity:
                 (warehouse_id, warehouse_id, limit),
             )
             return cur.fetchall()
-
+    @staticmethod
+    def count_for_warehouse(warehouse_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS total
+                   FROM shipment_status_history h
+                   JOIN shipments s ON s.id = h.shipment_id
+                   WHERE s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s""",
+                (warehouse_id, warehouse_id),
+            )
+            return cur.fetchone()["total"]
 class Payment:  
     FLAT_RATE = 50.00
     PER_KG_RATE = 20.00
@@ -1456,17 +1860,77 @@ class Payment:
             )
 
     @staticmethod
-    def list_pending_for_sender(sender_id):
+    def list_pending_for_sender(sender_id, limit=None, offset=None):
+        db = get_db()
+        query = """SELECT p.*, s.tracking_id FROM payments p
+                   JOIN shipments s ON s.id = p.shipment_id
+                   WHERE s.sender_id = %s AND p.status = 'pending'
+                   ORDER BY p.created_at DESC, p.id DESC"""
+        params = [sender_id]
+        if limit is not None:
+            query += " LIMIT %s OFFSET %s"
+            params.extend([limit, offset or 0])
+        with db.cursor() as cur:
+            cur.execute(query, tuple(params))
+            return cur.fetchall()
+
+    @staticmethod
+    def count_pending_for_sender(sender_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS total FROM payments p
+                   JOIN shipments s ON s.id = p.shipment_id
+                   WHERE s.sender_id = %s AND p.status = 'pending'""",
+                (sender_id,),
+            )
+            return cur.fetchone()["total"]
+    
+    @staticmethod
+    def list_all(limit=20, offset=0):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT p.*, s.tracking_id, u.name AS customer_name
+                   FROM payments p
+                   JOIN shipments s ON s.id = p.shipment_id
+                   JOIN users u ON u.id = s.sender_id
+                   ORDER BY p.created_at DESC LIMIT %s OFFSET %s""",
+                (limit, offset),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def count_all():
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS total FROM payments")
+            return cur.fetchone()["total"]
+
+    @staticmethod
+    def list_paid_for_sender(sender_id, limit=10, offset=0):
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
                 """SELECT p.*, s.tracking_id FROM payments p
                    JOIN shipments s ON s.id = p.shipment_id
-                   WHERE s.sender_id = %s AND p.status = 'pending'
-                   ORDER BY p.created_at DESC""",
-                (sender_id,),
+                   WHERE s.sender_id = %s AND p.status = 'paid'
+                   ORDER BY p.paid_at DESC LIMIT %s OFFSET %s""",
+                (sender_id, limit, offset),
             )
             return cur.fetchall()
+
+    @staticmethod
+    def count_paid_for_sender(sender_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT COUNT(*) AS total FROM payments p
+                   JOIN shipments s ON s.id = p.shipment_id
+                   WHERE s.sender_id = %s AND p.status = 'paid'""",
+                (sender_id,),
+            )
+            return cur.fetchone()["total"]
 
     @staticmethod
     def total_revenue():

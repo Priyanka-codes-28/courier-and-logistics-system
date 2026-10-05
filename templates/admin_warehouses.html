@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% from "_pagination.html" import render_pagination %}
+{% block title %}Warehouse Management{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">☰</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+
+    {{ admin_sidebar('warehouses') }}
+
+    <main class="grad-main">
+        <h1>Warehouse Management</h1>
+        <p class="page-sub">Add, edit or remove warehouses and see their shipment volume.</p>
+
+        <div style="margin-bottom:14px;">
+            <a href="{{ url_for('auth.add_warehouse') }}" class="cta-btn"
+                style="text-decoration:none; display:inline-block;">＋ Add Warehouse</a>
+        </div>
+
+        <div class="info-row admin-6col">
+            <div class="info-card">
+                <div class="k">Warehouses</div>
+                <div class="v">{{ pagination.total }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Agents Available</div>
+                <div class="v">{{ agents_available }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Agents Busy</div>
+                <div class="v">{{ agents_busy }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Agents Offline</div>
+                <div class="v">{{ agents_offline }}</div>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Warehouse Overview</h3>
+            </div>
+            {% if warehouses_list %}
+            <div class="table-scroll">
+                <table class="dash-table recent-table">
+                    <tr>
+                        <th>Warehouse</th>
+                        <th>Address</th>
+                        <th>City</th>
+                        <th>Contact</th>
+                        <th>Shipments</th>
+                        <th>Agents</th>
+                        <th>Actions</th>
+                    </tr>
+                    {% for w in warehouses_list %}
+                    <tr>
+                        <td>{{ w.name }}</td>
+                        <td>{{ w.address or '—' }}</td>
+                        <td>{{ w.city or '—' }}</td>
+                        <td>{{ w.contact_number or '—' }}</td>
+                        <td>{{ w.shipment_count }}</td>
+                        <td>{{ w.agent_count }}</td>
+                        <td style="white-space:nowrap;">
+                            <a href="{{ url_for('auth.edit_warehouse', warehouse_id=w.id) }}" class="link-btn">Edit</a>
+                            <form method="POST" action="{{ url_for('auth.delete_warehouse', warehouse_id=w.id) }}"
+                                style="display:inline;"
+                                onsubmit="return confirm('Remove warehouse {{ w.name|e }}? This cannot be undone. Warehouses that still have shipments or agents cannot be removed.');">
+                                <button type="submit" class="link-btn"
+                                    style="background:none; border:none; cursor:pointer; color:#B23A3A;">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-note">No warehouses set up yet — use “Add Warehouse”.</div>
+            {% endif %}
+            {{ render_pagination(pagination, 'auth.manage_warehouses') }}
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

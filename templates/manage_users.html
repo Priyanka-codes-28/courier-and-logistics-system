@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% from "_pagination.html" import render_pagination %}
 {% block title %}Manage Users{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
 
@@ -13,28 +15,20 @@
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="grad-shell">
 
-    <aside class="grad-sidebar" id="adminSidebar">
-        <!-- MOBILE CLOSE BUTTON -->
-        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button">
-            ✕
-        </button>
-        <div class="brand"><span class="dot"></span>CourierOS</div>
-        <nav class="grad-nav">
-            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('auth.dashboard') }}#recent-shipments-table">All Shipments</a>
-            <a href="{{ url_for('auth.dashboard') }}#warehouse-overview">Manage Warehouses</a>
-            <a href="{{ url_for('auth.dashboard') }}#delivery-exec-overview">Manage Delivery Agents</a>
-            <div class="item active">Manage Users</div>
-            <a href="{{ url_for('auth.dashboard') }}#reports-analytics">Reports &amp; Analytics</a>
-            <a href="{{ url_for('auth.dashboard') }}#notifications-log">Notifications Log</a>
-            <a href="{{ url_for('auth.dashboard') }}#system-settings">System Settings</a>
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
-        </nav>
-    </aside>
+    {{ admin_sidebar('agents' if role_filter == 'delivery_agent' else 'users') }}
 
     <main class="grad-main">
-        <h1>Manage Users</h1>
-        <p class="page-sub">All registered accounts — search, filter, edit, or manage status.</p>
+        <h1>{{ 'Delivery Agent Management' if role_filter == 'delivery_agent' else 'Manage Users' }}</h1>
+        <p class="page-sub">{{ 'All delivery agent accounts — search, filter, edit, or manage status.' if role_filter ==
+            'delivery_agent' else 'All registered accounts — search, filter, edit, or manage status.' }}</p>
+
+        {% if role_filter == 'delivery_agent' %}
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:14px;">
+            <a href="{{ url_for('auth.add_agent') }}" class="cta-btn"
+                style="text-decoration:none; display:inline-block;">＋ Add Delivery Agent</a>
+            <a href="{{ url_for('auth.agent_performance') }}" class="link-btn">📊 View Agent Performance</a>
+        </div>
+        {% endif %}
 
         <!-- SEARCH + FILTERS -->
         <div class="section-block">
@@ -151,6 +145,8 @@
             {% else %}
             <div class="empty-note">No users match your search/filters.</div>
             {% endif %}
+            {{ render_pagination(pagination, 'auth.manage_users', {'search': search, 'role': role_filter, 'status':
+            status_filter}) }}
         </div>
 
     </main>

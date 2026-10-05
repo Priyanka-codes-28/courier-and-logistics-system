@@ -30,7 +30,7 @@
             <a href="#contact">Contact</a>
         </div>
         <div class="l-nav-right">
-            <button type="button" class="theme-toggle-btn l-theme-toggle">☀️ Light Mode</button>
+            <button type="button" class="theme-toggle-btn l-theme-toggle"> Light Mode</button>
             <a href="{{ url_for('auth.login') }}" class="login">Login</a>
             <a href="{{ url_for('auth.register') }}" class="signup">Sign Up</a>
         </div>
@@ -346,7 +346,7 @@
     </footer>
 
     <script>
-        
+
         document.addEventListener("DOMContentLoaded", function () {
             var root = document.documentElement;
             var toggleButtons = document.querySelectorAll(".theme-toggle-btn");
@@ -358,7 +358,7 @@
             function updateButtonLabels() {
                 var theme = currentTheme();
                 toggleButtons.forEach(function (btn) {
-                    btn.textContent = theme === "dark" ? "🌙 Dark Mode" : "☀️ Light Mode";
+                    btn.textContent = theme === "dark" ? " Dark Mode" : " Light Mode";
                     btn.setAttribute("aria-label", theme === "dark" ? "Dark Mode active — click to switch to Light Mode" : "Light Mode active — click to switch to Dark Mode");
                 });
             }

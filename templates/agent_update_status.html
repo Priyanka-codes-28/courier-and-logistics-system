@@ -1,0 +1,25 @@
+{% extends "agent_base.html" %}
+{% set agent_active = 'update_status' %}
+{% block title %}Update Shipment Status{% endblock %}
+{% block ag_heading %}Update Shipment Status{% endblock %}
+{% block ag_sub %}Enter a tracking ID to open its status-update page.{% endblock %}
+{% block ag_body %}
+<div class="section-block" id="update-status-card">
+    <div class="section-title">Update Shipment Status</div>
+    <div class="current-ship-card">
+        {% if current_shipment %}
+        <div class="cs-row">
+            <div class="cs-item"><span class="cs-k">Current Job</span><span class="cs-v mono">{{ current_shipment.tracking_id }}</span></div>
+            <div class="cs-item"><span class="cs-k">Status</span><span class="pill transit">{{ current_shipment.status }}</span></div>
+        </div>
+        {% endif %}
+        <form method="GET" action="{{ url_for('shipments.goto_update_status') }}">
+            <label class="form-label">Tracking ID</label>
+            <input type="text" name="tracking_id" class="proof-input"
+                value="{{ current_shipment.tracking_id if current_shipment else '' }}"
+                placeholder="e.g. CL20260830X7F2" required>
+            <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Go to Update Status</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

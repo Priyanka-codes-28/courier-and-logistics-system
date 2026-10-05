@@ -1,0 +1,173 @@
+{% from "_customer_nav.html" import customer_sidebar %}
+{% extends "base.html" %}
+
+{% block title %}Payment History{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+
+{# Page links for the two lists (each has its own ?pending_page= / ?paid_page=) #}
+{% macro pager(kind, page, pages, pending_page, paid_page, anchor) %}
+<div class="pagination">
+    {% if page > 1 %}
+    <a class="page-link"
+        href="{{ url_for('shipments.my_payments', pending_page=(page - 1 if kind == 'pending' else pending_page), paid_page=(page - 1 if kind == 'paid' else paid_page)) }}#{{ anchor }}">‹
+        Prev</a>
+    {% else %}
+    <span class="page-link disabled">‹ Prev</span>
+    {% endif %}
+    {% for n in range(1, pages + 1) %}
+    <a class="page-link {{ 'current' if n == page else '' }}"
+        href="{{ url_for('shipments.my_payments', pending_page=(n if kind == 'pending' else pending_page), paid_page=(n if kind == 'paid' else paid_page)) }}#{{ anchor }}">{{
+        n }}</a>
+    {% endfor %}
+    {% if page < pages %} <a class="page-link"
+        href="{{ url_for('shipments.my_payments', pending_page=(page + 1 if kind == 'pending' else pending_page), paid_page=(page + 1 if kind == 'paid' else paid_page)) }}#{{ anchor }}">
+        Next ›</a>
+        {% else %}
+        <span class="page-link disabled">Next ›</span>
+        {% endif %}
+</div>
+{% endmacro %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation menu">
+    ☰
+</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+
+    <!-- LEFT SIDEBAR -->
+    {{ customer_sidebar('payments') }}
+
+
+    <!-- MAIN CONTENT -->
+    <main class="grad-main">
+
+        <div class="dash-page">
+
+            <div class="dash-wrapper">
+
+                <!-- PAGE HEADER -->
+                <div class="dash-header">
+
+                    <h1>
+                        Payment History
+                    </h1>
+
+                    <p class="sub">
+                        Every payment you've made on CourierOS.
+                    </p>
+
+                </div>
+
+                <!-- PAYMENT HISTORY -->
+                {% if pending_payments %}
+                <div class="dash-section" id="payment-due">
+
+                    <div class="sec-head">
+                        <h3>Payment Due</h3>
+                    </div>
+
+                    <div class="shipment-history-scroll">
+                        <table class="dash-table shipment-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Tracking ID</th>
+                                    <th>Amount</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in pending_payments %}
+                                <tr>
+                                    <td class="mono">{{ p.tracking_id }}</td>
+                                    <td>₹{{ p.amount }}</td>
+                                    <td>
+                                        <a href="{{ url_for('shipments.pay', tracking_id=p.tracking_id) }}"
+                                            class="link-btn">
+                                            Pay Now →
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{ pager('pending', pending_page, pending_pages, pending_page, paid_page, 'payment-due') }}
+
+                </div>
+                {% endif %}
+
+                <div class="dash-section" id="payment-history">
+
+                    <div class="sec-head">
+                        <h3>Payments</h3>
+                    </div>
+
+                    {% if payments %}
+
+                    <div class="shipment-history-scroll">
+
+                        <table class="dash-table shipment-history-table">
+
+                            <thead>
+                                <tr>
+                                    <th>Tracking ID</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Paid On</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for p in payments %}
+                                <tr>
+                                    <td class="mono">{{ p.tracking_id }}</td>
+                                    <td>₹{{ p.amount }}</td>
+                                    <td>{{ p.payment_method or '—' }}</td>
+                                    <td>{{ (p.paid_at | ist('%b %d, %Y')) if p.paid_at else '—' }}</td>
+                                    <td>
+                                        <a href="{{ url_for('shipments.track', tracking_id=p.tracking_id) }}"
+                                            class="link-btn">
+                                            Track →
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                    {% else %}
+
+                    <div class="empty-note">
+                        You haven't made any payments yet.
+                    </div>
+
+                    {% endif %}
+
+                    {% if payments %}
+                    {{ pager('paid', paid_page, paid_pages, pending_page, paid_page, 'payment-history') }}
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+{% endblock %}

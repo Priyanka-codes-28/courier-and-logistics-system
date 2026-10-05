@@ -1,0 +1,63 @@
+{% extends "warehouse_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set wh_active = 'assign' %}
+{% block title %}Assign Delivery Agent{% endblock %}
+{% block wh_heading %}Assign Delivery Agent{% endblock %}
+{% block wh_sub %}Final-delivery agents are assigned automatically.{% endblock %}
+{% block wh_body %}
+<div class="section-block">
+    <div class="section-title">Final Delivery Agent — Automatic Assignment</div>
+    <div class="current-ship-card">
+        <p style="font-size:13px; color:var(--d-text-dim, #5C6B7A); margin:0;">
+            There's no manual assignment step here. The moment a shipment reaches
+            <strong>Ready for Dispatch</strong>, the system automatically assigns it to whichever
+            available delivery agent has the fewest active jobs. If every agent is currently busy,
+            the shipment waits here and gets assigned when someone becomes available.
+        </p>
+    </div>
+</div>
+
+<div class="info-row">
+    <div class="info-card">
+        <div class="k">Agents Available</div>
+        <div class="v">{{ agents_available }}</div>
+    </div>
+    <div class="info-card">
+        <div class="k">Agents Busy</div>
+        <div class="v">{{ agents_busy }}</div>
+    </div>
+    <div class="info-card">
+        <div class="k">Agents Offline</div>
+        <div class="v">{{ agents_offline }}</div>
+    </div>
+    <div class="info-card">
+        <div class="k">Waiting for Agent</div>
+        <div class="v">{{ pagination.total }}</div>
+    </div>
+</div>
+
+<div class="dash-section">
+    <div class="sec-head">
+        <h3>Shipments Waiting for an Agent</h3>
+    </div>
+    {% if shipments %}
+    <div class="table-scroll">
+        <table class="dash-table">
+            <tr>
+                <th>Tracking ID</th>
+                <th>Status</th>
+            </tr>
+            {% for s in shipments %}
+            <tr>
+                <td class="mono">{{ s.tracking_id }}</td>
+                <td><span class="pill created">Waiting for agent</span></td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-note">No shipments currently waiting for a delivery agent.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.warehouse_assign_agent') }}
+</div>
+{% endblock %}

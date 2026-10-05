@@ -1,0 +1,39 @@
+{% extends "warehouse_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set wh_active = 'inventory' %}
+{% block title %}Warehouse Inventory{% endblock %}
+{% block wh_heading %}Warehouse Inventory{% endblock %}
+{% block wh_sub %}Shipments currently stored at this warehouse.{% endblock %}
+{% block wh_body %}
+<div class="dash-section">
+    <div class="sec-head">
+        <h3>Stored at Warehouse — {{ pagination.total }}</h3>
+    </div>
+    {% if shipments %}
+    <div class="table-scroll">
+        <table class="dash-table">
+            <tr>
+                <th>Tracking ID</th>
+                <th>Status</th>
+                <th>Received</th>
+                <th>Action</th>
+            </tr>
+            {% for s in shipments %}
+            <tr>
+                <td class="mono">{{ s.tracking_id }}</td>
+                <td><span class="pill warehouse">{{ s.status }}</span></td>
+                <td>{{ (s.created_at | ist('%b %d, %Y')) if s.created_at else '' }}</td>
+                <td>
+                    <a href="{{ url_for('shipments.update_status', tracking_id=s.tracking_id) }}"
+                        class="link-btn">Update</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-note">No shipments currently stored at this warehouse.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.warehouse_inventory') }}
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{# Layout shared by every dedicated warehouse module page.
+Children: {% set wh_active = '...' %} plus blocks title, wh_heading, wh_sub, wh_body #}
+{% extends "base.html" %}
+{% from "_warehouse_nav.html" import wh_sidebar %}
+{% block title %}Warehouse{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<style>
+    .wh-nav-badge {
+        display: inline-block;
+        min-width: 18px;
+        padding: 1px 5px;
+        background: var(--d-amber);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 10px;
+        text-align: center;
+        margin-left: 6px;
+    }
+</style>
+
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+    {{ wh_sidebar(wh_active, unread_notification_count) }}
+
+    <main class="grad-main">
+        <h1>{% block wh_heading %}{% endblock %}</h1>
+        <p class="page-sub">{% block wh_sub %}{% endblock %}</p>
+
+        {% block wh_body %}{% endblock %}
+    </main>
+</div>
+{% endblock %}

@@ -1,8 +1,16 @@
+{% from "_pagination.html" import render_pagination %}
 {% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
 {% block title %}Admin Dashboard{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
 
 {% block content %}
+<style>
+    /* Hide the green login/success flash bar on the admin dashboard */
+    .container .alert-success {
+        display: none;
+    }
+</style>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 <!-- MOBILE MENU BUTTON -->
 <button class="mobile-menu-btn" id="adminMenuBtn" type="button" aria-label="Open menu">
@@ -16,27 +24,7 @@
 <div class="grad-shell">
 
     <!-- GRADIENT SIDEBAR -->
-    <aside class="grad-sidebar" id="adminSidebar">
-
-        <!-- MOBILE CLOSE BUTTON -->
-        <button class="sidebar-close-btn" id="adminCloseBtn" type="button" aria-label="Close menu">
-            ✕
-        </button>
-        <div class="brand"><span class="dot"></span>CourierOS</div>
-        <nav class="grad-nav">
-            <div class="item active">Dashboard</div>
-            <a href="#recent-shipments-table">All Shipments</a>
-            <a href="#warehouse-overview">Manage Warehouses</a>
-            <a href="#delivery-exec-overview">Manage Delivery Agents</a>
-            <a href="{{ url_for('auth.manage_users') }}">Manage Users</a>
-            <a href="#reports-analytics">Reports &amp; Analytics</a>
-            <a href="#notifications-log">Notifications Log</a>
-            <a href="#system-settings">System Settings</a>
-            <a href="{{ url_for('auth.profile') }}">Profile &amp; Account</a>
-
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
-        </nav>
-    </aside>
+    {{ admin_sidebar('dashboard', 'adminCloseBtn') }}
 
     <!-- MAIN -->
     <main class="grad-main">
@@ -86,17 +74,21 @@
         <div class="section-block">
             <div class="section-title">Quick Actions</div>
             <div class="qa-row">
-                <a href="#recent-shipments-table" class="qa-btn">📦 Manage Shipments</a>
-                <a href="#delivery-exec-overview" class="qa-btn">🚚 Delivery Executives</a>
-                <a href="#warehouse-overview" class="qa-btn">🏢 Warehouses</a>
-                <a href="#" class="qa-btn">📊 View Reports</a>
+                <a href="{{ url_for('auth.manage_shipments') }}" class="qa-btn">📦 Manage Shipments</a>
+                <a href="{{ url_for('auth.manage_users', role='delivery_agent') }}" class="qa-btn">🚚 Delivery
+                    Executives</a>
+                <a href="{{ url_for('auth.manage_warehouses') }}" class="qa-btn">🏢 Warehouses</a>
+                <a href="{{ url_for('auth.admin_reports') }}" class="qa-btn">📊 View Reports</a>
                 <a href="{{ url_for('shipments.track') }}" class="qa-btn">🔍 Track a Shipment</a>
             </div>
         </div>
 
         <!-- SHIPMENT STATUS OVERVIEW -->
         <div class="chart-widget" id="reports-analytics">
-            <div class="w-title">Shipment Status Overview</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div class="w-title">Shipment Status Overview</div>
+                <a href="{{ url_for('auth.admin_reports') }}" class="link-btn">Open Full Reports &amp; Analytics →</a>
+            </div>
             {% if total_shipments %}
             <div class="status-bars">
                 <div class="status-bar-row">
@@ -168,6 +160,8 @@
         <div class="dash-section" id="delivery-exec-overview">
             <div class="sec-head">
                 <h3>Delivery Executive Overview</h3>
+                <a href="{{ url_for('auth.manage_users', role='delivery_agent') }}" class="link-btn">Open Full Delivery
+                    Agent Management →</a>
             </div>
             <div class="agent-avail-row">
                 <div class="agent-avail-item"><span class="agent-avail-dot available"></span>Available <b>{{
@@ -183,6 +177,7 @@
         <div class="dash-section" id="warehouse-overview">
             <div class="sec-head">
                 <h3>Warehouse Overview</h3>
+                <a href="{{ url_for('auth.manage_warehouses') }}" class="link-btn">Open Full Warehouse Management →</a>
             </div>
             {% if warehouses_overview %}
             <table class="dash-table">
@@ -200,12 +195,15 @@
             {% else %}
             <div class="empty-note">No warehouses set up yet.</div>
             {% endif %}
+            {{ render_pagination(warehouse_pagination, 'auth.dashboard', {'shipments_page': shipments_pagination.page,
+            'notif_page': notif_pagination.page}, 'warehouse_page') }}
         </div>
 
         <!-- RECENT SHIPMENTS -->
         <div class="dash-section" id="recent-shipments-table">
             <div class="sec-head">
                 <h3>Recent Shipments</h3>
+                <a href="{{ url_for('auth.manage_shipments') }}" class="link-btn">Open Full Shipment Management →</a>
             </div>
             <div class="table-scroll">
                 {% if all_shipments %}
@@ -238,6 +236,8 @@
                 {% endif %}
                 <div id="adminNoResults" class="empty-note" style="display:none;">No matching shipments.</div>
             </div>
+            {{ render_pagination(shipments_pagination, 'auth.dashboard', {'warehouse_page': warehouse_pagination.page,
+            'notif_page': notif_pagination.page}, 'shipments_page') }}
         </div>
 
         <!-- MANAGE USERS (real data) -->
@@ -275,6 +275,7 @@
         <div class="dash-section" id="notifications-log">
             <div class="sec-head">
                 <h3>Notifications Log</h3>
+                <a href="{{ url_for('auth.admin_notifications') }}" class="link-btn">Open Full Notifications Log →</a>
             </div>
             {% if notifications_log %}
             <div class="notification-log-scroll">
@@ -296,6 +297,8 @@
             {% else %}
             <div class="empty-note">No notifications sent yet.</div>
             {% endif %}
+            {{ render_pagination(notif_pagination, 'auth.dashboard', {'shipments_page': shipments_pagination.page,
+            'warehouse_page': warehouse_pagination.page}, 'notif_page') }}
         </div>
 
         <!-- SYSTEM PERFORMANCE -->

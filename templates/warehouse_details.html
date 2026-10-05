@@ -1,0 +1,26 @@
+{% extends "warehouse_base.html" %}
+{% set wh_active = 'details' %}
+{% block title %}Warehouse Details{% endblock %}
+{% block wh_heading %}Warehouse Details{% endblock %}
+{% block wh_sub %}Location and contact information.{% endblock %}
+{% block wh_body %}
+<div class="section-block">
+    <div class="section-title">Warehouse Details</div>
+    {% if warehouse %}
+    <div class="current-ship-card">
+        <div class="cs-row">
+            <div class="cs-item"><span class="cs-k">Warehouse Name</span><span class="cs-v">{{ warehouse.name }}</span>
+            </div>
+            <div class="cs-item"><span class="cs-k">Address</span>
+                <span class="cs-v">{{ warehouse.address }}, {{ warehouse.city }}, {{ warehouse.state }} {{
+                    warehouse.pincode }}</span>
+            </div>
+            <div class="cs-item"><span class="cs-k">Contact Number</span><span class="cs-v">{{ warehouse.contact_number
+                    or 'Not set' }}</span></div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-note">No warehouse is set up in the system yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "warehouse_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set wh_active = 'incoming' %}
+{% block title %}Incoming Shipments{% endblock %}
+{% block wh_heading %}Incoming Shipments{% endblock %}
+{% block wh_sub %}Shipments in transit to this warehouse.{% endblock %}
+{% block wh_body %}
+<div class="dash-section">
+    <div class="sec-head">
+        <h3>In Transit</h3>
+    </div>
+    {% if shipments %}
+    <div class="table-scroll">
+        <table class="dash-table recent-table">
+            <tr>
+                <th>Tracking ID</th>
+                <th>Sender</th>
+                <th>Receiver</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+            {% for s in shipments %}
+            <tr>
+                <td class="mono">{{ s.tracking_id }}</td>
+                <td>{{ s.sender_name or '—' }}</td>
+                <td>{{ s.receiver_name }}</td>
+                <td><span class="pill transit">{{ s.status }}</span></td>
+                <td>
+                    <a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}" class="link-btn">View</a>
+                    <a href="{{ url_for('shipments.update_status', tracking_id=s.tracking_id) }}"
+                        class="link-btn">Update</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-note">No shipments currently in transit to this warehouse.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.warehouse_incoming') }}
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "agent_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set agent_active = 'notifications' %}
+{% block title %}Notifications{% endblock %}
+{% block ag_heading %}Notifications{% endblock %}
+{% block ag_sub %}Everything sent to you — {{ pagination.total }} total.{% endblock %}
+{% block ag_body %}
+<div class="dash-section" id="recent-notifications">
+    <div class="sec-head"><h3>Notifications</h3></div>
+    {% if notifications %}
+    <div class="notif-list">
+        {% for n in notifications %}
+        <div class="notif-item">
+            <span class="notif-dot"></span>
+            <div>
+                {{ n.message }}<br>
+                <span style="font-size:11px; color:var(--d-text-dim);">
+                    {% if n.tracking_id %}<span style="font-family:'Courier New', monospace;">{{ n.tracking_id }}</span> &nbsp;·&nbsp; {% endif %}
+                    {% if n.sent_at %}{{ n.sent_at | ist('%b %d, %Y %I:%M %p') }}{% endif %}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-note">No notifications yet.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.agent_notifications') }}
+</div>
+{% endblock %}

@@ -4,12 +4,30 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from werkzeug.security import check_password_hash
-from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings
+from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings, get_pagination
 import email_utils
 import google_oauth
 
 # BLUEPRINT
 auth_bp = Blueprint("auth", __name__)
+
+def _warehouse_badge_count(counter):
+    if session.get("user_role") != "warehouse_staff":
+        return 0
+    try:
+        wh = Warehouse.get_first()
+        return counter(wh["id"]) if wh else 0
+    except Exception:
+        return 0
+
+
+@auth_bp.record_once
+def _register_sidebar_globals(state):
+    g = state.app.jinja_env.globals
+    g["incoming_shipment_count"] = lambda: _warehouse_badge_count(Shipment.count_incoming_at_warehouse)
+    g["outgoing_shipment_count"] = lambda: _warehouse_badge_count(Shipment.count_outgoing_at_warehouse)
+    g["inventory_shipment_count"] = lambda: _warehouse_badge_count(Shipment.count_inventory_at_warehouse)
+
 # Brute-force protection: after this many wrong OTP attempts, the OTP
 # is invalidated and the user must request a brand new one.
 MAX_OTP_ATTEMPTS = 5
@@ -52,6 +70,8 @@ def _send_otp_email(to_email, otp):
     except requests.RequestException as e:
         current_app.logger.error(f"Failed to reach Brevo API: {e}")
         return False
+    
+    
 
 #INPUT VALIDATION
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -92,6 +112,9 @@ def _customer_dashboard_context():
     pending = sum(1 for s in shipments if s["status"] in ("Created", "Awaiting Pickup"))
 
     current_shipment = Shipment.get_current_for_sender(session["user_id"])
+    out_for_delivery_shipments = Shipment.list_out_for_delivery_for_sender(session["user_id"])
+    for ofd in out_for_delivery_shipments:
+        Shipment.ensure_delivery_code(ofd["id"])   # does nothing if a code already exists
     current_location = None
     pickup_agent_name = None
     delivery_agent_name = None
@@ -123,29 +146,36 @@ def _customer_dashboard_context():
         pickup_agent_name=pickup_agent_name, delivery_agent_name=delivery_agent_name, progress_steps=progress_steps,
         notifications=notifications, delivery_proof=delivery_proof,
         pending_payments=pending_payments,
+        out_for_delivery_shipments=out_for_delivery_shipments,
     )
 
 #DELIVERY AGENT DASHBOARD
 def _agent_dashboard_context():
     agent = DeliveryAgent.get_or_create(session["user_id"])
-    assigned = Shipment.list_assigned_to_agent(agent["id"])
-    picked_up = sum(1 for s in assigned if s["status"] == "Picked Up")
-    delivered = sum(1 for s in assigned if s["status"] == "Delivered")
-    failed = sum(1 for s in assigned if s["status"] in ("Failed Delivery", "RTO"))
+    all_assigned = Shipment.list_assigned_to_agent(agent["id"])
+    picked_up = sum(1 for s in all_assigned if s["status"] == "Picked Up")
+    delivered = sum(1 for s in all_assigned if s["status"] == "Delivered")
+    failed = sum(1 for s in all_assigned if s["status"] in ("Failed Delivery", "RTO"))
+    route_stops = [s["receiver_address"] for s in all_assigned if s["status"] not in ("Delivered", "Failed Delivery", "RTO")]
+
+    # Paginate the Assigned Shipments table only; every stat above already
+    # used the full list, so pagination here can't skew those counts.
+    assigned_page = request.args.get("assigned_page", 1, type=int)
+    assigned_pagination = get_pagination(len(all_assigned), assigned_page, 10)
+    assigned = all_assigned[assigned_pagination["offset"]: assigned_pagination["offset"] + assigned_pagination["per_page"]]
 
     current_shipment = Shipment.get_current_for_agent(agent["id"])
     delivery_history = Shipment.list_delivery_history_for_agent(agent["id"], limit=5)
     notifications = Notification.list_for_user(session["user_id"], limit=4)
 
-    route_stops = [s["receiver_address"] for s in assigned if s["status"] not in ("Delivered", "Failed Delivery", "RTO")]
-
     return dict(
         name=session.get("user_name"), role="delivery_agent",
-        assigned=assigned, assigned_count=len(assigned),
+        assigned=assigned, assigned_count=len(all_assigned),
         picked_up=picked_up, delivered=delivered, failed=failed,
         is_available=agent["is_available"],
         current_shipment=current_shipment, delivery_history=delivery_history,
         notifications=notifications, route_stops=route_stops,
+        assigned_pagination=assigned_pagination,
     )
 
 #WAREHOUSE DASHBOARD
@@ -153,8 +183,9 @@ def _warehouse_dashboard_context():
     warehouse = Warehouse.get_first()
     if warehouse:
         incoming = Shipment.list_at_warehouse(warehouse["id"], status="In Transit")
-        at_warehouse_now = Shipment.list_at_warehouse(warehouse["id"], status="Arrived at Warehouse")
+        at_warehouse_now = Shipment.list_inventory_at_warehouse(warehouse["id"])
         outgoing_unassigned = Shipment.unassigned_at_warehouse(warehouse["id"])
+        outgoing_all = Shipment.list_outgoing_at_warehouse(warehouse["id"])
         agents_available = DeliveryAgent.count_available(warehouse["id"])
         received_today = WarehouseActivity.count_received_today(warehouse["id"])
         dispatched_today = WarehouseActivity.count_dispatched_today(warehouse["id"])
@@ -162,26 +193,39 @@ def _warehouse_dashboard_context():
         notification_count = Notification.count_for_warehouse(warehouse["id"])
         unread_notification_count = Notification.count_unread_for_warehouse(warehouse["id"])
     else:
-        incoming, at_warehouse_now, outgoing_unassigned, agents_available = [], [], [], 0
+        incoming, at_warehouse_now, outgoing_unassigned, outgoing_all, agents_available = [], [], [], [], 0
         received_today, dispatched_today, recent_activity = 0, 0, []
-        notification_count, unread_notification_count = 0,0
+        notification_count, unread_notification_count = 0, 0
     agents_busy = DeliveryAgent.count_busy()
     agents_offline = DeliveryAgent.count_offline()
+
+    incoming_page = request.args.get("incoming_page", 1, type=int)
+    incoming_pagination = get_pagination(len(incoming), incoming_page, 10)
+    incoming_page_items = incoming[incoming_pagination["offset"]: incoming_pagination["offset"] + incoming_pagination["per_page"]]
+
+    outgoing_page = request.args.get("outgoing_page", 1, type=int)
+    outgoing_pagination = get_pagination(len(outgoing_all), outgoing_page, 10)
+    outgoing_page_items = outgoing_all[outgoing_pagination["offset"]: outgoing_pagination["offset"] + outgoing_pagination["per_page"]]
+
     return dict(
         name=session.get("user_name"), role="warehouse_staff",
         warehouse=warehouse, incoming=incoming,
+        incoming_page_items=incoming_page_items,
         at_warehouse_now=at_warehouse_now,
-        outgoing_unassigned=outgoing_unassigned, agents_available=agents_available,
+        outgoing_unassigned=outgoing_unassigned,
+        outgoing_all=outgoing_all,
+        outgoing_page_items=outgoing_page_items,
+        agents_available=agents_available,
         waiting_shipments=outgoing_unassigned, agents_busy=agents_busy, agents_offline=agents_offline,
         received_today=received_today, dispatched_today=dispatched_today,
         recent_activity=recent_activity,
         notification_count=notification_count,
         unread_notification_count=unread_notification_count,
+        incoming_pagination=incoming_pagination,
+        outgoing_pagination=outgoing_pagination,
     )
-
 #ADMIN DASHBOARD
 def _admin_dashboard_context():
-    all_shipments = Shipment.list_all_with_sender(limit=5)
     total_shipments = Shipment.count_all()
     delivered_count = Shipment.count_delivered()
     active_agents = DeliveryAgent.count_available()
@@ -190,9 +234,7 @@ def _admin_dashboard_context():
 
     breakdown = Shipment.status_breakdown()
     weekly = Shipment.deliveries_this_week()
-    warehouses_overview = Warehouse.list_all_with_counts()
     users_list = User.list_all(limit=10)
-    notifications_log = Notification.list_all_recent(limit=5)
 
     agents_busy = DeliveryAgent.count_busy()
     agents_offline = DeliveryAgent.count_offline()
@@ -203,6 +245,22 @@ def _admin_dashboard_context():
     unassigned_count = Shipment.count_unassigned_system_wide()
     total_revenue = Payment.total_revenue()
     settings = SystemSettings.load()
+
+    # Three independent, small paginators for the dashboard's inline
+    # preview tables — each keeps its own page in the URL without
+    # resetting the other two (see extra_args in the template).
+    shipments_page = request.args.get("shipments_page", 1, type=int)
+    shipments_pagination = get_pagination(total_shipments, shipments_page, 5)
+    all_shipments = Shipment.list_all_with_sender(limit=5, offset=shipments_pagination["offset"])
+
+    warehouse_page = request.args.get("warehouse_page", 1, type=int)
+    warehouse_pagination = get_pagination(warehouse_count, warehouse_page, 5)
+    warehouses_overview = Warehouse.list_all_with_counts(limit=5, offset=warehouse_pagination["offset"])
+
+    notif_page = request.args.get("notif_page", 1, type=int)
+    notif_total = Notification.count_all()
+    notif_pagination = get_pagination(notif_total, notif_page, 5)
+    notifications_log = Notification.list_all_recent(limit=5, offset=notif_pagination["offset"])
 
     return dict(
         name=session.get("user_name"), role="admin",
@@ -218,6 +276,9 @@ def _admin_dashboard_context():
         failed_count=breakdown["failed"], failed_rate=failed_rate,
         unassigned_count=unassigned_count, total_revenue=total_revenue,
         settings=settings,
+        shipments_pagination=shipments_pagination,
+        warehouse_pagination=warehouse_pagination,
+        notif_pagination=notif_pagination,
     )
 
 #CONTEXT BUILDER MAPPING
@@ -564,7 +625,14 @@ def warehouse_dashboard():
 @role_required("warehouse_staff")
 def warehouse_notifications():
     warehouse = Warehouse.get_first()
-    notifications = Notification.list_for_warehouse(warehouse["id"], limit=50) if warehouse else []
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+    total = Notification.count_for_warehouse(warehouse["id"]) if warehouse else 0
+    pagination = get_pagination(total, page, per_page)
+    notifications = (
+        Notification.list_for_warehouse(warehouse["id"], limit=per_page, offset=pagination["offset"])
+        if warehouse else []
+    )
     unread_count = Notification.count_unread_for_warehouse(warehouse["id"]) if warehouse else 0
     return render_template(
         "warehouse_notifications.html",
@@ -572,6 +640,7 @@ def warehouse_notifications():
         name=session.get("user_name"),
         notifications=notifications,
         unread_count=unread_count,
+        pagination=pagination,
     )
 
 
@@ -581,7 +650,7 @@ def mark_warehouse_notification_read(notification_id):
     warehouse = Warehouse.get_first()
     if warehouse:
         Notification.mark_read_for_warehouse(notification_id, warehouse["id"])
-    return redirect(url_for("auth.warehouse_notifications"))
+    return redirect(url_for("auth.warehouse_notifications", page=request.form.get("page", 1, type=int)))
 
 
 @auth_bp.route("/warehouse/notifications/mark-all-read", methods=["POST"])
@@ -593,11 +662,329 @@ def mark_all_warehouse_notifications_read():
         flash("All notifications marked as read.", "success")
     return redirect(url_for("auth.warehouse_notifications"))
 
+# ==================== WAREHOUSE MODULE PAGES ====================
+# One dedicated page per sidebar module, same pattern as
+# /warehouse/notifications. All are warehouse_staff only.
+WAREHOUSE_PAGE_SIZE = 10
+
+
+def _warehouse_page_base():
+    """Shared by every warehouse module page: the warehouse row and the
+    unread count for the sidebar badge."""
+    warehouse = Warehouse.get_first()
+    unread = Notification.count_unread_for_warehouse(warehouse["id"]) if warehouse else 0
+    return warehouse, unread
+
+
+def _paginate_list(items, page_arg="page", per_page=WAREHOUSE_PAGE_SIZE):
+    pagination = get_pagination(len(items), request.args.get(page_arg, 1, type=int), per_page)
+    start = pagination["offset"]
+    return items[start:start + per_page], pagination
+
+
+@auth_bp.route("/warehouse/incoming")
+@role_required("warehouse_staff")
+def warehouse_incoming():
+    warehouse, unread = _warehouse_page_base()
+    items = Shipment.list_at_warehouse(warehouse["id"], status="In Transit") if warehouse else []
+    page_items, pagination = _paginate_list(items)
+    return render_template(
+        "warehouse_incoming.html", role="warehouse_staff", name=session.get("user_name"),
+        warehouse=warehouse, shipments=page_items, pagination=pagination,
+        unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/warehouse/outgoing")
+@role_required("warehouse_staff")
+def warehouse_outgoing():
+    warehouse, unread = _warehouse_page_base()
+    items = Shipment.list_outgoing_at_warehouse(warehouse["id"]) if warehouse else []
+    page_items, pagination = _paginate_list(items)
+    return render_template(
+        "warehouse_outgoing.html", role="warehouse_staff", name=session.get("user_name"),
+        warehouse=warehouse, shipments=page_items, pagination=pagination,
+        unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/warehouse/assign-agent")
+@role_required("warehouse_staff")
+def warehouse_assign_agent():
+    warehouse, unread = _warehouse_page_base()
+    items = Shipment.unassigned_at_warehouse(warehouse["id"]) if warehouse else []
+    page_items, pagination = _paginate_list(items)
+    return render_template(
+        "warehouse_assign_agent.html", role="warehouse_staff", name=session.get("user_name"),
+        warehouse=warehouse, shipments=page_items, pagination=pagination,
+        agents_available=DeliveryAgent.count_available(warehouse["id"]) if warehouse else 0,
+        agents_busy=DeliveryAgent.count_busy(), agents_offline=DeliveryAgent.count_offline(),
+        unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/warehouse/inventory")
+@role_required("warehouse_staff")
+def warehouse_inventory():
+    warehouse, unread = _warehouse_page_base()
+    items = Shipment.list_inventory_at_warehouse(warehouse["id"]) if warehouse else []
+    page_items, pagination = _paginate_list(items)
+    return render_template(
+        "warehouse_inventory.html", role="warehouse_staff", name=session.get("user_name"),
+        warehouse=warehouse, shipments=page_items, pagination=pagination,
+        unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/warehouse/update-status")
+@role_required("warehouse_staff")
+def warehouse_update_status():
+    warehouse, unread = _warehouse_page_base()
+    return render_template(
+        "warehouse_update_status.html", role="warehouse_staff", name=session.get("user_name"),
+        warehouse=warehouse, unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/warehouse/details")
+@role_required("warehouse_staff")
+def warehouse_details():
+    warehouse, unread = _warehouse_page_base()
+    return render_template(
+        "warehouse_details.html", role="warehouse_staff", name=session.get("user_name"),
+        warehouse=warehouse, unread_notification_count=unread,
+    )
+
+
+# ==================== DELIVERY AGENT MODULE PAGES ====================
+# One dedicated page per sidebar module, same pattern as the warehouse
+# module pages. All are delivery_agent only.
+AGENT_PAGE_SIZE = 10
+
+
+def _agent_page_base():
+    """Shared by every agent module page: the agent row, current job,
+    and the unread count for the sidebar badge."""
+    agent = DeliveryAgent.get_or_create(session["user_id"])
+    current_shipment = Shipment.get_current_for_agent(agent["id"])
+    unread = Notification.count_for_user(session["user_id"])
+    return agent, current_shipment, unread
+
+
+@auth_bp.route("/delivery-agent/assigned")
+@role_required("delivery_agent")
+def agent_assigned_shipments():
+    agent, current_shipment, unread = _agent_page_base()
+    all_assigned = Shipment.list_assigned_to_agent(agent["id"])
+    page = request.args.get("page", 1, type=int)
+    pagination = get_pagination(len(all_assigned), page, AGENT_PAGE_SIZE)
+    shipments = all_assigned[pagination["offset"]: pagination["offset"] + AGENT_PAGE_SIZE]
+    return render_template(
+        "agent_assigned.html", role="delivery_agent", name=session.get("user_name"),
+        shipments=shipments, pagination=pagination,
+        assigned_count=len(all_assigned), unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/delivery-agent/update-status")
+@role_required("delivery_agent")
+def agent_update_status():
+    agent, current_shipment, unread = _agent_page_base()
+    return render_template(
+        "agent_update_status.html", role="delivery_agent", name=session.get("user_name"),
+        current_shipment=current_shipment, unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/delivery-agent/update-location")
+@role_required("delivery_agent")
+def agent_update_location():
+    agent, current_shipment, unread = _agent_page_base()
+    return render_template(
+        "agent_update_location.html", role="delivery_agent", name=session.get("user_name"),
+        current_shipment=current_shipment, unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/delivery-agent/delivery-proof")
+@role_required("delivery_agent")
+def agent_delivery_proof():
+    agent, current_shipment, unread = _agent_page_base()
+    return render_template(
+        "agent_delivery_proof.html", role="delivery_agent", name=session.get("user_name"),
+        current_shipment=current_shipment, unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/delivery-agent/availability")
+@role_required("delivery_agent")
+def agent_availability():
+    agent, current_shipment, unread = _agent_page_base()
+    return render_template(
+        "agent_availability.html", role="delivery_agent", name=session.get("user_name"),
+        is_available=agent["is_available"], unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/delivery-agent/history")
+@role_required("delivery_agent")
+def agent_delivery_history():
+    agent, current_shipment, unread = _agent_page_base()
+    page = request.args.get("page", 1, type=int)
+    total = Shipment.count_delivery_history_for_agent(agent["id"])
+    pagination = get_pagination(total, page, AGENT_PAGE_SIZE)
+    delivery_history = Shipment.list_delivery_history_for_agent(
+        agent["id"], limit=AGENT_PAGE_SIZE, offset=pagination["offset"],
+    )
+    return render_template(
+        "agent_delivery_history.html", role="delivery_agent", name=session.get("user_name"),
+        delivery_history=delivery_history, pagination=pagination,
+        unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/delivery-agent/notifications")
+@role_required("delivery_agent")
+def agent_notifications():
+    agent, current_shipment, unread = _agent_page_base()
+    page = request.args.get("page", 1, type=int)
+    total = Notification.count_for_user(session["user_id"])
+    pagination = get_pagination(total, page, AGENT_PAGE_SIZE)
+    notifications = Notification.list_for_user(
+        session["user_id"], limit=AGENT_PAGE_SIZE, offset=pagination["offset"],
+    )
+    return render_template(
+        "agent_notifications.html", role="delivery_agent", name=session.get("user_name"),
+        notifications=notifications, pagination=pagination,
+        unread_notification_count=unread,
+    )
+
+
+@auth_bp.route("/admin/system-settings")
+@role_required("admin")
+def admin_system_settings():
+    settings = SystemSettings.load()
+    return render_template("admin_system_settings.html", settings=settings)
+
+
+# ==================== CUSTOMER MODULE PAGES ====================
+CUSTOMER_PAGE_SIZE = 10
+
+
+@auth_bp.route("/customer/notifications")
+@role_required("customer")
+def customer_notifications():
+    page = request.args.get("page", 1, type=int)
+    total = Notification.count_for_user(session["user_id"])
+    pagination = get_pagination(total, page, CUSTOMER_PAGE_SIZE)
+    notifications = Notification.list_for_user(
+        session["user_id"], limit=CUSTOMER_PAGE_SIZE, offset=pagination["offset"],
+    )
+    return render_template(
+        "customer_notifications.html", role="customer", name=session.get("user_name"),
+        notifications=notifications, pagination=pagination,
+    )
+
+
+@auth_bp.route("/customer/delivery-proof")
+@role_required("customer")
+def customer_delivery_proof():
+    page = request.args.get("page", 1, type=int)
+    total = DeliveryProof.count_for_sender(session["user_id"])
+    pagination = get_pagination(total, page, CUSTOMER_PAGE_SIZE)
+    proofs = DeliveryProof.list_for_sender(
+        session["user_id"], limit=CUSTOMER_PAGE_SIZE, offset=pagination["offset"],
+    )
+    return render_template(
+        "customer_delivery_proof.html", role="customer", name=session.get("user_name"),
+        proofs=proofs, pagination=pagination,
+    )
+
+
 #ADMIN USER MANAGEMENT
 @auth_bp.route("/admin/dashboard")
 @role_required("admin")
 def admin_dashboard():
     return render_template(DASHBOARD_TEMPLATES["admin"], **_admin_dashboard_context())
+
+#ADMIN — SHIPMENT MANAGEMENT (dedicated page, reuses Shipment.list_all_with_sender)
+@auth_bp.route("/admin/shipments")
+@role_required("admin")
+def manage_shipments():
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    total = Shipment.count_all()
+    pagination = get_pagination(total, page, per_page)
+    shipments_list = Shipment.list_all_with_sender(limit=per_page, offset=pagination["offset"])
+    return render_template("admin_shipments.html", shipments_list=shipments_list, pagination=pagination)
+
+#ADMIN — WAREHOUSE MANAGEMENT (dedicated page, reuses Warehouse.list_all_with_counts)
+@auth_bp.route("/admin/warehouses")
+@role_required("admin")
+def manage_warehouses():
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+    total = Warehouse.count_all()
+    pagination = get_pagination(total, page, per_page)
+    warehouses_list = Warehouse.list_all_with_counts(limit=per_page, offset=pagination["offset"])
+    agents_available = DeliveryAgent.count_available()
+    agents_busy = DeliveryAgent.count_busy()
+    agents_offline = DeliveryAgent.count_offline()
+    return render_template(
+        "admin_warehouses.html",
+        warehouses_list=warehouses_list,
+        agents_available=agents_available,
+        agents_busy=agents_busy,
+        agents_offline=agents_offline,
+        pagination=pagination,
+    )
+
+#ADMIN — NOTIFICATIONS (dedicated page, reuses Notification.list_all_recent)
+@auth_bp.route("/admin/notifications")
+@role_required("admin")
+def admin_notifications():
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    total = Notification.count_all()
+    pagination = get_pagination(total, page, per_page)
+    notifications_log = Notification.list_all_recent(limit=per_page, offset=pagination["offset"])
+    return render_template("admin_notifications.html", notifications_log=notifications_log, pagination=pagination)
+
+#ADMIN — REPORTS & ANALYTICS (dedicated page, reuses the same metrics as the dashboard)
+@auth_bp.route("/admin/reports")
+@role_required("admin")
+def admin_reports():
+    total_shipments = Shipment.count_all()
+    delivered_count = Shipment.count_delivered()
+    delivered_rate = round((delivered_count / total_shipments) * 100, 1) if total_shipments else 0
+    breakdown = Shipment.status_breakdown()
+    weekly = Shipment.deliveries_this_week()
+    failed_rate = round((breakdown["failed"] / total_shipments) * 100, 1) if total_shipments else 0
+    active_shipments = total_shipments - delivered_count - breakdown["failed"]
+    total_revenue = Payment.total_revenue()
+    return render_template(
+        "admin_reports.html",
+        total_shipments=total_shipments, delivered_count=delivered_count,
+        delivered_rate=delivered_rate, breakdown=breakdown, weekly=weekly,
+        failed_rate=failed_rate, active_shipments=active_shipments,
+        total_revenue=total_revenue,
+    )
+
+@auth_bp.route("/admin/payments")
+@role_required("admin")
+def admin_payments():
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    total = Payment.count_all()
+    pagination = get_pagination(total, page, per_page)
+    payments_list = Payment.list_all(limit=per_page, offset=pagination["offset"])
+    total_revenue = Payment.total_revenue()
+    return render_template(
+        "admin_payments.html",
+        payments_list=payments_list,
+        total_revenue=total_revenue,
+        pagination=pagination,
+    )
 
 # USER MANAGEMENT 
 
@@ -607,11 +994,19 @@ def manage_users():
     search = request.args.get("search", "").strip()
     role_filter = request.args.get("role", "").strip()
     status_filter = request.args.get("status", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = 10
+
+    total = User.count_for_management(
+        search=search or None, role=role_filter or None, status=status_filter or None,
+    )
+    pagination = get_pagination(total, page, per_page)
 
     users_list = User.list_for_management(
         search=search or None,
         role=role_filter or None,
         status=status_filter or None,
+        limit=per_page, offset=pagination["offset"],
     )
     availability_map = DeliveryAgent.list_availability_by_user_id()
 
@@ -620,6 +1015,7 @@ def manage_users():
         users_list=users_list,
         availability_map=availability_map,
         search=search, role_filter=role_filter, status_filter=status_filter,
+        pagination=pagination,
     )
 
 
@@ -684,6 +1080,162 @@ def delete_user(user_id):
     User.delete(user_id)
     flash("User permanently deleted.", "success")
     return redirect(url_for("auth.manage_users"))
+# ===== ADMIN: WAREHOUSE ADD / EDIT / REMOVE =====
+def _read_warehouse_form():
+    return {
+        "name": request.form.get("name", "").strip(),
+        "address": request.form.get("address", "").strip(),
+        "city": request.form.get("city", "").strip(),
+        "contact_number": request.form.get("contact_number", "").strip(),
+    }
+
+
+def _validate_warehouse_form(data):
+    if not all(data.values()):
+        return "All warehouse fields are required."
+    if not PHONE_PATTERN.match(data["contact_number"]):
+        return "Please enter a valid contact number."
+    return None
+
+
+@auth_bp.route("/admin/warehouses/add", methods=["GET", "POST"])
+@role_required("admin")
+def add_warehouse():
+    if request.method == "POST":
+        data = _read_warehouse_form()
+        error = _validate_warehouse_form(data)
+        if error:
+            flash(error, "danger")
+            return render_template("admin_warehouse_form.html", mode="add", warehouse=data)
+        Warehouse.create(data["name"], data["address"], data["city"], data["contact_number"])
+        flash("Warehouse added successfully.", "success")
+        return redirect(url_for("auth.manage_warehouses"))
+    return render_template("admin_warehouse_form.html", mode="add", warehouse={})
+
+
+@auth_bp.route("/admin/warehouses/<int:warehouse_id>/edit", methods=["GET", "POST"])
+@role_required("admin")
+def edit_warehouse(warehouse_id):
+    warehouse = Warehouse.find_by_id(warehouse_id)
+    if not warehouse:
+        flash("Warehouse not found.", "danger")
+        return redirect(url_for("auth.manage_warehouses"))
+
+    if request.method == "POST":
+        data = _read_warehouse_form()
+        error = _validate_warehouse_form(data)
+        if error:
+            flash(error, "danger")
+            data["id"] = warehouse_id
+            return render_template("admin_warehouse_form.html", mode="edit", warehouse=data)
+        Warehouse.update(warehouse_id, data["name"], data["address"], data["city"], data["contact_number"])
+        flash("Warehouse updated successfully.", "success")
+        return redirect(url_for("auth.manage_warehouses"))
+
+    return render_template("admin_warehouse_form.html", mode="edit", warehouse=warehouse)
+
+
+@auth_bp.route("/admin/warehouses/<int:warehouse_id>/delete", methods=["POST"])
+@role_required("admin")
+def delete_warehouse(warehouse_id):
+    if not Warehouse.find_by_id(warehouse_id):
+        flash("Warehouse not found.", "danger")
+        return redirect(url_for("auth.manage_warehouses"))
+
+    deps = Warehouse.dependency_counts(warehouse_id)
+    if deps["shipments"] or deps["agents"]:
+        flash(
+            f"This warehouse still has {deps['shipments']} shipment(s) and "
+            f"{deps['agents']} agent(s) linked to it and can't be removed.",
+            "danger",
+        )
+        return redirect(url_for("auth.manage_warehouses"))
+
+    Warehouse.delete(warehouse_id)
+    flash("Warehouse removed.", "success")
+    return redirect(url_for("auth.manage_warehouses"))
+
+
+# ===== ADMIN: DELIVERY AGENT ADD / PERFORMANCE =====
+@auth_bp.route("/admin/agents/add", methods=["GET", "POST"])
+@role_required("admin")
+def add_agent():
+    warehouses = Warehouse.list_all_with_counts()
+    form = {}
+
+    if request.method == "POST":
+        form = {
+            "name": request.form.get("name", "").strip(),
+            "email": request.form.get("email", "").strip().lower(),
+            "phone": request.form.get("phone", "").strip(),
+            "warehouse_id": request.form.get("warehouse_id", "").strip(),
+        }
+        password = request.form.get("password", "")
+
+        error = None
+        if not form["name"] or not form["email"] or not password:
+            error = "Name, email and password are required."
+        elif not NAME_PATTERN.match(form["name"]):
+            error = "Please enter a valid full name (letters only, 2-80 characters)."
+        elif not EMAIL_PATTERN.match(form["email"]):
+            error = "Please enter a valid email address."
+        elif form["phone"] and not PHONE_PATTERN.match(form["phone"]):
+            error = "Please enter a valid phone number."
+        elif len(password) < 6:
+            error = "Password must be at least 6 characters long."
+        elif User.find_by_email(form["email"]):
+            error = "An account with this email already exists."
+
+        warehouse_id = None
+        if not error and form["warehouse_id"]:
+            try:
+                warehouse_id = int(form["warehouse_id"])
+            except ValueError:
+                error = "Invalid warehouse selected."
+            else:
+                if not Warehouse.find_by_id(warehouse_id):
+                    error = "Selected warehouse does not exist."
+
+        if error:
+            flash(error, "danger")
+            return render_template("admin_agent_form.html", form=form, warehouses=warehouses)
+
+        user_id = User.create(form["name"], form["email"], form["phone"] or None,
+                              password, role="delivery_agent")
+        DeliveryAgent.get_or_create(user_id, warehouse_id)
+        flash("Delivery agent added successfully.", "success")
+        return redirect(url_for("auth.manage_users", role="delivery_agent"))
+
+    return render_template("admin_add_agent.html", form=form, warehouses=warehouses)
+
+
+@auth_bp.route("/admin/agents/performance")
+@role_required("admin")
+def agent_performance():
+    agents = []
+    for r in DeliveryAgent.list_performance():
+        r = dict(r)
+        finished = (r["delivered"] or 0) + (r["failed"] or 0)
+        r["success_rate"] = round(r["delivered"] / finished * 100, 1) if finished else None
+        if r["is_available"]:
+            r["availability"] = "Available"
+        elif r["active"]:
+            r["availability"] = "Busy"
+        else:
+            r["availability"] = "Offline"
+        agents.append(r)
+
+    total_delivered = sum(a["delivered"] for a in agents)
+    total_failed = sum(a["failed"] for a in agents)
+    total_active = sum(a["active"] for a in agents)
+    finished_total = total_delivered + total_failed
+    overall_rate = round(total_delivered / finished_total * 100, 1) if finished_total else None
+
+    return render_template(
+        "admin_agent_performance.html",
+        agents=agents, total_delivered=total_delivered, total_failed=total_failed,
+        total_active=total_active, overall_rate=overall_rate,
+    )
 
 VALID_NOTIFICATION_PREFERENCES = {"In-App", "Email", "SMS"}
 
@@ -712,7 +1264,7 @@ def save_system_settings():
     if errors:
         for message in errors:
             flash(message, "danger")
-        return redirect(url_for("auth.dashboard") + "#system-settings")
+        return redirect(request.form.get("next") or (url_for("auth.dashboard") + "#system-settings"))
 
     SystemSettings.update({
         "tracking_id_format": tracking_id_format,
@@ -727,7 +1279,7 @@ def save_system_settings():
     })
 
     flash("System settings saved successfully.", "success")
-    return redirect(url_for("auth.dashboard") + "#system-settings")
+    return redirect(request.form.get("next") or (url_for("auth.dashboard") + "#system-settings"))
 #DEMO LOGIN
 DEMO_ROLES = ["customer", "delivery_agent", "warehouse_staff", "admin"]
 

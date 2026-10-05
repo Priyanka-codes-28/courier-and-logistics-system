@@ -1,0 +1,42 @@
+{% extends "customer_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set customer_active = 'proof' %}
+{% block title %}Delivery Proof{% endblock %}
+{% block cu_heading %}Delivery Proof{% endblock %}
+{% block cu_sub %}Proof of delivery for every completed shipment — {{ pagination.total }} total.{% endblock %}
+{% block cu_body %}
+<div class="dash-section">
+    <div class="sec-head">
+        <h3>Delivery Proof</h3>
+    </div>
+    {% if proofs %}
+    <div class="table-scroll">
+        <table class="dash-table">
+            <tr>
+                <th>Tracking ID</th>
+                <th>Receiver</th>
+                <th>Delivered</th>
+                <th>Type</th>
+                <th>Action</th>
+            </tr>
+            {% for p in proofs %}
+            <tr>
+                <td class="mono">{{ p.tracking_id }}</td>
+                <td>{{ p.receiver_name }}</td>
+                <td>{{ (p.delivered_at | ist('%b %d, %Y')) if p.delivered_at else '' }}</td>
+                <td>{{ p.proof_type|title }}</td>
+                <td>
+                    {% if p.file_path %}
+                    <a href="{{ p.file_path }}" class="link-btn">View Proof →</a>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-note">No delivery proof available yet — this appears once a shipment is delivered.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.customer_delivery_proof') }}
+</div>
+{% endblock %}

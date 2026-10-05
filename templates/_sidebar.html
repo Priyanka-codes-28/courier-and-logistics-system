@@ -1,0 +1,414 @@
+
+{% macro sb_icon(name) -%}
+{%- set paths = {
+'home': '
+<path d="M3 11.5 12 4l9 7.5" />
+<path d="M5.5 10v10h4.5v-6h4v6h4.5V10" />',
+'box': '
+<path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3z" />
+<path d="m4 7.5 8 4.5 8-4.5M12 12v9" />',
+'plus': '
+<path d="M12 5v14M5 12h14" />',
+'pin': '
+<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+<circle cx="12" cy="10" r="2.5" />',
+'card': '
+<rect x="3" y="5" width="18" height="14" rx="2.5" />
+<path d="M3 10h18M7 15h3" />',
+'proof': '
+<rect x="3" y="4" width="18" height="16" rx="2" />
+<circle cx="8.5" cy="9.5" r="1.5" />
+<path d="m21 16-5-5-4 4-3-3-6 6" />',
+'bell': '
+<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4l2-2z" />
+<path d="M10 21a2 2 0 0 0 4 0" />',
+'user': '
+<circle cx="12" cy="8" r="4" />
+<path d="M4 21c0-4 3.5-6 8-6s8 2 8 6z" />',
+'logout': '
+<path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5" />
+<path d="m15 8 4 4-4 4M19 12H9" />',
+'building': '
+<path d="M4 20V9.5L12 4l8 5.5V20z" />
+<path d="M9 20v-6h6v6" />',
+'driver': '
+<circle cx="12" cy="10" r="3.5" />
+<path d="M8.5 8h7M10 5.5h4" />
+<path d="M4.5 21c0-3.5 3-5.5 7.5-5.5s7.5 2 7.5 5.5z" />',
+'users': '
+<circle cx="9" cy="8" r="3.5" />
+<path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5z" />
+<circle cx="17" cy="9" r="2.8" />
+<path d="M17 14.5c2.8 0 4.5 1.7 4.5 4.5" />',
+'chart': '
+<path d="M5 20v-8M10 20V6M15 20v-10M20 20V3" />',
+'gear': '
+<circle cx="12" cy="12" r="3" />
+<path
+    d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+',
+'inventory': '
+<rect x="3" y="3" width="8" height="8" rx="1.5" />
+<rect x="13" y="3" width="8" height="8" rx="1.5" />
+<rect x="8" y="13" width="8" height="8" rx="1.5" />',
+'status': '
+<path d="M20 12a8 8 0 1 1-2.3-5.7" />
+<path d="M20 4v4h-4" />
+<path d="m8.5 12 2.5 2.5 4.5-5" />',
+'history': '
+<path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+<path d="M3 3v5h5" />
+<path d="M12 7.5V12l3 2" />',
+'clock': '
+<circle cx="12" cy="12" r="9" />
+<path d="M12 7v5l3 2" />',
+'incoming': '
+<path d="M12 3v9M8.5 8.5 12 12l3.5-3.5" />
+<path d="M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5" />
+<path d="M4 14h5l1 2.5h4l1-2.5h5" />',
+'outgoing': '
+<rect x="4" y="8" width="16" height="12" rx="2" />
+<path d="m4 8 2-4h12l2 4" />
+<path d="M12 17v-5M9.5 14.5 12 12l2.5 2.5" />',
+'assign': '
+<circle cx="9" cy="8" r="4" />
+<path d="M2 21c0-3.5 3-6 7-6 1.5 0 2.8.3 4 .9" />
+<path d="M18 14v6M15 17h6" />'
+} -%}
+<svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths[name]|safe }}</svg>
+{%- endmacro %}
+
+
+{% macro sidebar_styles() %}
+<style>
+    /* container: same colour as the top navbar */
+    .grad-sidebar.sidebar {
+        background: var(--navbar-bg, #1f4e79);
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        padding: 16px 14px 12px;
+        border-radius: 0 20px 20px 0;
+        overflow: hidden !important;
+        /* only .sidebar-scroll scrolls */
+        box-sizing: border-box;
+    }
+
+    .sidebar .sidebar-close-btn {
+        color: #fff;
+    }
+
+    @media (max-width: 768px) {
+        .grad-sidebar.sidebar {
+            display: flex !important;
+        }
+    }
+
+    /* brand  */
+    .sidebar .sidebar-brand {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 2px 6px 14px;
+    }
+
+    .sidebar .sidebar-brand-icon {
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        color: #7cc4ff;
+    }
+
+    .sidebar .sidebar-brand-title {
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.15;
+        color: #fff;
+    }
+
+    .sidebar .sidebar-brand-sub {
+        font-size: 12.5px;
+        color: #c4d9ee;
+        margin-top: 2px;
+    }
+
+    /* scrolling menu (scrollbar hidden) */
+    .sidebar .sidebar-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .sidebar .sidebar-scroll::-webkit-scrollbar {
+        display: none;
+        width: 0;
+        height: 0;
+    }
+
+    /* section headings */
+    .sidebar .sidebar-section {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 20px 0 8px 4px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #8fd0ff;
+    }
+
+    .sidebar .sidebar-section:first-child {
+        margin-top: 6px;
+    }
+
+    .sidebar .sidebar-section::before {
+        content: "";
+        width: 4px;
+        height: 14px;
+        border-radius: 2px;
+        background: #8fd0ff;
+    }
+
+    /* links */
+    .sidebar .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .grad-sidebar.sidebar .sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 11px;
+        background: transparent;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.25;
+        text-decoration: none;
+        box-shadow: none;
+        transition: background 0.18s ease, color 0.18s ease;
+    }
+
+    .grad-sidebar.sidebar a.sidebar-link:hover {
+        background: rgba(255, 255, 255, 0.10);
+        color: #fff;
+    }
+
+    .grad-sidebar.sidebar a.sidebar-link:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+    }
+
+    .grad-sidebar.sidebar .sidebar-link.active {
+        background: linear-gradient(90deg, #0a58d6, #1677ff);
+        color: #fff;
+        font-weight: 600;
+    }
+
+    .sidebar .sidebar-icon {
+        width: 23px;
+        height: 23px;
+        flex-shrink: 0;
+        color: currentColor;
+    }
+
+    .sidebar .sidebar-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sidebar .sidebar-badge {
+        margin-left: auto;
+        flex-shrink: 0;
+        min-width: 20px;
+        padding: 1px 6px;
+        border-radius: 10px;
+        background: #f08c00;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.5;
+        text-align: center;
+    }
+
+    /* red notification-style variant */
+    .sidebar .sidebar-badge.sidebar-badge-red {
+        background: #e03131;
+        color: #fff;
+    }
+
+    /* green variant (Outgoing Shipments count) */
+    .sidebar .sidebar-badge.sidebar-badge-green {
+        background: #22c55e;
+        color: #fff;
+    }
+
+    /* orange variant (Inventory count) */
+    .sidebar .sidebar-badge.sidebar-badge-orange {
+        background: #f59e0b;
+        color: #fff;
+    }
+
+    /* logged-in user card */
+    .sidebar .sidebar-user-wrap {
+        flex-shrink: 0;
+        padding-top: 10px;
+    }
+
+    .sidebar .sidebar-user {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 8px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.20);
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .sidebar .sidebar-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #1677ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .sidebar .sidebar-user-text {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .sidebar .sidebar-user-text div {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sidebar .sidebar-user-name {
+        font-size: 14.5px;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+    .sidebar .sidebar-user-status {
+        font-size: 12px;
+        color: #c4d9ee;
+        margin-top: 2px;
+    }
+
+    .sidebar .sidebar-chevron {
+        width: 18px;
+        height: 18px;
+        color: #c4d9ee;
+        flex-shrink: 0;
+    }
+
+    /* ---------- short screens: tighter spacing ---------- */
+    @media (max-height: 800px) {
+        .grad-sidebar.sidebar .sidebar-link {
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+
+        .sidebar .sidebar-section {
+            margin-top: 14px;
+            margin-bottom: 6px;
+        }
+
+        .sidebar .sidebar-brand {
+            padding-bottom: 8px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .grad-sidebar.sidebar .sidebar-link {
+            min-height: 44px;
+        }
+    }
+</style>
+{% endmacro %}
+
+{% macro render_sidebar(portal, brand, groups, active, aside_id, close_id, user_name, user_sub, profile_href, unread=0, badges=none, badge_colors=none)
+%}
+{{ sidebar_styles() }}
+<aside class="grad-sidebar sidebar" id="{{ aside_id }}">
+    <button class="sidebar-close-btn" id="{{ close_id }}" type="button" aria-label="Close navigation">✕</button>
+
+    <div class="sidebar-brand">
+        {% if brand == 'truck' %}
+        <svg class="sidebar-brand-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 16h8M2 22h10M6 28h6" />
+            <path d="M16 12h18v20H16z" />
+            <path d="M34 19h6l5 6v7H34" />
+            <circle cx="23" cy="34" r="4" />
+            <circle cx="39" cy="34" r="4" />
+        </svg>
+        {% else %}
+        <svg class="sidebar-brand-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M24 4 41 13.5v21L24 44 7 34.5v-21L24 4z" />
+            <path d="m7 13.5 17 9.5 17-9.5M24 23v21" />
+        </svg>
+        {% endif %}
+        <div>
+            <div class="sidebar-brand-title">CourierOS</div>
+            <div class="sidebar-brand-sub">{{ portal }}</div>
+        </div>
+    </div>
+
+    <div class="sidebar-scroll">
+        {% for title, items in groups %}
+        <div class="sidebar-section">{{ title }}</div>
+        <nav class="sidebar-nav">
+            {% for key, icon, label, href in items %}
+            {% if key == active %}
+            <div class="sidebar-link active" aria-current="page">
+                {% else %}
+                <a class="sidebar-link" href="{{ href }}">
+                    {% endif %}
+                    {{ sb_icon(icon) }}
+                    <span class="sidebar-label">{{ label }}</span>
+                    {% if key == 'notifications' and unread %}<span class="sidebar-badge">{{ unread }}</span>{% endif %}
+                    {% set badge_count = (badges or {}).get(key) %}
+                    {% if badge_count %}<span class="sidebar-badge sidebar-badge-{{ (badge_colors or {}).get(key, 'red') }}"
+                        aria-label="{{ badge_count }} pending">{{ badge_count if badge_count < 100 else '99+' }}</span>{% endif %}
+                    {% if key == active %}
+            </div>{% else %}</a>{% endif %}
+            {% endfor %}
+        </nav>
+        {% endfor %}
+    </div>
+
+    <div class="sidebar-user-wrap">
+        <a class="sidebar-user" href="{{ profile_href }}">
+            <div class="sidebar-avatar">{{ user_name[0]|upper }}</div>
+            <div class="sidebar-user-text">
+                <div class="sidebar-user-name">{{ user_name }}</div>
+                <div class="sidebar-user-status">{{ user_sub }}</div>
+            </div>
+            <svg class="sidebar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+            </svg>
+        </a>
+    </div>
+</aside>
+{% endmacro %}

@@ -1,0 +1,55 @@
+{# Layout shared by every dedicated customer module page.
+Children: {% set customer_active = '...' %} plus blocks title, cu_heading, cu_sub, cu_body #}
+{% extends "base.html" %}
+{% from "_customer_nav.html" import customer_sidebar %}
+{% block title %}CourierOS{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+    {{ customer_sidebar(customer_active) }}
+
+    <main class="grad-main">
+        <div class="dash-page">
+            <div class="dash-wrapper">
+
+                <div class="dash-header">
+                    <h1>{% block cu_heading %}{% endblock %}</h1>
+                    <p class="sub">{% block cu_sub %}{% endblock %}</p>
+                </div>
+
+                {% block cu_body %}{% endblock %}
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("customerSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) { link.addEventListener("click", closeSidebar); });
+        window.addEventListener("resize", function () { if (window.innerWidth > 768) closeSidebar(); });
+    });
+</script>
+{% endblock %}

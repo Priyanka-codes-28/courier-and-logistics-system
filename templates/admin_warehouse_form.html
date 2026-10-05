@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% block title %}Warehouse{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">☰</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+
+    {{ admin_sidebar('warehouses') }}
+
+    <main class="grad-main">
+        <h1>{{ 'Edit Warehouse' if mode == 'edit' else 'Add Warehouse' }}</h1>
+        <p class="page-sub">{{ 'Update this warehouse\'s details.' if mode == 'edit' else 'Create a new warehouse
+            record.' }}</p>
+
+        <div class="dash-section">
+            <form method="POST"
+                action="{{ url_for('auth.edit_warehouse', warehouse_id=warehouse.id) if mode == 'edit' else url_for('auth.add_warehouse') }}"
+                style="display:flex; flex-direction:column; gap:14px; max-width:560px; padding:6px 4px;">
+
+                <div>
+                    <label class="form-label" for="name">Warehouse name *</label>
+                    <input type="text" id="name" name="name" class="proof-input" required maxlength="120"
+                        value="{{ warehouse.name or '' }}" placeholder="e.g. Hyderabad Central Hub">
+                </div>
+                <div>
+                    <label class="form-label" for="address">Address *</label>
+                    <input type="text" id="address" name="address" class="proof-input" required maxlength="255"
+                        value="{{ warehouse.address or '' }}" placeholder="Street, area">
+                </div>
+                <div>
+                    <label class="form-label" for="city">City *</label>
+                    <input type="text" id="city" name="city" class="proof-input" required maxlength="80"
+                        value="{{ warehouse.city or '' }}" placeholder="e.g. Hyderabad">
+                </div>
+                <div>
+                    <label class="form-label" for="contact_number">Contact number *</label>
+                    <input type="text" id="contact_number" name="contact_number" class="proof-input" required
+                        maxlength="20" value="{{ warehouse.contact_number or '' }}" placeholder="e.g. +91 98765 43210">
+                </div>
+
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">
+                        {{ 'Save Changes' if mode == 'edit' else 'Add Warehouse' }}
+                    </button>
+                    <a href="{{ url_for('auth.manage_warehouses') }}" class="link-btn">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

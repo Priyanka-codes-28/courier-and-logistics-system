@@ -1,0 +1,31 @@
+{% extends "agent_base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% set agent_active = 'history' %}
+{% block title %}Delivery History{% endblock %}
+{% block ag_heading %}Delivery History{% endblock %}
+{% block ag_sub %}Completed and failed deliveries — {{ pagination.total }} total.{% endblock %}
+{% block ag_body %}
+<div class="dash-section" id="delivery-history">
+    <div class="sec-head"><h3>Delivery History</h3></div>
+    {% if delivery_history %}
+    <div class="table-scroll">
+        <table class="dash-table">
+            <tr><th>Tracking ID</th><th>Finished</th><th>Result</th></tr>
+            {% for h in delivery_history %}
+            <tr>
+                <td class="mono">{{ h.tracking_id }}</td>
+                <td>{{ (h.finished_at | ist('%b %d, %Y %I:%M %p')) if h.finished_at else '' }}</td>
+                <td>
+                    {% if h.status == 'Delivered' %}<span class="pill delivered">Delivered</span>
+                    {% else %}<span class="pill failed">Failed / RTO</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-note">No completed deliveries yet.</div>
+    {% endif %}
+    {{ render_pagination(pagination, 'auth.agent_delivery_history') }}
+</div>
+{% endblock %}

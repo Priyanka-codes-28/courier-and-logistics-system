@@ -1,0 +1,41 @@
+{# Shared pagination control. Save this file as templates/_pagination.html
+Usage:
+{% from "_pagination.html" import render_pagination %}
+{{ render_pagination(pagination, 'auth.manage_users', {'search': search, 'role': role_filter}) }}
+
+- pagination: the dict returned by get_pagination() in models.py
+- endpoint: the Flask endpoint name for this page (string)
+- extra_args: dict of query params to preserve (search/filters/other tables'
+page numbers). Falsy values are skipped automatically.
+- page_param: name of the page query param (default 'page'; use
+'assigned_page' / 'incoming_page' / 'outgoing_page' for dashboards
+that have more than one paginated table on the same page)
+#}
+{% macro render_pagination(pagination, endpoint, extra_args={}, page_param='page') %}
+{% if pagination %}
+<nav class="pagination" aria-label="Pagination">
+    {% set args = {} %}
+    {% for k, v in extra_args.items() %}{% if v %}{% set _ = args.update({k: v}) %}{% endif %}{% endfor %}
+
+    {% if pagination.has_prev %}
+    <a class="page-link" href="{{ url_for(endpoint, **dict(args, **{page_param: pagination.prev_page})) }}">Previous</a>
+    {% else %}
+    <span class="page-link disabled">Previous</span>
+    {% endif %}
+
+    {% for p in pagination.page_numbers %}
+    {% if p == pagination.page %}
+    <span class="page-link current" aria-current="page">{{ p }}</span>
+    {% else %}
+    <a class="page-link" href="{{ url_for(endpoint, **dict(args, **{page_param: p})) }}">{{ p }}</a>
+    {% endif %}
+    {% endfor %}
+
+    {% if pagination.has_next %}
+    <a class="page-link" href="{{ url_for(endpoint, **dict(args, **{page_param: pagination.next_page})) }}">Next</a>
+    {% else %}
+    <span class="page-link disabled">Next</span>
+    {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

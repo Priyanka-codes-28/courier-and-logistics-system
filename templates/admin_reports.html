@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% block title %}Reports & Analytics{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">
+    ☰
+</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="grad-shell">
+
+    {{ admin_sidebar('reports') }}
+
+    <main class="grad-main">
+        <h1>Reports &amp; Analytics</h1>
+        <p class="page-sub">Shipment performance and revenue overview.</p>
+
+        <div class="info-row admin-6col">
+            <div class="info-card">
+                <div class="k">Total Shipments</div>
+                <div class="v">{{ total_shipments }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Delivered</div>
+                <div class="v">{{ delivered_count }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Active Shipments</div>
+                <div class="v">{{ active_shipments }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Total Revenue</div>
+                <div class="v">₹{{ total_revenue }}</div>
+            </div>
+        </div>
+
+        <!-- SHIPMENT STATUS OVERVIEW -->
+        <div class="chart-widget">
+            <div class="w-title">Shipment Status Overview</div>
+            {% if total_shipments %}
+            <div class="status-bars">
+                <div class="status-bar-row">
+                    <span class="sb-label">Delivered</span>
+                    <div class="sb-track">
+                        <div class="sb-fill delivered"
+                            style="width: {{ (breakdown.delivered / total_shipments * 100)|round(1) }}%;"></div>
+                    </div>
+                    <span class="sb-num">{{ breakdown.delivered }}</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">In Transit</span>
+                    <div class="sb-track">
+                        <div class="sb-fill transit"
+                            style="width: {{ (breakdown.in_transit / total_shipments * 100)|round(1) }}%;"></div>
+                    </div>
+                    <span class="sb-num">{{ breakdown.in_transit }}</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">Out for Delivery</span>
+                    <div class="sb-track">
+                        <div class="sb-fill transit"
+                            style="width: {{ (breakdown.out_for_delivery / total_shipments * 100)|round(1) }}%;"></div>
+                    </div>
+                    <span class="sb-num">{{ breakdown.out_for_delivery }}</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">Pending</span>
+                    <div class="sb-track">
+                        <div class="sb-fill pending"
+                            style="width: {{ (breakdown.pending / total_shipments * 100)|round(1) }}%;"></div>
+                    </div>
+                    <span class="sb-num">{{ breakdown.pending }}</span>
+                </div>
+                <div class="status-bar-row">
+                    <span class="sb-label">Failed / RTO</span>
+                    <div class="sb-track">
+                        <div class="sb-fill failed"
+                            style="width: {{ (breakdown.failed / total_shipments * 100)|round(1) }}%;"></div>
+                    </div>
+                    <span class="sb-num">{{ breakdown.failed }}</span>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-note">No shipments in the system yet.</div>
+            {% endif %}
+        </div>
+
+        <!-- DELIVERIES THIS WEEK -->
+        <div class="chart-widget">
+            <div class="w-title">Deliveries This Week</div>
+            {% if weekly %}
+            {% set max_count = weekly|map(attribute='count')|max %}
+            <div class="chart-bars">
+                {% for day in weekly %}
+                <div style="height: {{ (day.count / max_count * 100) if max_count else 0 }}%"
+                    class="{{ 'peak' if day.count == max_count and max_count > 0 else '' }}"></div>
+                {% endfor %}
+            </div>
+            <div class="chart-labels">
+                {% for day in weekly %}<span>{{ day.label }} {{ day.count }}</span>{% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-note">No delivery data yet this week.</div>
+            {% endif %}
+        </div>
+
+        <!-- SYSTEM PERFORMANCE -->
+        <div class="section-block">
+            <div class="section-title">System Performance</div>
+            <div class="perf-row">
+                <div class="perf-item"><span class="perf-label">Delivery Success Rate</span><span
+                        class="perf-val good">{{ delivered_rate }}%</span></div>
+                <div class="perf-item"><span class="perf-label">Failed / RTO Rate</span><span class="perf-val bad">{{
+                        failed_rate }}%</span></div>
+                <div class="perf-item"><span class="perf-label">Active Shipments</span><span class="perf-val">{{
+                        active_shipments }}</span></div>
+            </div>
+        </div>
+    </main>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

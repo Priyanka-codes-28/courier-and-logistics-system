@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% block title %}Agent Performance{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">☰</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+
+    {{ admin_sidebar('agents') }}
+
+    <main class="grad-main">
+        <h1>Agent Performance</h1>
+        <p class="page-sub">Agent-wise deliveries, failures and success rate.</p>
+
+        <div style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="{{ url_for('auth.manage_users', role='delivery_agent') }}" class="link-btn">← Back to Delivery
+                Agents</a>
+        </div>
+
+        <div class="info-row admin-6col">
+            <div class="info-card">
+                <div class="k">Agents</div>
+                <div class="v">{{ agents|length }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Delivered</div>
+                <div class="v">{{ total_delivered }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Failed</div>
+                <div class="v">{{ total_failed }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Active Jobs</div>
+                <div class="v">{{ total_active }}</div>
+            </div>
+            <div class="info-card">
+                <div class="k">Success Rate</div>
+                <div class="v">{{ (overall_rate ~ '%') if overall_rate is not none else '—' }}</div>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>Performance by Agent</h3>
+            </div>
+            {% if agents %}
+            <div class="table-scroll">
+                <table class="dash-table recent-table">
+                    <tr>
+                        <th>Agent</th>
+                        <th>Account</th>
+                        <th>Availability</th>
+                        <th>Assigned</th>
+                        <th>Delivered</th>
+                        <th>Failed</th>
+                        <th>Active</th>
+                        <th>Success rate</th>
+                        <th></th>
+                    </tr>
+                    {% for a in agents %}
+                    <tr>
+                        <td>{{ a.name }}<br><span style="font-size:11px; color:var(--d-text-dim);">{{ a.email }}</span>
+                        </td>
+                        <td>
+                            {% if a.status == 'active' %}<span class="pill delivered">Active</span>
+                            {% else %}<span class="pill failed">Inactive</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if a.availability == 'Available' %}<span class="pill delivered">Available</span>
+                            {% elif a.availability == 'Busy' %}<span class="pill transit">Busy</span>
+                            {% else %}<span class="pill failed">Offline</span>{% endif %}
+                        </td>
+                        <td>{{ a.total_assigned }}</td>
+                        <td>{{ a.delivered }}</td>
+                        <td>{{ a.failed }}</td>
+                        <td>{{ a.active }}</td>
+                        <td style="min-width:130px;">
+                            {% if a.success_rate is not none %}
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div
+                                    style="flex:1; height:8px; border-radius:4px; background:rgba(128,128,128,0.25); overflow:hidden;">
+                                    <div style="width:{{ a.success_rate }}%; height:100%; background:#1e90ff;"></div>
+                                </div>
+                                <span>{{ a.success_rate }}%</span>
+                            </div>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td><a href="{{ url_for('auth.edit_user', user_id=a.user_id) }}" class="link-btn">Edit</a></td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-note">No delivery agents yet — add one from Manage Delivery Agents.</div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

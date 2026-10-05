@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import render_pagination %}
+{% from "_warehouse_nav.html" import wh_sidebar %}
 {% block title %}Warehouse Notifications{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
 
@@ -13,26 +15,8 @@
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="grad-shell">
 
-    <!-- GRADIENT SIDEBAR -->
-    <aside class="grad-sidebar" id="warehouseSidebar">
-        <!-- MOBILE CLOSE BUTTON -->
-        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button">
-            ✕
-        </button>
-        <div class="brand"><span class="dot"></span>CourierOS</div>
-        <nav class="grad-nav">
-            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('auth.dashboard') }}#incoming-table">Incoming Shipments</a>
-            <a href="{{ url_for('auth.dashboard') }}#outgoing-table">Outgoing Shipments</a>
-            <a href="{{ url_for('auth.dashboard') }}#assign-agent-card">Assign Delivery Agent</a>
-            <a href="{{ url_for('auth.dashboard') }}#warehouse-inventory">Warehouse Inventory</a>
-            <a href="{{ url_for('auth.dashboard') }}#update-shipment-card">Update Shipment Status</a>
-            <a href="{{ url_for('auth.dashboard') }}#warehouse-details">Warehouse Details</a>
-            <div class="item active">Notifications</div>
-            <a href="{{ url_for('auth.profile') }}">Profile</a>
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
-        </nav>
-    </aside>
+    <!-- SIDEBAR -->
+    {{ wh_sidebar('notifications', unread_notification_count) }}
 
     <style>
         /* Scoped to this page only */
@@ -202,6 +186,7 @@
                     {% if not n.is_read %}
                     <form method="POST"
                         action="{{ url_for('auth.mark_warehouse_notification_read', notification_id=n.id) }}">
+                        <input type="hidden" name="page" value="{{ pagination.page }}">
                         <button type="submit" class="wn-mark-btn">Mark as Read</button>
                     </form>
                     {% endif %}
@@ -212,6 +197,8 @@
                 through the warehouse.</div>
             {% endfor %}
         </div>
+
+        {{ render_pagination(pagination, 'auth.warehouse_notifications') }}
 
     </main>
 </div>

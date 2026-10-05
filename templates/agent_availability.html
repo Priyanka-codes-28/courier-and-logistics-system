@@ -1,0 +1,24 @@
+{% extends "agent_base.html" %}
+{% set agent_active = 'availability' %}
+{% block title %}Availability{% endblock %}
+{% block ag_heading %}Availability{% endblock %}
+{% block ag_sub %}Control whether you receive new shipment assignments.{% endblock %}
+{% block ag_body %}
+<div class="chart-widget" id="availability">
+    <div class="w-title">Availability</div>
+    <span class="avail-toggle {{ '' if is_available else 'off' }}">
+        <span class="dot"></span>
+        {{ 'Available for new assignments' if is_available else 'Currently unavailable' }}
+    </span>
+    <div class="avail-btn-row">
+        <form method="POST" action="{{ url_for('shipments.set_availability') }}" style="display:contents;">
+            <input type="hidden" name="is_available" value="true">
+            <button type="submit" class="avail-btn on">Available</button>
+        </form>
+        <form method="POST" action="{{ url_for('shipments.set_availability') }}" style="display:contents;">
+            <input type="hidden" name="is_available" value="false">
+            <button type="submit" class="avail-btn off">Not Available</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
