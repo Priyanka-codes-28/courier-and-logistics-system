@@ -2,10 +2,11 @@ import secrets
 import hmac
 import hashlib
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dtime
 from flask import current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db
+from timezone_utils import IST
 
 def get_pagination(total, page, per_page):
     
@@ -282,11 +283,26 @@ STATUS_FLOW = [
 ]
 
 EXCEPTION_STATUSES = ["Failed Delivery", "RTO"]
+FAILED_DELIVERY_REASONS = [
+    "Customer unavailable",
+    "Incorrect address",
+    "Customer refused delivery",
+    "Delivery location inaccessible",
+    "Other",
+]
 
 # Delivery verification code settings
 DELIVERY_CODE_MAX_ATTEMPTS = 5
 DELIVERY_CODE_VALID_HOURS = 12          
 DELIVERY_CODE_MAX_REGENERATIONS = 3
+DELIVERY_SLOTS = [
+    (dtime(9, 0), dtime(11, 0)),
+    (dtime(11, 0), dtime(13, 0)),
+    (dtime(14, 0), dtime(16, 0)),
+    (dtime(16, 0), dtime(18, 0)),
+    (dtime(18, 0), dtime(20, 0)),
+]
+DELIVERY_SCHEDULE_MAX_DAYS = 30
 
 
 def _delivery_code_secret():
@@ -324,7 +340,9 @@ class Shipment:
     def create(sender_id, receiver_name, receiver_address, receiver_phone,
                package_type=None, weight=None, sender_name=None, sender_address=None,
                sender_phone=None, package_description=None,
-               origin_warehouse_id=None, destination_warehouse_id=None):
+               origin_warehouse_id=None, destination_warehouse_id=None,
+               scheduled_delivery_date=None, scheduled_delivery_start=None,
+               scheduled_delivery_end=None):
         db = get_db()
         tracking_id = Shipment.generate_tracking_id()
         with db.cursor() as cur:
@@ -333,13 +351,16 @@ class Shipment:
                    (tracking_id, sender_id, sender_name, sender_address, sender_phone,
                     receiver_name, receiver_address, receiver_phone, package_type,
                     package_description, weight,
-                    origin_warehouse_id, destination_warehouse_id, status)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Created')
+                    origin_warehouse_id, destination_warehouse_id,
+                    scheduled_delivery_date, scheduled_delivery_start, scheduled_delivery_end,
+                    status)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Created')
                    RETURNING id""",
                 (tracking_id, sender_id, sender_name, sender_address, sender_phone,
                  receiver_name, receiver_address, receiver_phone, package_type,
                  package_description, weight,
-                 origin_warehouse_id, destination_warehouse_id),
+                 origin_warehouse_id, destination_warehouse_id,
+                 scheduled_delivery_date, scheduled_delivery_start, scheduled_delivery_end),
             )
             shipment_id = cur.fetchone()["id"]
             cur.execute(
@@ -348,6 +369,70 @@ class Shipment:
                 (shipment_id, sender_id),
             )
         return tracking_id
+
+    # ---- Scheduled delivery (preferred window chosen by the customer) ----
+
+    @staticmethod
+    def delivery_slot_options():
+        """Allowed slots for the create-shipment dropdown."""
+        return [
+            {
+                "value": f"{s:%H:%M}-{e:%H:%M}",
+                "label": f"{s:%I:%M %p} - {e:%I:%M %p}",
+                "end": f"{e:%H:%M}",
+            }
+            for s, e in DELIVERY_SLOTS
+        ]
+
+    @staticmethod
+    def schedule_form_context(now=None):
+        """Template values for the scheduled-delivery fields (IST based)."""
+        now = now or datetime.now(IST)
+        today = now.date()
+        return {
+            "slot_options": Shipment.delivery_slot_options(),
+            "schedule_min_date": today.isoformat(),
+            "schedule_max_date": (today + timedelta(days=DELIVERY_SCHEDULE_MAX_DAYS)).isoformat(),
+            "schedule_max_days": DELIVERY_SCHEDULE_MAX_DAYS,
+        }
+
+    @staticmethod
+    def parse_delivery_schedule(date_str, slot_str, now=None):
+        """Validate the optional scheduled-delivery inputs.
+
+        Returns (date, start_time, end_time, error). All three values are None
+        when no schedule was chosen. error is None on success. The start/end
+        times always come from the server-side slot table, never from the form.
+        """
+        date_str = (date_str or "").strip()
+        slot_str = (slot_str or "").strip()
+        if not date_str and not slot_str:
+            return None, None, None, None
+        if not date_str or not slot_str:
+            return None, None, None, "Please choose both a preferred delivery date and a time slot, or leave both empty."
+
+        try:
+            delivery_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return None, None, None, "Preferred delivery date is not a valid date."
+
+        slot = next((s for s in DELIVERY_SLOTS if f"{s[0]:%H:%M}-{s[1]:%H:%M}" == slot_str), None)
+        if slot is None:
+            return None, None, None, "Please select a valid delivery time slot."
+        start, end = slot
+        if not end > start:
+            return None, None, None, "Delivery end time must be later than the start time."
+
+        now = now or datetime.now(IST)
+        today = now.date()
+        if delivery_date < today:
+            return None, None, None, "Preferred delivery date cannot be in the past."
+        if delivery_date > today + timedelta(days=DELIVERY_SCHEDULE_MAX_DAYS):
+            return None, None, None, f"Preferred delivery date must be within the next {DELIVERY_SCHEDULE_MAX_DAYS} days."
+        if delivery_date == today and end <= now.time():
+            return None, None, None, "That time slot has already ended today. Please choose an upcoming slot."
+
+        return delivery_date, start, end, None
 
     @staticmethod
     def find_by_tracking_id(tracking_id):
@@ -447,7 +532,112 @@ class Shipment:
                     )
                 except Exception:
                     pass
+    @staticmethod
+    def mark_failed_delivery(shipment_id, reason, updated_by):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE shipments
+                   SET status = 'Failed Delivery',
+                       failed_delivery_reason = %s,
+                       failed_delivery_at = NOW()
+                   WHERE id = %s AND status = 'Out for Delivery'
+                   RETURNING id""",
+                (reason, shipment_id),
+            )
+            if cur.fetchone() is None:
+                return False
+            cur.execute(
+                """INSERT INTO shipment_status_history (shipment_id, status, location, remarks, updated_by)
+                   VALUES (%s, 'Failed Delivery', 'Delivery Attempt', %s, %s)""",
+                (shipment_id, f"Reason: {reason}", updated_by),
+            )
 
+        try:
+            _notify_shipment_status_change(shipment_id, "Failed Delivery")
+        except Exception as e:
+            try:
+                current_app.logger.error(f"[email_utils] failed-delivery email failed for shipment {shipment_id}: {e}")
+            except Exception:
+                pass
+        try:
+            _notify_role_based_status_change(shipment_id, "Failed Delivery", remarks=f"Reason: {reason}")
+        except Exception as e:
+            try:
+                current_app.logger.error(f"[email_utils] role-based failed-delivery email failed for shipment {shipment_id}: {e}")
+            except Exception:
+                pass
+        return True
+    
+    @staticmethod
+    def format_delivery_window(delivery_date, start, end):
+        if not (delivery_date and start and end):
+            return ""
+        return f"{delivery_date:%d %B %Y}, {start:%I:%M %p} - {end:%I:%M %p}"
+
+    @staticmethod
+    def reschedule_delivery(shipment_id, sender_id, delivery_date, delivery_start, delivery_end, updated_by):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT scheduled_delivery_date, scheduled_delivery_start, scheduled_delivery_end
+                   FROM shipments WHERE id = %s""",
+                (shipment_id,),
+            )
+            old = cur.fetchone() or {}
+            cur.execute(
+                """UPDATE shipments
+                   SET scheduled_delivery_date = %s,
+                       scheduled_delivery_start = %s,
+                       scheduled_delivery_end = %s,
+                       status = 'Ready for Dispatch',
+                       delivery_code_nonce = NULL,
+                       delivery_code_verified = FALSE,
+                       delivery_code_attempts = 0,
+                       delivery_code_regenerations = 0,
+                       delivery_code_expires_at = NULL,
+                       delivery_code_verified_at = NULL
+                   WHERE id = %s AND sender_id = %s AND status = 'Failed Delivery'
+                   RETURNING id""",
+                (delivery_date, delivery_start, delivery_end, shipment_id, sender_id),
+            )
+            if cur.fetchone() is None:
+                return None
+
+            new_text = Shipment.format_delivery_window(delivery_date, delivery_start, delivery_end)
+            old_text = Shipment.format_delivery_window(
+                old.get("scheduled_delivery_date"), old.get("scheduled_delivery_start"),
+                old.get("scheduled_delivery_end"),
+            )
+            remarks = (f"Delivery rescheduled from {old_text} to {new_text}" if old_text
+                       else f"Delivery rescheduled to {new_text}")
+            cur.execute(
+                """INSERT INTO shipment_status_history (shipment_id, status, location, remarks, updated_by)
+                   VALUES (%s, 'Rescheduled', 'Customer Dashboard', %s, %s)""",
+                (shipment_id, remarks, updated_by),
+            )
+            cur.execute(
+                """INSERT INTO shipment_status_history (shipment_id, status, location, remarks, updated_by)
+                   VALUES (%s, 'Ready for Dispatch', 'Returned to dispatch queue', NULL, %s)""",
+                (shipment_id, updated_by),
+            )
+
+        try:
+            _notify_shipment_status_change(shipment_id, "Ready for Dispatch")
+        except Exception as e:
+            try:
+                current_app.logger.error(f"[email_utils] reschedule email failed for shipment {shipment_id}: {e}")
+            except Exception:
+                pass
+        try:
+            _notify_role_based_status_change(shipment_id, "Ready for Dispatch", remarks=remarks)
+        except Exception as e:
+            try:
+                current_app.logger.error(f"[email_utils] role-based reschedule email failed for shipment {shipment_id}: {e}")
+            except Exception:
+                pass
+        return new_text
+    
     @staticmethod
     def ensure_delivery_code(shipment_id):
         db = get_db()
@@ -635,6 +825,7 @@ class Shipment:
                        FROM shipments s
                        JOIN shipment_assignments sa ON sa.shipment_id = s.id
                        WHERE sa.agent_id = %s
+                       AND NOT (sa.status = 'failed' AND s.status NOT IN ('Failed Delivery', 'RTO'))
                        ORDER BY s.id, sa.assigned_at DESC
                    ) sub
                    ORDER BY assigned_at DESC""",
@@ -689,7 +880,8 @@ class Shipment:
                    AND s.status = 'Ready for Dispatch'
                    AND NOT EXISTS (
                        SELECT 1 FROM shipment_assignments sa
-                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery' AND sa.status <> 'failed'
+                       
                    )
                    ORDER BY s.created_at ASC""",
                 (warehouse_id, warehouse_id),
@@ -707,6 +899,7 @@ class Shipment:
                              JOIN delivery_agents da ON da.id = sa.agent_id
                              JOIN users u ON u.id = da.user_id
                             WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                            AND NOT (sa.status = 'failed' AND s.status NOT IN ('Failed Delivery', 'RTO'))
                             ORDER BY sa.assigned_at DESC LIMIT 1) AS delivery_agent_name
                    FROM shipments s
                    WHERE (s.origin_warehouse_id = %s OR s.destination_warehouse_id = %s)
@@ -804,7 +997,7 @@ class Shipment:
                 )
             elif new_shipment_status == "Delivered":
                 cur.execute(
-                    "UPDATE shipment_assignments SET status = 'delivered' WHERE shipment_id = %s",
+                    "UPDATE shipment_assignments SET status = 'delivered' WHERE shipment_id = %s AND status <> 'failed'",
                     (shipment_id,),
                 )
             elif new_shipment_status in ("Failed Delivery", "RTO"):
@@ -838,7 +1031,7 @@ class Shipment:
                    WHERE s.status = 'Ready for Dispatch'
                    AND NOT EXISTS (
                        SELECT 1 FROM shipment_assignments sa
-                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery' AND sa.status <> 'failed'
                    )
                    ORDER BY s.created_at ASC"""
             )
@@ -958,7 +1151,19 @@ class Shipment:
         db = get_db()
         with db.cursor() as cur:
             cur.execute(
-                """SELECT s.*, u.name AS customer_name FROM shipments s
+                """SELECT s.*, u.name AS customer_name,
+                          (SELECT du.name FROM shipment_assignments sa
+                             JOIN delivery_agents da ON da.id = sa.agent_id
+                             JOIN users du ON du.id = da.user_id
+                            WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                              AND NOT (sa.status = 'failed' AND s.status NOT IN ('Failed Delivery', 'RTO'))
+                            ORDER BY sa.assigned_at DESC LIMIT 1) AS delivery_agent_name,
+                          (SELECT COUNT(*) FROM shipment_status_history h
+                            WHERE h.shipment_id = s.id AND h.status = 'Rescheduled') AS reschedule_count,
+                          (SELECT h.remarks FROM shipment_status_history h
+                            WHERE h.shipment_id = s.id AND h.status = 'Rescheduled'
+                            ORDER BY h.timestamp DESC LIMIT 1) AS last_reschedule_note
+                   FROM shipments s
                    JOIN users u ON u.id = s.sender_id
                    ORDER BY s.created_at DESC LIMIT %s OFFSET %s""",
                 (limit, offset),
@@ -975,7 +1180,7 @@ class Shipment:
                    WHERE s.status = 'Ready for Dispatch'
                    AND NOT EXISTS (
                        SELECT 1 FROM shipment_assignments sa
-                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery'
+                       WHERE sa.shipment_id = s.id AND sa.agent_role = 'delivery' AND sa.status <> 'failed'
                    )"""
             )
             return cur.fetchone()["c"]
@@ -1020,9 +1225,11 @@ class Shipment:
         with db.cursor() as cur:
             cur.execute(
                 """SELECT u.name FROM shipment_assignments sa
+                   JOIN shipments s ON s.id = sa.shipment_id
                    JOIN delivery_agents da ON da.id = sa.agent_id
                    JOIN users u ON u.id = da.user_id
                    WHERE sa.shipment_id = %s
+                     AND NOT (sa.status = 'failed' AND s.status NOT IN ('Failed Delivery', 'RTO'))
                    ORDER BY sa.assigned_at DESC LIMIT 1""",
                 (shipment_id,),
             )
@@ -1040,6 +1247,7 @@ class Shipment:
                 """SELECT s.* FROM shipments s
                    JOIN shipment_assignments sa ON sa.shipment_id = s.id
                    WHERE sa.agent_id = %s AND s.status NOT IN ('Delivered', 'Failed Delivery', 'RTO')
+                   AND NOT (sa.status = 'failed' AND s.status NOT IN ('Failed Delivery', 'RTO'))
                    ORDER BY sa.assigned_at DESC LIMIT 1""",
                 (agent_id,),
             )
@@ -1050,6 +1258,7 @@ class Shipment:
                 """SELECT s.* FROM shipments s
                    JOIN shipment_assignments sa ON sa.shipment_id = s.id
                    WHERE sa.agent_id = %s
+                   AND NOT (sa.status = 'failed' AND s.status NOT IN ('Failed Delivery', 'RTO'))
                    ORDER BY sa.assigned_at DESC LIMIT 1""",
                 (agent_id,),
             )
@@ -2016,3 +2225,126 @@ class SystemSettings:
                 f"UPDATE system_settings SET {set_clause}, updated_at = NOW() WHERE id = 1",
                 params,
             )
+
+class DeliveryRating:
+    
+    @staticmethod
+    def create_rating(shipment_id, customer_id, rating, feedback=None):
+        
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """INSERT INTO delivery_ratings (shipment_id, customer_id, rating, feedback)
+                   SELECT s.id, s.sender_id, %s, %s
+                   FROM shipments s
+                   WHERE s.id = %s AND s.sender_id = %s AND s.status = 'Delivered'
+                   ON CONFLICT (shipment_id) DO NOTHING
+                   RETURNING id""",
+                (rating, feedback, shipment_id, customer_id),
+            )
+            return cur.fetchone() is not None
+
+    @staticmethod
+    def get_rating_by_shipment(shipment_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT id, shipment_id, customer_id, rating, feedback, created_at
+                   FROM delivery_ratings WHERE shipment_id = %s""",
+                (shipment_id,),
+            )
+            return cur.fetchone()
+
+    @staticmethod
+    def get_customer_ratings(customer_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT r.id, r.rating, r.feedback, r.created_at, s.tracking_id
+                   FROM delivery_ratings r
+                   JOIN shipments s ON s.id = r.shipment_id
+                   WHERE r.customer_id = %s
+                   ORDER BY r.created_at DESC""",
+                (customer_id,),
+            )
+            return cur.fetchall()
+    @staticmethod
+    def count_delivered_for_customer(customer_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM shipments WHERE sender_id = %s AND status = 'Delivered'",
+                (customer_id,),
+            )
+            return cur.fetchone()["c"]
+
+    @staticmethod
+    def list_delivered_for_customer(customer_id, limit=5, offset=0):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT s.id, s.tracking_id, s.receiver_name,
+                          r.rating, r.feedback, r.created_at AS rated_at
+                   FROM shipments s
+                   LEFT JOIN delivery_ratings r ON r.shipment_id = s.id
+                   WHERE s.sender_id = %s AND s.status = 'Delivered'
+                   ORDER BY s.created_at DESC, s.id DESC
+                   LIMIT %s OFFSET %s""",
+                (customer_id, limit, offset),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def list_recent_delivered_for_customer(customer_id, limit=5):
+        
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT s.id, s.tracking_id, s.receiver_name,
+                          r.rating, r.feedback, r.created_at AS rated_at
+                   FROM shipments s
+                   LEFT JOIN delivery_ratings r ON r.shipment_id = s.id
+                   WHERE s.sender_id = %s AND s.status = 'Delivered'
+                   ORDER BY s.created_at DESC
+                   LIMIT %s""",
+                (customer_id, limit),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def count_all():
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS c FROM delivery_ratings")
+            return cur.fetchone()["c"]
+
+    @staticmethod
+    def get_all_ratings(limit=20, offset=0):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """SELECT r.id, r.rating, r.feedback, r.created_at,
+                          s.tracking_id, u.name AS customer_name
+                   FROM delivery_ratings r
+                   JOIN shipments s ON s.id = r.shipment_id
+                   JOIN users u ON u.id = r.customer_id
+                   ORDER BY r.created_at DESC
+                   LIMIT %s OFFSET %s""",
+                (limit, offset),
+            )
+            return cur.fetchall()
+
+    @staticmethod
+    def get_rating_summary():
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS total, AVG(rating) AS average FROM delivery_ratings")
+            row = cur.fetchone()
+            cur.execute("SELECT rating, COUNT(*) AS c FROM delivery_ratings GROUP BY rating")
+            counts = {r["rating"]: r["c"] for r in cur.fetchall()}
+        total = row["total"] or 0
+        return {
+            "total": total,
+            "average": round(float(row["average"]), 2) if total and row["average"] is not None else None,
+            "distribution": {star: counts.get(star, 0) for star in (5, 4, 3, 2, 1)},
+        }

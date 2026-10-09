@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_schedule.html" import schedule_text, schedule_block %}
 {% from "_customer_nav.html" import customer_sidebar %}
 {% block title %}Customer Dashboard{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
@@ -162,6 +163,27 @@
                 Current Shipment
             </div>
 
+            {# ---- Delivery verification codes: one card per Out for Delivery shipment of THIS customer ---- #}
+            {% for ofd in out_for_delivery_shipments or [] %}
+            {% set dcode = customer_delivery_code(ofd) %}
+            {% if dcode %}
+            <div class="verify-code-card">
+                <div class="cs-k">Delivery Verification Code</div>
+                <div class="cs-v mono">{{ ofd.tracking_id }}</div>
+                {% if dcode.state == 'active' and dcode.code %}
+                <p>Share this code with the delivery agent when your shipment arrives.</p>
+                <div class="vc-digits">{% for d in dcode.code %}<span>{{ d }}</span>{% endfor %}</div>
+                <small>Valid until: {{ dcode.expires_at_ist }}</small>
+                {% elif dcode.state == 'verified' %}<p>Delivery verified. Thank you!</p>
+                {% elif dcode.state == 'locked' %}<p>Too many incorrect attempts. The delivery agent can request a new
+                    code.</p>
+                {% elif dcode.state == 'expired' %}<p>This code has expired. The delivery agent can request a new one.
+                </p>
+                {% else %}<p>Your code is being prepared. Please refresh in a moment.</p>{% endif %}
+            </div>
+            {% endif %}
+            {% endfor %}
+
             {% if current_shipment %}
 
             <div class="current-ship-card">
@@ -253,25 +275,88 @@
                         </span>
 
                     </div>
+                    <div class="cs-item">
+                        <span class="cs-k">Scheduled Delivery</span>
+                        <span class="cs-v">{{ schedule_block(current_shipment) }}</span>
+                    </div>
 
                 </div>
-
-
-                {% set dcode = customer_delivery_code(current_shipment) %}
-                {% if dcode %}
-                <div class="verify-code-card">
-                    <div class="cs-k">Delivery Verification Code</div>
-                    {% if dcode.state == 'active' %}
-                    <p>Share this code with the delivery agent when your shipment arrives.</p>
-                    <div class="vc-digits">{% for d in dcode.code %}<span>{{ d }}</span>{% endfor %}</div>
-                    <small>Valid until {{ dcode.expires_at_ist }}</small>
-                    {% elif dcode.state == 'verified' %}<p>Delivery verified. Thank you!</p>
-                    {% elif dcode.state == 'locked' %}<p>Too many incorrect attempts. The agent can request a new code.
-                    </p>
-                    {% elif dcode.state == 'expired' %}<p>This code expired. The agent can request a new one.</p>
-                    {% else %}<p>Your code will appear here shortly.</p>{% endif %}
+                {% if current_shipment.status == 'Failed Delivery' %}
+                <div class="cs-item">
+                    <span class="cs-k">Failure Reason</span>
+                    <span class="cs-v">{{ current_shipment.failed_delivery_reason or '—' }}</span>
+                </div>
+                <div class="cs-item">
+                    <span class="cs-k">Failed Delivery Date/Time</span>
+                    <span class="cs-v">{{ (current_shipment.failed_delivery_at | ist('%d %B %Y, %I:%M %p')) if
+                        current_shipment.failed_delivery_at else '—' }}</span>
+                </div>
+                {% if current_shipment.status == 'Failed Delivery' %}
+                {% set sf = schedule_form_context() %}
+                <div class="cs-item" style="flex-basis:100%;">
+                    <button type="button" class="cta-btn" id="rescheduleToggle"
+                        style="border:none; cursor:pointer;">Reschedule Delivery</button>
+                    <form method="POST" id="rescheduleForm" style="display:none; margin-top:12px;"
+                        action="{{ url_for('shipments.reschedule_shipment', tracking_id=current_shipment.tracking_id) }}">
+                        <label class="form-label" for="rsDate">New Delivery Date</label>
+                        <input type="date" id="rsDate" name="scheduled_delivery_date" class="proof-input"
+                            min="{{ sf.schedule_min_date }}" max="{{ sf.schedule_max_date }}" required>
+                        <label class="form-label" for="rsSlot">New Delivery Time Slot</label>
+                        <select id="rsSlot" name="scheduled_delivery_slot" class="proof-input" required>
+                            <option value="">Select a time slot</option>
+                            {% for slot in sf.slot_options %}
+                            <option value="{{ slot.value }}" data-end="{{ slot.end }}">{{ slot.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small id="rsHint">Choose a date within the next {{ sf.schedule_max_days }} days.</small>
+                        <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Confirm New
+                            Schedule</button>
+                    </form>
+                    <script>
+                        (function () {
+                            var toggle = document.getElementById("rescheduleToggle");
+                            var form = document.getElementById("rescheduleForm");
+                            var dateInput = document.getElementById("rsDate");
+                            var slotSelect = document.getElementById("rsSlot");
+                            var hint = document.getElementById("rsHint");
+                            if (!toggle || !form) return;
+                            var defaultHint = hint.textContent;
+                            toggle.addEventListener("click", function () {
+                                form.style.display = form.style.display === "none" ? "block" : "none";
+                            });
+                            function istNow() {
+                                var parts = new Intl.DateTimeFormat("en-CA", {
+                                    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+                                    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+                                }).formatToParts(new Date());
+                                var p = {};
+                                parts.forEach(function (x) { p[x.type] = x.value; });
+                                return { date: p.year + "-" + p.month + "-" + p.day, minutes: parseInt(p.hour, 10) * 60 + parseInt(p.minute, 10) };
+                            }
+                            function refreshSlots() {
+                                var now = istNow();
+                                var isToday = dateInput.value === now.date;
+                                var open = 0;
+                                Array.prototype.forEach.call(slotSelect.options, function (opt) {
+                                    if (!opt.value) return;
+                                    var end = opt.getAttribute("data-end").split(":");
+                                    var ended = isToday && (parseInt(end[0], 10) * 60 + parseInt(end[1], 10)) <= now.minutes;
+                                    opt.disabled = ended;
+                                    if (ended && opt.selected) slotSelect.value = "";
+                                    if (!ended) open++;
+                                });
+                                hint.textContent = (isToday && open === 0)
+                                    ? "No delivery slots are left today. Please choose a later date." : defaultHint;
+                            }
+                            dateInput.addEventListener("change", refreshSlots);
+                            refreshSlots();
+                        })();
+                    </script>
                 </div>
                 {% endif %}
+                {% endif %}
+
+
 
                 <a href="{{ url_for('shipments.track') }}?tracking_id={{ current_shipment.tracking_id }}"
                     class="cta-btn">
@@ -374,6 +459,53 @@
         </div>
 
 
+        <!-- RATE YOUR DELIVERY -->
+        {% if rate_cards %}
+        <div class="dash-section" id="rate-delivery">
+
+            <div class="sec-head">
+                <h3>Customer Rating</h3>
+                <a href="{{ url_for('auth.customer_ratings') }}" class="link-btn">View All →</a>
+            </div>
+
+            {% for rc in rate_cards %}
+            <div class="rate-card">
+
+                <div class="rate-card-head">
+                    <span class="rate-k">Shipment:</span>
+                    <span class="rate-v">{{ rc.tracking_id }}</span>
+                    {% if rc.receiver_name %}<span class="rate-sub">to {{ rc.receiver_name }}</span>{% endif %}
+                </div>
+
+                {% if rc.rating %}
+                <div class="rate-stars-static" aria-label="Rated {{ rc.rating }} out of 5">
+                    {% for i in range(1, 6) %}<span class="{{ 'on' if i <= rc.rating else '' }}">&#9733;</span>{% endfor
+                    %}
+                </div>
+                <p class="rate-thanks">Thanks for your feedback!</p>
+                {% if rc.feedback %}<p class="rate-feedback">&ldquo;{{ rc.feedback }}&rdquo;</p>{% endif %}
+
+                {% else %}
+                <form method="POST" action="{{ url_for('auth.rate_delivery', tracking_id=rc.tracking_id) }}">
+                    <div class="star-input" role="radiogroup" aria-label="Rating out of 5 stars">
+                        {% for i in range(5, 0, -1) %}
+                        <input type="radio" id="star-{{ rc.id }}-{{ i }}" name="rating" value="{{ i }}" required>
+                        <label for="star-{{ rc.id }}-{{ i }}" title="{{ i }} star{{ 's' if i > 1 }}">&#9733;</label>
+                        {% endfor %}
+                    </div>
+                    <textarea name="feedback" class="proof-input" rows="3" maxlength="1000"
+                        placeholder="Optional feedback"></textarea>
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Submit Rating</button>
+                </form>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+
+        </div>
+        {% endif %}
+
+
         <!-- RECENT SHIPMENTS -->
         <div class="dash-section">
 
@@ -399,6 +531,7 @@
                         <th>To</th>
                         <th>Status</th>
                         <th>Created</th>
+                        <th>Scheduled Delivery</th>
 
                     </tr>
 
@@ -449,6 +582,7 @@
                             {{ (s.created_at | ist('%b %d, %Y')) if s.created_at else '' }}
 
                         </td>
+                        <td>{{ schedule_text(s) }}</td>
 
                     </tr>
 

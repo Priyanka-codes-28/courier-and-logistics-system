@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
-from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings, get_pagination
+from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings, get_pagination, FAILED_DELIVERY_REASONS
 import os
 import secrets
 from werkzeug.utils import secure_filename
@@ -22,8 +22,7 @@ def login_required_role(*roles):
 
 
 def _customer_delivery_code(shipment):
-    """The ONLY place the plaintext code is produced: for the shipment's own
-    customer, while the shipment is Out for Delivery. Everyone else gets None."""
+    
     if not shipment or session.get("user_id") != shipment.get("sender_id"):
         return None
     if shipment.get("status") != "Out for Delivery":
@@ -71,6 +70,9 @@ def _register_delivery_code_helpers(state):
     g = state.app.jinja_env.globals
     g["customer_delivery_code"] = _customer_delivery_code
     g["delivery_code_state"] = _agent_delivery_code_state
+    g["failed_delivery_reasons"] = FAILED_DELIVERY_REASONS
+    g["schedule_form_context"] = Shipment.schedule_form_context
+    
 
 
 #display the payment page for a shipment
@@ -145,6 +147,8 @@ def create_shipment():
         package_type = request.form.get("package_type", "").strip()
         package_description = request.form.get("package_description", "").strip()
         weight = request.form.get("weight", "").strip()
+        scheduled_date_raw = request.form.get("scheduled_delivery_date", "")
+        scheduled_slot_raw = request.form.get("scheduled_delivery_slot", "")
         required = {
             "Sender Name": sender_name, "Sender Phone": sender_phone,
             "Pickup Address": sender_address, "Receiver Name": receiver_name,
@@ -172,6 +176,12 @@ def create_shipment():
             except ValueError:
                 flash("Package weight must be a positive number.", "danger")
                 return redirect(url_for("shipments.create_shipment"))
+        scheduled_date, scheduled_start, scheduled_end, schedule_error = Shipment.parse_delivery_schedule(
+            scheduled_date_raw, scheduled_slot_raw
+        )
+        if schedule_error:
+            flash(schedule_error, "danger")
+            return redirect(url_for("shipments.create_shipment"))
         warehouse = Warehouse.get_first()
         tracking_id = Shipment.create(
             sender_id=session["user_id"],
@@ -185,6 +195,9 @@ def create_shipment():
             sender_address=sender_address,
             sender_phone=sender_phone,
             origin_warehouse_id=warehouse["id"] if warehouse else None,
+            scheduled_delivery_date=scheduled_date,
+            scheduled_delivery_start=scheduled_start,
+            scheduled_delivery_end=scheduled_end,
         )
 
         new_shipment_for_billing = Shipment.find_by_tracking_id(tracking_id)
@@ -228,7 +241,7 @@ def create_shipment():
 
         return redirect(url_for("shipments.my_shipments"))
     sender = User.find_by_id(session["user_id"])
-    return render_template("create_shipment.html", sender=sender)
+    return render_template("create_shipment.html", sender=sender, **Shipment.schedule_form_context())
 
 #display the customer's shipments (5 per page)
 @shipments_bp.route("/shipments/my")
@@ -377,6 +390,13 @@ def update_status(tracking_id):
         location = request.form.get("location", "").strip()
         remarks = request.form.get("remarks", "").strip()
         chosen_status = request.form.get("status", next_status)
+        if chosen_status == "Failed Delivery":
+            flash(
+                "Failed Delivery can only be recorded by the assigned delivery agent, "
+                "with a reason, from the delivery agent dashboard.",
+                "danger",
+            )
+            return redirect(url_for("shipments.update_status", tracking_id=tracking_id))
 
         if not Shipment.is_valid_transition(shipment["status"], chosen_status):
             flash(
@@ -433,7 +453,7 @@ def update_status(tracking_id):
                         message=f"Your delivery verification code for {tracking_id} is ready. "
                                 "Open your dashboard to view it and share it with the delivery agent on arrival.",
                     )
-                _email_delivery_code(shipment)   # only for a NEW code; failure never blocks the update
+                _email_delivery_code(shipment)   
 
         elif chosen_status in ("Delivered", "Failed Delivery", "RTO"):
 
@@ -485,6 +505,130 @@ def update_status(tracking_id):
         next_status=next_status,
     )
 
+@shipments_bp.route("/shipments/<tracking_id>/failed-delivery", methods=["POST"])
+def failed_delivery(tracking_id):
+    if not login_required_role("delivery_agent"):
+        flash("You don't have permission to mark deliveries as failed.", "danger")
+        return redirect(url_for("auth.login"))
+    back = url_for("auth.dashboard") + "#delivery-proof"
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    if not shipment:
+        flash("Shipment not found.", "danger")
+        return redirect(back)
+
+    agent = DeliveryAgent.get_or_create(session["user_id"])
+    if Shipment.get_agent_id_by_role(shipment["id"], "delivery") != agent["id"]:
+        flash("You can only mark deliveries assigned to you as failed.", "danger")
+        return redirect(back)
+    if shipment["status"] != "Out for Delivery":
+        flash("Only a shipment that is Out for Delivery can be marked as Failed Delivery.", "danger")
+        return redirect(back)
+
+    reason_choice = request.form.get("reason", "").strip()
+    if reason_choice not in FAILED_DELIVERY_REASONS:
+        flash("Please select a valid failure reason.", "danger")
+        return redirect(back)
+    reason = reason_choice
+    if reason_choice == "Other":
+        details = request.form.get("other_details", "").strip()
+        if len(details) > 200:
+            flash("The description must be 200 characters or fewer.", "danger")
+            return redirect(back)
+        if details:
+            reason = f"Other: {details}"
+
+    if not Shipment.mark_failed_delivery(shipment["id"], reason, session["user_id"]):
+        flash("This shipment has already been updated.", "danger")
+        return redirect(back)
+
+    Shipment.sync_assignment_status(shipment["id"], "Failed Delivery")
+    DeliveryAgent.set_free_by_agent_id(agent["id"])
+    Shipment.try_assign_waiting_shipments()
+
+    settings = SystemSettings.load()
+    if settings.get("in_app_notifications_enabled", True):
+        Notification.create(
+            user_id=shipment["sender_id"], shipment_id=shipment["id"],
+            message=f"Your shipment {tracking_id} could not be delivered. Reason: {reason}.",
+        )
+        warehouse_id = shipment.get("origin_warehouse_id") or shipment.get("destination_warehouse_id")
+        if warehouse_id:
+            Notification.create(
+                shipment_id=shipment["id"], warehouse_id=warehouse_id,
+                title="Delivery Issue", notif_type="failed_rto",
+                message=f"Shipment {tracking_id} had a failed delivery attempt.",
+            )
+
+    flash(f"Shipment {tracking_id} marked as Failed Delivery.", "success")
+    return redirect(back)
+
+@shipments_bp.route("/shipments/<tracking_id>/reschedule", methods=["POST"])
+def reschedule_shipment(tracking_id):
+    if not login_required_role("customer"):
+        flash("Only the customer who owns a shipment can reschedule it.", "danger")
+        return redirect(url_for("auth.login"))
+    back = url_for("auth.dashboard")
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    if not shipment or shipment["sender_id"] != session["user_id"]:
+        flash("Shipment not found.", "danger")
+        return redirect(back)
+    if shipment["status"] != "Failed Delivery":
+        flash("Only a shipment with a failed delivery can be rescheduled.", "danger")
+        return redirect(back)
+
+    date_raw = request.form.get("scheduled_delivery_date", "")
+    slot_raw = request.form.get("scheduled_delivery_slot", "")
+    if not date_raw.strip() or not slot_raw.strip():
+        flash("Please choose a new delivery date and time slot.", "danger")
+        return redirect(back)
+    new_date, new_start, new_end, schedule_error = Shipment.parse_delivery_schedule(date_raw, slot_raw)
+    if schedule_error:
+        flash(schedule_error, "danger")
+        return redirect(back)
+
+    window = Shipment.reschedule_delivery(
+        shipment["id"], session["user_id"], new_date, new_start, new_end, session["user_id"],
+    )
+    if window is None:
+        flash("This shipment has already been rescheduled or is no longer awaiting a new delivery date.", "danger")
+        return redirect(back)
+    # Confirmation email. Best effort: the reschedule is already saved and is never undone.
+    email_sent = False
+    try:
+        customer = User.find_by_id(shipment["sender_id"])
+        if customer and customer.get("email"):
+            email_sent = bool(email_utils.send_rescheduled_delivery_email(
+                customer["email"], customer.get("name"), tracking_id,
+                new_date, new_start, new_end,
+            ))
+        else:
+            current_app.logger.warning(f"[email_utils] no customer email on file for {tracking_id}; reschedule email skipped")
+    except Exception as e:
+        current_app.logger.error(f"[email_utils] rescheduled-delivery email failed for {tracking_id}: {e}")
+
+    Shipment.try_auto_assign_delivery_agent(shipment["id"])
+
+    settings = SystemSettings.load()
+    if settings.get("in_app_notifications_enabled", True):
+        Notification.create(
+            user_id=shipment["sender_id"], shipment_id=shipment["id"],
+            message=f"Your shipment {tracking_id} has been rescheduled to {window}.",
+        )
+        warehouse_id = shipment.get("origin_warehouse_id") or shipment.get("destination_warehouse_id")
+        if warehouse_id:
+            Notification.create(
+                shipment_id=shipment["id"], warehouse_id=warehouse_id,
+                title="Delivery Rescheduled", notif_type="ready_for_dispatch",
+                message=f"Shipment {tracking_id} was rescheduled by the customer to {window}.",
+            )
+
+    if email_sent:
+        flash("Shipment rescheduled successfully.", "success")
+    else:
+        flash("Shipment rescheduled successfully, but the confirmation email could not be sent.", "success")
+    return redirect(back)
 
 @shipments_bp.route("/shipments/goto-update-status")
 def goto_update_status():

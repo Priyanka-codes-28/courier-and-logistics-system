@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_customer_nav.html" import customer_sidebar %}
+{% from "_pagination.html" import render_pagination %}
+{% block title %}Customer Rating{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">☰</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+
+    {{ customer_sidebar('ratings') }}
+
+    <main class="grad-main">
+        <h1>Customer Rating</h1>
+        <p class="page-sub">Rate your delivered shipments and see the feedback you've shared.</p>
+
+        <div class="dash-section" id="rate-delivery">
+            <div class="sec-head">
+                <h3>Your Deliveries</h3>
+                {% if pagination.total_pages > 1 %}
+                <span class="rate-pager-info">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+                {% endif %}
+            </div>
+
+            {% for rc in rate_items %}
+            <div class="rate-card">
+
+                <div class="rate-card-head">
+                    <span class="rate-k">Shipment:</span>
+                    <span class="rate-v">{{ rc.tracking_id }}</span>
+                    {% if rc.receiver_name %}
+                    <span class="rate-k">Recipient:</span>
+                    <span class="rate-v">{{ rc.receiver_name }}</span>
+                    {% endif %}
+                </div>
+
+                {% if rc.rating %}
+                <div class="rate-stars-static" aria-label="Rated {{ rc.rating }} out of 5">
+                    {% for i in range(1, 6) %}<span class="{{ 'on' if i <= rc.rating else '' }}">&#9733;</span>{% endfor
+                    %}
+                </div>
+                <p class="rate-thanks">Thanks for your feedback!</p>
+                {% if rc.feedback %}<p class="rate-feedback">&ldquo;{{ rc.feedback }}&rdquo;</p>{% endif %}
+
+                {% else %}
+                <form method="POST" action="{{ url_for('auth.rate_delivery', tracking_id=rc.tracking_id) }}">
+                    <input type="hidden" name="return_to" value="ratings">
+                    <input type="hidden" name="page" value="{{ pagination.page }}">
+                    <div class="star-input" role="radiogroup" aria-label="Rating out of 5 stars">
+                        {% for i in range(5, 0, -1) %}
+                        <input type="radio" id="star-{{ rc.id }}-{{ i }}" name="rating" value="{{ i }}" required>
+                        <label for="star-{{ rc.id }}-{{ i }}" title="{{ i }} star{{ 's' if i > 1 }}">&#9733;</label>
+                        {% endfor %}
+                    </div>
+                    <textarea name="feedback" class="proof-input" rows="3" maxlength="1000"
+                        placeholder="Optional feedback"></textarea>
+                    <button type="submit" class="cta-btn" style="border:none; cursor:pointer;">Submit Rating</button>
+                </form>
+                {% endif %}
+
+            </div>
+            {% else %}
+            <div class="empty-note">No delivered shipments yet — you can rate a shipment once it has been delivered.
+            </div>
+            {% endfor %}
+
+            {{ render_pagination(pagination, 'auth.customer_ratings') }}
+        </div>
+    </main>
+</div>
+
+<!-- MOBILE SIDEBAR JAVASCRIPT -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("customerSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

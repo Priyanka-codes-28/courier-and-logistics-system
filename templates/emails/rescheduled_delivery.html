@@ -1,0 +1,25 @@
+{% extends "emails/base_email.html" %}
+{% from "emails/_macros.html" import detail_table %}
+
+{% block email_title %}Your Rescheduled Delivery Is Confirmed — {{ tracking_id }}{% endblock %}
+{% block preheader %}{{ tracking_id }}: new delivery on {{ delivery_date }}, {{ delivery_slot }}{% endblock %}
+
+{% block body %}
+<h2 style="margin:0 0 8px; color:#1e7e34; font-size:20px;">Your rescheduled delivery is confirmed</h2>
+<p style="margin:0 0 4px; color:#4a5568; font-size:14px; line-height:1.6;">
+    Hi {{ to_name or 'there' }}, your new delivery schedule for shipment {{ tracking_id }} has been saved.
+</p>
+
+{{ detail_table([
+("Tracking ID", tracking_id),
+("New Delivery Date", delivery_date),
+("New Delivery Time Slot", delivery_slot),
+]) }}
+
+<p style="margin:16px 0 0; color:#4a5568; font-size:13px; line-height:1.6;">
+    Please keep your phone available on the day of delivery so our delivery agent can coordinate with you.
+</p>
+<p style="margin:8px 0 0; color:#4a5568; font-size:13px; line-height:1.6;">
+    You can track your shipment at any time using your tracking ID <strong>{{ tracking_id }}</strong>.
+</p>
+{% endblock %}

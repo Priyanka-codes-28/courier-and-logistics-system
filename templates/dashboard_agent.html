@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import render_pagination %}
 {% from "_agent_nav.html" import agent_sidebar %}
+{% from "_schedule.html" import schedule_text, schedule_block %}
 {% block title %}Delivery Agent Dashboard{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
 {% block content %}
@@ -173,6 +174,7 @@
                         <th>Role</th>
                         <th>Receiver</th>
                         <th>Address</th>
+                        <th>Preferred Delivery</th>
                         <th>Status</th>
                         <th>Action</th>
 
@@ -216,6 +218,11 @@
 
                         <td>
                             {{ s.receiver_address }}
+                        </td>
+
+
+                        <td>
+                            {{ schedule_text(s) }}
                         </td>
 
 
@@ -283,7 +290,7 @@
 
                     <tr>
 
-                        <td colspan="6" class="empty-note">
+                        <td colspan="7" class="empty-note">
 
                             No shipments assigned to you yet.
                             Once a warehouse assigns one,
@@ -392,6 +399,19 @@
 
                         <span class="pill transit">
                             {{ current_shipment.status }}
+                        </span>
+
+                    </div>
+
+
+                    <div class="cs-item">
+
+                        <span class="cs-k">
+                            Preferred Delivery
+                        </span>
+
+                        <span class="cs-v">
+                            {{ schedule_block(current_shipment) }}
                         </span>
 
                     </div>
@@ -555,6 +575,40 @@
                 </form>
                 {% elif dc.state != 'verified' %}<p>Maximum new codes reached. Please contact admin.</p>{% endif %}
                 {% endif %}
+            </div>
+            {% endif %}
+
+            {% if current_shipment.status == 'Out for Delivery' %}
+            <div class="current-ship-card" id="failed-delivery">
+                <div class="section-title">Failed Delivery</div>
+                <form method="POST"
+                    action="{{ url_for('shipments.failed_delivery', tracking_id=current_shipment.tracking_id) }}"
+                    onsubmit="return confirm('Mark this delivery as failed? This cannot be undone.');">
+                    <label class="form-label" for="fdReason">Reason for failed delivery</label>
+                    <select id="fdReason" name="reason" class="proof-input" required>
+                        <option value="">Select a reason</option>
+                        {% for r in failed_delivery_reasons %}
+                        <option value="{{ r }}">{{ r }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="fdOtherWrap" style="display:none;">
+                        <label class="form-label" for="fdOther">Description (optional)</label>
+                        <textarea id="fdOther" name="other_details" class="proof-input" rows="2" maxlength="200"
+                            placeholder="Briefly describe what happened"></textarea>
+                    </div>
+                    <button type="submit" class="cta-btn"
+                        style="border:none; cursor:pointer; background:#b3261e;">Failed Delivery</button>
+                </form>
+                <script>
+                    (function () {
+                        var sel = document.getElementById("fdReason");
+                        var wrap = document.getElementById("fdOtherWrap");
+                        if (!sel || !wrap) return;
+                        sel.addEventListener("change", function () {
+                            wrap.style.display = sel.value === "Other" ? "block" : "none";
+                        });
+                    })();
+                </script>
             </div>
             {% endif %}
 

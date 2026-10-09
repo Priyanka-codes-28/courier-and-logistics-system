@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_schedule.html" import schedule_text, schedule_block %}
 {% from "_admin_nav.html" import admin_sidebar %}
 {% from "_pagination.html" import render_pagination %}
 {% block title %}Shipment Management{% endblock %}
@@ -33,8 +34,11 @@
                         <th>Customer</th>
                         <th>Receiver</th>
                         <th>Status</th>
+                        <th>Delivery Agent</th>
+                        <th>Failure Details</th>
                         <th>Weight</th>
                         <th>Created</th>
+                        <th>Scheduled Delivery</th>
                         <th>Actions</th>
                     </tr>
                     {% for s in shipments_list %}
@@ -49,8 +53,22 @@
                             {% elif s.status == 'Created' %}<span class="pill created">{{ s.status }}</span>
                             {% else %}<span class="pill transit">{{ s.status }}</span>{% endif %}
                         </td>
+                        <td>{{ s.delivery_agent_name or '—' }}</td>
+                        <td>
+                            {% if s.status == 'Failed Delivery' and s.failed_delivery_reason %}
+                            {{ s.failed_delivery_reason }}<br>
+                            <small>{{ (s.failed_delivery_at | ist('%d %b %Y, %I:%M %p')) if s.failed_delivery_at else ''
+                                }}</small>
+                            {% endif %}
+                            {% if s.reschedule_count %}
+                            <div><span class="pill transit">Rescheduled &times;{{ s.reschedule_count }}</span><br>
+                                <small>{{ s.last_reschedule_note }}</small>
+                            </div>
+                            {% elif not (s.status == 'Failed Delivery' and s.failed_delivery_reason) %}—{% endif %}
+                        </td>
                         <td>{{ s.weight if s.weight else '—' }}</td>
                         <td>{{ (s.created_at | ist('%b %d, %Y')) if s.created_at else '' }}</td>
+                        <td>{{ schedule_text(s) }}</td>
                         <td style="white-space:nowrap;">
                             <a href="{{ url_for('shipments.track', tracking_id=s.tracking_id) }}"
                                 class="link-btn">Track</a>

@@ -2,7 +2,7 @@
 {% from "_admin_nav.html" import admin_sidebar %}
 {{ admin_sidebar('shipments') }}
 active = dashboard | shipments | warehouses | agents | users | payments |
-reports | notifications | settings | profile
+reports | ratings | notifications | settings | profile
 close_id (default "sidebarCloseBtn") and name (default "Admin") are optional. #}
 {% from "_sidebar.html" import render_sidebar %}
 {% macro admin_sidebar(active, close_id='sidebarCloseBtn', name=none) %}
@@ -22,6 +22,7 @@ groups=[
 ]),
 ('Analytics', [
 ('reports', 'chart', 'Reports', url_for('auth.admin_reports')),
+('ratings', 'star', 'Customer Ratings', url_for('auth.admin_ratings')),
 ]),
 ('Communication', [
 ('notifications', 'bell', 'Notifications', url_for('auth.admin_notifications')),

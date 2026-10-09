@@ -1,0 +1,35 @@
+{# Scheduled-delivery display helpers. Values are PostgreSQL DATE/TIME objects. #}
+
+{% macro schedule_date(s) -%}
+{%- if s and s.scheduled_delivery_date -%}
+{{ s.scheduled_delivery_date.day }} {{ s.scheduled_delivery_date.strftime('%B %Y') }}
+{%- else -%}
+Not scheduled
+{%- endif -%}
+{%- endmacro %}
+
+{% macro schedule_time(s) -%}
+{%- if s and s.scheduled_delivery_start and s.scheduled_delivery_end -%}
+{{ s.scheduled_delivery_start.strftime('%I:%M %p') }} - {{ s.scheduled_delivery_end.strftime('%I:%M %p') }}
+{%- else -%}
+—
+{%- endif -%}
+{%- endmacro %}
+
+{# One line, for table cells: "15 October 2026, 10:00 AM - 12:00 PM" or "Not scheduled" #}
+{% macro schedule_text(s) -%}
+{%- if s and s.scheduled_delivery_date and s.scheduled_delivery_start and s.scheduled_delivery_end -%}
+{{ schedule_date(s) }}, {{ schedule_time(s) }}
+{%- else -%}
+Not scheduled
+{%- endif -%}
+{%- endmacro %}
+
+{# Two lines, for detail cards: date, then time #}
+{% macro schedule_block(s) -%}
+{%- if s and s.scheduled_delivery_date and s.scheduled_delivery_start and s.scheduled_delivery_end -%}
+{{ schedule_date(s) }}<br>{{ schedule_time(s) }}
+{%- else -%}
+Not scheduled
+{%- endif -%}
+{%- endmacro %}

@@ -271,3 +271,24 @@ def send_delivery_code_email(to_email, to_name, tracking_id, code, expires_text)
         "delivery_code.html", to_email, to_name, subject, text_content=text,
         tracking_id=tracking_id, code=str(code), expires_text=expires_text,
     )
+# 8. Rescheduled delivery confirmation
+def send_rescheduled_delivery_email(to_email, to_name, tracking_id,
+                                    scheduled_date, scheduled_start, scheduled_end):
+    if not (scheduled_date and scheduled_start and scheduled_end):
+        _log_error(f"send_rescheduled_delivery_email({tracking_id}) called without a full schedule \u2014 skipped")
+        return False
+    delivery_date = f"{scheduled_date:%d %B %Y}"                                   # 12 October 2026
+    delivery_slot = f"{scheduled_start:%I:%M %p} \u2013 {scheduled_end:%I:%M %p}"   # 02:00 PM – 04:00 PM
+    subject = "Your Rescheduled Delivery Is Confirmed \u2013 CourierOS"
+    text = (
+        f"Hi {to_name or 'there'},\n\n"
+        f"Your new delivery schedule for shipment {tracking_id} has been saved.\n\n"
+        f"New delivery date: {delivery_date}\n"
+        f"New delivery time slot: {delivery_slot}\n\n"
+        f"Please keep your phone available for delivery coordination.\n"
+        f"You can track your shipment at any time using your tracking ID {tracking_id}."
+    )
+    return _send_rendered(
+        "rescheduled_delivery.html", to_email, to_name, subject, text_content=text,
+        tracking_id=tracking_id, delivery_date=delivery_date, delivery_slot=delivery_slot,
+    )

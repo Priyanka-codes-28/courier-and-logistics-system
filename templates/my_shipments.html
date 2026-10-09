@@ -1,6 +1,7 @@
 {% from "_pagination.html" import render_pagination %}
 {% extends "base.html" %}
 {% from "_customer_nav.html" import customer_sidebar %}
+{% from "_schedule.html" import schedule_text, schedule_block %}
 
 {% block title %}My Shipments{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
@@ -114,6 +115,10 @@
                                     </th>
 
                                     <th>
+                                        Scheduled Delivery
+                                    </th>
+
+                                    <th>
                                         Action
                                     </th>
 
@@ -184,6 +189,11 @@
 
                                     <td>
                                         {{ s.created_at.strftime('%b %d, %Y') if s.created_at else '' }}
+                                    </td>
+
+
+                                    <td>
+                                        {{ schedule_text(s) }}
                                     </td>
 
 

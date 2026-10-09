@@ -1,3 +1,10 @@
+{# =====================================================================
+Shared sidebar for ALL four CourierOS dashboards (customer, delivery
+agent, warehouse, admin). The four role files (_customer_nav.html,
+_agent_nav.html, _warehouse_nav.html, _admin_nav.html) only declare the
+menu; the markup, icons and CSS live here so the design stays identical.
+Background follows the top navbar colour (var(--navbar-bg)).
+===================================================================== #}
 
 {% macro sb_icon(name) -%}
 {%- set paths = {
@@ -73,7 +80,9 @@
 'assign': '
 <circle cx="9" cy="8" r="4" />
 <path d="M2 21c0-3.5 3-6 7-6 1.5 0 2.8.3 4 .9" />
-<path d="M18 14v6M15 17h6" />'
+<path d="M18 14v6M15 17h6" />',
+'star': '
+<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />'
 } -%}
 <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths[name]|safe }}</svg>
@@ -82,7 +91,7 @@
 
 {% macro sidebar_styles() %}
 <style>
-    /* container: same colour as the top navbar */
+    /* ---------- container: same colour as the top navbar ---------- */
     .grad-sidebar.sidebar {
         background: var(--navbar-bg, #1f4e79);
         color: #fff;
@@ -105,7 +114,7 @@
         }
     }
 
-    /* brand  */
+    /* ---------- brand ---------- */
     .sidebar .sidebar-brand {
         flex-shrink: 0;
         display: flex;
@@ -134,7 +143,7 @@
         margin-top: 2px;
     }
 
-    /* scrolling menu (scrollbar hidden) */
+    /* ---------- scrolling menu (scrollbar hidden) ---------- */
     .sidebar .sidebar-scroll {
         flex: 1 1 auto;
         min-height: 0;
@@ -149,7 +158,7 @@
         height: 0;
     }
 
-    /* section headings */
+    /* ---------- section headings ---------- */
     .sidebar .sidebar-section {
         display: flex;
         align-items: center;
@@ -174,7 +183,7 @@
         background: #8fd0ff;
     }
 
-    /* links */
+    /* ---------- links ---------- */
     .sidebar .sidebar-nav {
         display: flex;
         flex-direction: column;
@@ -243,7 +252,7 @@
         text-align: center;
     }
 
-    /* red notification-style variant */
+    /* red notification-style variant (e.g. Incoming Shipments count) */
     .sidebar .sidebar-badge.sidebar-badge-red {
         background: #e03131;
         color: #fff;
@@ -261,7 +270,7 @@
         color: #fff;
     }
 
-    /* logged-in user card */
+    /* ---------- logged-in user card (pinned) ---------- */
     .sidebar .sidebar-user-wrap {
         flex-shrink: 0;
         padding-top: 10px;
@@ -337,6 +346,7 @@
         }
     }
 
+    /* ---------- phones: bigger touch targets ---------- */
     @media (max-width: 768px) {
         .grad-sidebar.sidebar .sidebar-link {
             min-height: 44px;
@@ -345,7 +355,10 @@
 </style>
 {% endmacro %}
 
-{% macro render_sidebar(portal, brand, groups, active, aside_id, close_id, user_name, user_sub, profile_href, unread=0, badges=none, badge_colors=none)
+
+{# groups = [ (section title, [ (key, icon, label, href), ... ]), ... ] #}
+{% macro render_sidebar(portal, brand, groups, active, aside_id, close_id, user_name, user_sub, profile_href, unread=0,
+badges=none, badge_colors=none)
 %}
 {{ sidebar_styles() }}
 <aside class="grad-sidebar sidebar" id="{{ aside_id }}">
@@ -388,9 +401,11 @@
                     <span class="sidebar-label">{{ label }}</span>
                     {% if key == 'notifications' and unread %}<span class="sidebar-badge">{{ unread }}</span>{% endif %}
                     {% set badge_count = (badges or {}).get(key) %}
-                    {% if badge_count %}<span class="sidebar-badge sidebar-badge-{{ (badge_colors or {}).get(key, 'red') }}"
-                        aria-label="{{ badge_count }} pending">{{ badge_count if badge_count < 100 else '99+' }}</span>{% endif %}
-                    {% if key == active %}
+                    {% if badge_count %}<span
+                        class="sidebar-badge sidebar-badge-{{ (badge_colors or {}).get(key, 'red') }}"
+                        aria-label="{{ badge_count }} pending">{{ badge_count if badge_count < 100 else '99+' }}</span>
+                            {% endif %}
+                            {% if key == active %}
             </div>{% else %}</a>{% endif %}
             {% endfor %}
         </nav>

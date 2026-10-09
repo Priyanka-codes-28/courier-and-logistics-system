@@ -20,7 +20,9 @@ groups=[
 ('Services', [
 ('payments', 'card', 'Payments', url_for('shipments.my_payments') + '#payment-due'),
 ('proof', 'proof', 'Delivery Proof', url_for('auth.customer_delivery_proof')),
+('ratings', 'star', 'Customer Rating', url_for('auth.customer_ratings')),
 ]),
+
 ('Communication', [
 ('notifications', 'bell', 'Notifications', url_for('auth.customer_notifications')),
 ]),

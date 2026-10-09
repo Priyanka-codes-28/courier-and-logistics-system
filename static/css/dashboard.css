@@ -4039,7 +4039,7 @@ body {
     font-size: 18px;
 }
 
-/* Append to static/css/dashboard.css */
+
 .verify-code-card {
     margin: 12px 0;
     padding: 14px;
@@ -4068,4 +4068,127 @@ body {
     letter-spacing: .45em;
     text-align: center;
     font: 700 22px monospace
+}
+
+
+.rate-card {
+    margin: 10px 0;
+    padding: 14px;
+    border: 1px solid rgba(128, 128, 128, .3);
+    border-radius: 12px
+}
+
+.rate-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: baseline;
+    margin-bottom: 8px
+}
+
+.rate-k {
+    font-size: 12px;
+    opacity: .7
+}
+
+.rate-v {
+    font-weight: 700;
+    font-family: monospace
+}
+
+.rate-sub {
+    font-size: 12px;
+    opacity: .7
+}
+
+.rate-thanks {
+    margin: 4px 0;
+    font-size: 13px
+}
+
+.rate-feedback {
+    margin: 4px 0;
+    font-size: 13px;
+    font-style: italic;
+    word-break: break-word
+}
+
+.rate-card textarea {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 8px 0;
+    resize: vertical
+}
+
+
+.star-input {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 2px
+}
+
+.star-input input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px
+}
+
+.star-input label {
+    font-size: 34px;
+    line-height: 1;
+    cursor: pointer;
+    color: rgba(128, 128, 128, .45);
+    padding: 2px 3px
+}
+
+.star-input input:checked~label,
+.star-input label:hover,
+.star-input label:hover~label {
+    color: #f59e0b
+}
+
+.star-input input:focus-visible+label {
+    outline: 2px solid #f59e0b;
+    border-radius: 6px
+}
+
+.rate-stars-static span {
+    font-size: 26px;
+    color: rgba(128, 128, 128, .45)
+}
+
+.rate-stars-static span.on {
+    color: #f59e0b
+}
+
+.stars-inline {
+    color: #f59e0b;
+    letter-spacing: 1px;
+    white-space: nowrap
+}
+
+.stars-inline .off {
+    color: rgba(128, 128, 128, .45)
+}
+
+.fb-cell {
+    max-width: 360px;
+    word-break: break-word
+}
+
+@media (max-width:480px) {
+    .star-input label {
+        font-size: 38px
+    }
+}
+
+.rate-pager-info {
+    font-size: 13px;
+    opacity: .75
+}
+
+.rate-card-head .rate-v {
+    word-break: break-word
 }

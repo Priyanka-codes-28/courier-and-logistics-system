@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "_admin_nav.html" import admin_sidebar %}
+{% from "_pagination.html" import render_pagination %}
+{% block title %}Customer Ratings{% endblock %}
+{% block container_class %}dash-wide{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<!-- MOBILE MENU BUTTON -->
+<button class="mobile-menu-btn" id="mobileMenuBtn" type="button">☰</button>
+
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="grad-shell">
+
+    {{ admin_sidebar('ratings') }}
+
+    <main class="grad-main">
+        <h1>Customer Ratings</h1>
+        <p class="page-sub">What customers think of their deliveries.</p>
+
+        <div class="info-row admin-6col">
+            <div class="info-card">
+                <div class="k">Average Rating</div>
+                <div class="v">{{ ('%.2f'|format(summary.average) ~ ' / 5') if summary.average is not none else '—' }}
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="k">Total Ratings</div>
+                <div class="v">{{ summary.total }}</div>
+            </div>
+            {% for star in [5, 4, 3, 2, 1] %}
+            <div class="info-card">
+                <div class="k">{{ star }} ★</div>
+                <div class="v">{{ summary.distribution[star] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="dash-section">
+            <div class="sec-head">
+                <h3>All Ratings</h3>
+            </div>
+            {% if ratings_list %}
+            <div class="table-scroll">
+                <table class="dash-table recent-table">
+                    <tr>
+                        <th>Customer</th>
+                        <th>Shipment</th>
+                        <th>Rating</th>
+                        <th>Feedback</th>
+                        <th>Date</th>
+                    </tr>
+                    {% for r in ratings_list %}
+                    <tr>
+                        <td>{{ r.customer_name }}</td>
+                        <td>{{ r.tracking_id }}</td>
+                        <td>
+                            <span class="stars-inline" aria-label="{{ r.rating }} out of 5">{% for i in range(1, 6)
+                                %}<span class="{{ '' if i <= r.rating else 'off' }}">&#9733;</span>{% endfor %}</span>
+                        </td>
+                        <td class="fb-cell">{{ r.feedback or '—' }}</td>
+                        <td>{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-note">No ratings yet — they appear here after customers rate their delivered shipments.
+            </div>
+            {% endif %}
+            {{ render_pagination(pagination, 'auth.admin_ratings') }}
+        </div>
+    </main>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuBtn = document.getElementById("mobileMenuBtn");
+        const closeBtn = document.getElementById("sidebarCloseBtn");
+        const sidebar = document.getElementById("adminSidebar");
+        const overlay = document.getElementById("sidebarOverlay");
+        if (!menuBtn || !closeBtn || !sidebar || !overlay) return;
+        function openSidebar() {
+            sidebar.classList.add("mobile-open");
+            overlay.classList.add("active");
+            document.body.style.overflow = "hidden";
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+            document.body.style.overflow = "";
+        }
+        menuBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+        sidebar.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", closeSidebar);
+        });
+        window.addEventListener("resize", function () {
+            if (window.innerWidth > 768) closeSidebar();
+        });
+    });
+</script>
+{% endblock %}

@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app
 from werkzeug.security import check_password_hash
-from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings, get_pagination
+from models import User, Shipment, DeliveryAgent, Warehouse, Notification, DeliveryProof, STATUS_FLOW, WarehouseActivity, Payment, SystemSettings, get_pagination, DeliveryRating
 import email_utils
 import google_oauth
 
@@ -112,9 +112,6 @@ def _customer_dashboard_context():
     pending = sum(1 for s in shipments if s["status"] in ("Created", "Awaiting Pickup"))
 
     current_shipment = Shipment.get_current_for_sender(session["user_id"])
-    out_for_delivery_shipments = Shipment.list_out_for_delivery_for_sender(session["user_id"])
-    for ofd in out_for_delivery_shipments:
-        Shipment.ensure_delivery_code(ofd["id"])   # does nothing if a code already exists
     current_location = None
     pickup_agent_name = None
     delivery_agent_name = None
@@ -138,6 +135,12 @@ def _customer_dashboard_context():
     delivery_proof = DeliveryProof.find_latest_for_sender(session["user_id"])
     pending_payments = Payment.list_pending_for_sender(session["user_id"])
 
+    out_for_delivery_shipments = Shipment.list_out_for_delivery_for_sender(session["user_id"])
+    for ofd in out_for_delivery_shipments:
+        Shipment.ensure_delivery_code(ofd["id"])   # no-op when a code already exists
+
+    rate_cards = DeliveryRating.list_recent_delivered_for_customer(session["user_id"], limit=5)
+
     return dict(
         name=session.get("user_name"), role="customer",
         shipments=shipments[:3], total=total, in_transit=in_transit,
@@ -147,8 +150,8 @@ def _customer_dashboard_context():
         notifications=notifications, delivery_proof=delivery_proof,
         pending_payments=pending_payments,
         out_for_delivery_shipments=out_for_delivery_shipments,
+        rate_cards=rate_cards,
     )
-
 #DELIVERY AGENT DASHBOARD
 def _agent_dashboard_context():
     agent = DeliveryAgent.get_or_create(session["user_id"])
@@ -157,6 +160,7 @@ def _agent_dashboard_context():
     delivered = sum(1 for s in all_assigned if s["status"] == "Delivered")
     failed = sum(1 for s in all_assigned if s["status"] in ("Failed Delivery", "RTO"))
     route_stops = [s["receiver_address"] for s in all_assigned if s["status"] not in ("Delivered", "Failed Delivery", "RTO")]
+
 
     # Paginate the Assigned Shipments table only; every stat above already
     # used the full list, so pagination here can't skew those counts.
@@ -224,7 +228,8 @@ def _warehouse_dashboard_context():
         incoming_pagination=incoming_pagination,
         outgoing_pagination=outgoing_pagination,
     )
-#ADMIN DASHBOARD
+    
+#ADMIN DASHBOARD CONTEXT
 def _admin_dashboard_context():
     total_shipments = Shipment.count_all()
     delivered_count = Shipment.count_delivered()
@@ -262,6 +267,8 @@ def _admin_dashboard_context():
     notif_pagination = get_pagination(notif_total, notif_page, 5)
     notifications_log = Notification.list_all_recent(limit=5, offset=notif_pagination["offset"])
 
+    rating_summary = DeliveryRating.get_rating_summary()
+
     return dict(
         name=session.get("user_name"), role="admin",
         all_shipments=all_shipments, total_shipments=total_shipments,
@@ -279,6 +286,7 @@ def _admin_dashboard_context():
         shipments_pagination=shipments_pagination,
         warehouse_pagination=warehouse_pagination,
         notif_pagination=notif_pagination,
+        rating_summary=rating_summary,
     )
 
 #CONTEXT BUILDER MAPPING
@@ -480,8 +488,6 @@ def verify_otp():
             flash(generic_error, "danger")
             return redirect(url_for("auth.verify_otp"))
 
-        # Correct OTP — invalidate it immediately so it can never be
-        # reused, then mark this session as verified for the next step.
         User.invalidate_reset_otp(email)
         session.pop("otp_reset_email", None)
         session["otp_verified_email"] = email
@@ -512,8 +518,7 @@ def reset_password():
 
         user = User.find_by_email(email)
         if not user:
-            # Shouldn't happen (email existed earlier in this same flow),
-            # but fail safely rather than crash if it somehow does.
+            
             flash("Something went wrong. Please start again.", "danger")
             return redirect(url_for("auth.forgot_password"))
 
@@ -662,9 +667,8 @@ def mark_all_warehouse_notifications_read():
         flash("All notifications marked as read.", "success")
     return redirect(url_for("auth.warehouse_notifications"))
 
-# ==================== WAREHOUSE MODULE PAGES ====================
-# One dedicated page per sidebar module, same pattern as
-# /warehouse/notifications. All are warehouse_staff only.
+# WAREHOUSE MODULE PAGES
+
 WAREHOUSE_PAGE_SIZE = 10
 
 
@@ -755,12 +759,7 @@ def warehouse_details():
         warehouse=warehouse, unread_notification_count=unread,
     )
 
-
-# ==================== DELIVERY AGENT MODULE PAGES ====================
-# One dedicated page per sidebar module, same pattern as the warehouse
-# module pages. All are delivery_agent only.
 AGENT_PAGE_SIZE = 10
-
 
 def _agent_page_base():
     """Shared by every agent module page: the agent row, current job,
@@ -867,8 +866,71 @@ def admin_system_settings():
     return render_template("admin_system_settings.html", settings=settings)
 
 
-# ==================== CUSTOMER MODULE PAGES ====================
+# CUSTOMER MODULE PAGES 
 CUSTOMER_PAGE_SIZE = 10
+
+@auth_bp.route("/customer/ratings")
+@role_required("customer")
+def customer_ratings():
+    page = request.args.get("page", 1, type=int)
+    per_page = 5
+    total = DeliveryRating.count_delivered_for_customer(session["user_id"])
+    pagination = get_pagination(total, page, per_page)
+    rate_items = DeliveryRating.list_delivered_for_customer(
+        session["user_id"], limit=per_page, offset=pagination["offset"]
+    )
+    return render_template("customer_ratings.html", rate_items=rate_items, pagination=pagination)
+
+#CUSTOMER - RATE A DELIVERED SHIPMENT
+@auth_bp.route("/customer/shipments/<tracking_id>/rate", methods=["POST"])
+@role_required("customer")
+def rate_delivery(tracking_id):
+    if request.form.get("return_to") == "ratings":
+        back = url_for("auth.customer_ratings", page=request.form.get("page", 1, type=int))
+    else:
+        back = url_for("auth.dashboard") + "#rate-delivery"
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    if not shipment or shipment["sender_id"] != session["user_id"]:
+        flash("You can only rate your own shipments.", "danger")
+        return redirect(back)
+    if shipment["status"] != "Delivered":
+        flash("You can rate a shipment only after it has been delivered.", "danger")
+        return redirect(back)
+
+    raw_rating = request.form.get("rating", "").strip()
+    if not (raw_rating.isascii() and raw_rating.isdigit() and 1 <= int(raw_rating) <= 5):
+        flash("Please choose a rating from 1 to 5 stars.", "danger")
+        return redirect(back)
+
+    feedback = request.form.get("feedback", "").strip()
+    if len(feedback) > 1000:
+        flash("Feedback must be 1000 characters or fewer.", "danger")
+        return redirect(back)
+
+    created = DeliveryRating.create_rating(
+        shipment["id"], session["user_id"], int(raw_rating), feedback or None
+    )
+    if created:
+        flash("Thank you! Your rating has been submitted.", "success")
+    else:
+        flash("This shipment has already been rated.", "danger")
+    return redirect(back)
+
+
+#ADMIN - CUSTOMER RATINGS
+@auth_bp.route("/admin/ratings")
+@role_required("admin")
+def admin_ratings():
+    page = request.args.get("page", 1, type=int)
+    per_page = 20
+    summary = DeliveryRating.get_rating_summary()
+    pagination = get_pagination(summary["total"], page, per_page)
+    ratings_list = DeliveryRating.get_all_ratings(limit=per_page, offset=pagination["offset"])
+    return render_template(
+        "admin_ratings.html",
+        ratings_list=ratings_list, summary=summary, pagination=pagination,
+    )
 
 
 @auth_bp.route("/customer/notifications")

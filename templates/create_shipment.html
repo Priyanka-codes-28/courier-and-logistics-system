@@ -96,6 +96,29 @@
                 <label>Package Weight (kg)</label>
                 <input type="number" step="0.1" name="weight" placeholder="e.g. 2.5">
 
+                <div class="shipment-section-label">Scheduled Delivery (Optional)</div>
+
+                <div class="shipment-form-row">
+                    <div>
+                        <label for="scheduledDeliveryDate">Preferred Delivery Date</label>
+                        <input type="date" id="scheduledDeliveryDate" name="scheduled_delivery_date"
+                            min="{{ schedule_min_date }}" max="{{ schedule_max_date }}">
+                    </div>
+                    <div>
+                        <label for="scheduledDeliverySlot">Preferred Delivery Time Slot</label>
+                        <select id="scheduledDeliverySlot" name="scheduled_delivery_slot">
+                            <option value="">Select a time slot</option>
+                            {% for slot in slot_options %}
+                            <option value="{{ slot.value }}" data-end="{{ slot.end }}">{{ slot.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <p id="scheduledDeliveryHint" style="font-size:11px; color:#5C6B7A; margin:0 0 10px;">
+                    Choose a date within the next {{ schedule_max_days }} days. Leave both fields empty if you have no
+                    preference.
+                </p>
+
 
                 <!-- SUBMIT -->
                 <button type="submit">
@@ -119,5 +142,49 @@
     </main>
 
 </div>
+
+<script>
+    // Convenience only - the server re-validates everything.
+    // Slots whose end time has already passed (IST) are disabled when today is selected.
+    (function () {
+        var dateInput = document.getElementById("scheduledDeliveryDate");
+        var slotSelect = document.getElementById("scheduledDeliverySlot");
+        var hint = document.getElementById("scheduledDeliveryHint");
+        if (!dateInput || !slotSelect) return;
+        var defaultHint = hint ? hint.textContent : "";
+
+        function istNow() {
+            var parts = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+                hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+            }).formatToParts(new Date());
+            var p = {};
+            parts.forEach(function (x) { p[x.type] = x.value; });
+            return { date: p.year + "-" + p.month + "-" + p.day, minutes: parseInt(p.hour, 10) * 60 + parseInt(p.minute, 10) };
+        }
+
+        function refreshSlots() {
+            var now = istNow();
+            var isToday = dateInput.value === now.date;
+            var openSlots = 0;
+            Array.prototype.forEach.call(slotSelect.options, function (opt) {
+                if (!opt.value) return;
+                var end = opt.getAttribute("data-end").split(":");
+                var ended = isToday && (parseInt(end[0], 10) * 60 + parseInt(end[1], 10)) <= now.minutes;
+                opt.disabled = ended;
+                if (ended && opt.selected) slotSelect.value = "";
+                if (!ended) openSlots++;
+            });
+            if (hint) {
+                hint.textContent = (isToday && openSlots === 0)
+                    ? "No delivery slots are left today. Please choose a later date."
+                    : defaultHint;
+            }
+        }
+
+        dateInput.addEventListener("change", refreshSlots);
+        refreshSlots();
+    })();
+</script>
 
 {% endblock %}

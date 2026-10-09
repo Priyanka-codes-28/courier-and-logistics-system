@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_schedule.html" import schedule_text, schedule_block %}
 {% from "_pagination.html" import render_pagination %}
 {% from "_warehouse_nav.html" import wh_sidebar %}
 
@@ -416,6 +417,7 @@
                         <th>Tracking ID</th>
                         <th>Receiver</th>
                         <th>Package</th>
+                        <th>Preferred Delivery</th>
                         <th>Status</th>
 
                     </tr>
@@ -443,6 +445,11 @@
 
 
                         <td>
+                            {{ schedule_text(s) }}
+                        </td>
+
+
+                        <td>
 
                             {% if s.status == 'Agent Assigned' %}
                             <span class="pill transit">
@@ -465,7 +472,7 @@
 
                     <tr>
 
-                        <td colspan="4" class="empty-note">
+                        <td colspan="5" class="empty-note">
 
                             No outgoing shipments right now.
 
