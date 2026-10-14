@@ -212,7 +212,7 @@ class User:
         with db.cursor() as cur:
             cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
 
-    # ---------- Password reset ----------
+    # Password reset 
 
     @staticmethod
     def set_reset_otp(email):
@@ -269,6 +269,122 @@ class User:
                    WHERE id = %s""",
                 (password_hash, user_id),
             )
+    LOGIN_OTP_TTL_MINUTES = 5
+    LOGIN_OTP_MAX_ATTEMPTS = 5
+    LOGIN_OTP_RESEND_COOLDOWN_SECONDS = 60
+    @staticmethod
+    def set_two_factor(user_id, enabled):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("UPDATE users SET two_factor_enabled = %s WHERE id = %s", (bool(enabled), user_id))
+
+    @staticmethod
+    def requires_two_factor(user):
+        """OTP is required when admin enabled 2FA for everyone OR this user enabled it for themselves."""
+        return bool(SystemSettings.is_two_factor_enabled() or (user and user.get("two_factor_enabled")))
+
+    @staticmethod
+    def issue_login_otp(user_id):
+        otp = "".join(secrets.choice("0123456789") for _ in range(6))
+        otp_hash = generate_password_hash(otp)
+        now = datetime.now()
+        expiry = now + timedelta(minutes=User.LOGIN_OTP_TTL_MINUTES)
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE users
+                   SET login_otp_hash = %s, login_otp_expiry = %s,
+                       login_otp_attempts = 0, login_otp_sent_at = %s
+                   WHERE id = %s""",
+                (otp_hash, expiry, now, user_id),
+            )
+        return otp
+
+    @staticmethod
+    def has_active_login_otp(user_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT login_otp_hash, login_otp_expiry, login_otp_attempts FROM users WHERE id = %s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+        return bool(
+            row and row["login_otp_hash"] and row["login_otp_expiry"]
+            and row["login_otp_expiry"] > datetime.now()
+            and row["login_otp_attempts"] < User.LOGIN_OTP_MAX_ATTEMPTS
+        )
+
+    @staticmethod
+    def login_otp_cooldown_remaining(user_id):
+        import math
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT login_otp_sent_at FROM users WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+        sent = row["login_otp_sent_at"] if row else None
+        if not sent:
+            return 0
+        elapsed = (datetime.now() - sent).total_seconds()
+        return max(0, math.ceil(User.LOGIN_OTP_RESEND_COOLDOWN_SECONDS - elapsed))
+
+    @staticmethod
+    def clear_login_otp(user_id):
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                """UPDATE users
+                   SET login_otp_hash = NULL, login_otp_expiry = NULL, login_otp_attempts = 0
+                   WHERE id = %s""",
+                (user_id,),
+            )
+
+    @staticmethod
+    def verify_login_otp(user_id, submitted_otp):
+        """Returns: 'ok', 'invalid', 'expired', 'locked' or 'missing'."""
+        now = datetime.now()
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT login_otp_hash, login_otp_expiry, login_otp_attempts FROM users WHERE id = %s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if not row or not row["login_otp_hash"]:
+                return "missing"
+            otp_hash = row["login_otp_hash"]
+
+            if row["login_otp_attempts"] >= User.LOGIN_OTP_MAX_ATTEMPTS:
+                User.clear_login_otp(user_id)
+                return "locked"
+            if not row["login_otp_expiry"] or row["login_otp_expiry"] < now:
+                User.clear_login_otp(user_id)
+                return "expired"
+
+            cur.execute(
+                """UPDATE users SET login_otp_attempts = login_otp_attempts + 1
+                   WHERE id = %s AND login_otp_hash = %s AND login_otp_attempts < %s
+                   RETURNING login_otp_attempts""",
+                (user_id, otp_hash, User.LOGIN_OTP_MAX_ATTEMPTS),
+            )
+            counted = cur.fetchone()
+            if counted is None:
+                return "missing"
+
+            if not check_password_hash(otp_hash, submitted_otp):
+                if counted["login_otp_attempts"] >= User.LOGIN_OTP_MAX_ATTEMPTS:
+                    User.clear_login_otp(user_id)
+                    return "locked"
+                return "invalid"
+
+            cur.execute(
+                """UPDATE users
+                   SET login_otp_hash = NULL, login_otp_expiry = NULL, login_otp_attempts = 0
+                   WHERE id = %s AND login_otp_hash = %s
+                   RETURNING id""",
+                (user_id, otp_hash),
+            )
+            return "ok" if cur.fetchone() else "missing"
 STATUS_FLOW = [
     "Created",
     "Awaiting Pickup",
@@ -2201,6 +2317,7 @@ class SystemSettings:
         "in_app_notifications_enabled": True,
         "status_change_notifications_enabled": True,
         "customer_notification_preference": "In-App",
+        "two_factor_enabled": False,
     }
 
     @staticmethod
@@ -2225,6 +2342,9 @@ class SystemSettings:
                 f"UPDATE system_settings SET {set_clause}, updated_at = NOW() WHERE id = 1",
                 params,
             )
+    @staticmethod
+    def is_two_factor_enabled():
+        return bool(SystemSettings.load().get("two_factor_enabled"))
 
 class DeliveryRating:
     

@@ -2,6 +2,7 @@
 {% from "_customer_nav.html" import customer_sidebar %}
 {% from "_agent_nav.html" import agent_sidebar %}
 {% from "_warehouse_nav.html" import wh_sidebar %}
+{% from "_admin_nav.html" import admin_sidebar %}
 {% block title %}Profile & Account{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
 
@@ -17,7 +18,7 @@
 <div class="grad-shell">
 
 
-    <!-- GRADIENT SIDEBAR — same nav macro as the role's dashboard, with Profile marked active -->
+    <!-- GRADIENT SIDEBAR -->
     {% if role == 'customer' %}
     {{ customer_sidebar('profile') }}
     {% elif role == 'delivery_agent' %}
@@ -25,23 +26,7 @@
     {% elif role == 'warehouse_staff' %}
     {{ wh_sidebar('profile', unread_notification_count|default(0)) }}
     {% elif role == 'admin' %}
-    <aside class="grad-sidebar" id="adminSidebar">
-        <button class="sidebar-close-btn" id="sidebarCloseBtn" type="button">✕</button>
-        <div class="brand"><span class="dot"></span>CourierOS</div>
-        <nav class="grad-nav">
-            <a href="{{ url_for('auth.dashboard') }}">Dashboard</a>
-            <a href="{{ url_for('auth.manage_shipments') }}">All Shipments</a>
-            <a href="{{ url_for('auth.manage_warehouses') }}">Manage Warehouses</a>
-            <a href="{{ url_for('auth.manage_users', role='delivery_agent') }}">Manage Delivery Agents</a>
-            <a href="{{ url_for('auth.manage_users') }}">Manage Users</a>
-            <a href="{{ url_for('auth.admin_payments') }}">Payments</a>
-            <a href="{{ url_for('auth.admin_reports') }}">Reports &amp; Analytics</a>
-            <a href="{{ url_for('auth.admin_notifications') }}">Notifications Log</a>
-            <a href="{{ url_for('auth.admin_system_settings') }}">System Settings</a>
-            <div class="item active">Profile &amp; Account</div>
-            <a href="{{ url_for('auth.logout') }}">Logout</a>
-        </nav>
-    </aside>
+    {{ admin_sidebar('profile') }}
     {% endif %}
 
     <!-- MAIN -->
@@ -95,6 +80,199 @@
                 </form>
             </div>
         </div>
+        <div class="section-block">
+            <div class="section-title">Login Security</div>
+            <style>
+                .tfa-card {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 18px;
+                }
+
+                .tfa-card+.tfa-card {
+                    margin-top: 14px;
+                }
+
+                .tfa-info {
+                    min-width: 0;
+                }
+
+                .tfa-head {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                }
+
+                .tfa-title {
+                    font-size: 16px;
+                    font-weight: 700;
+                }
+
+                .tfa-badge {
+                    font-size: 12px;
+                    font-weight: 700;
+                    padding: 3px 10px;
+                    border-radius: 999px;
+                }
+
+                .tfa-badge.on {
+                    background: #E3F6EA;
+                    color: #15803D;
+                }
+
+                .tfa-badge.off {
+                    background: #EEF2F7;
+                    color: #64748B;
+                }
+
+                .tfa-desc {
+                    margin: 8px 0 0;
+                    font-size: 13.5px;
+                    opacity: .85;
+                    max-width: 560px;
+                }
+
+                .tfa-note {
+                    margin: 8px 0 0;
+                    font-size: 12px;
+                    opacity: .7;
+                }
+
+                .tfa-switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 46px;
+                    height: 26px;
+                    flex-shrink: 0;
+                }
+
+                .tfa-switch input {
+                    opacity: 0;
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    position: absolute;
+                    inset: 0;
+                    z-index: 1;
+                    cursor: pointer;
+                }
+
+                .tfa-switch input:disabled {
+                    cursor: not-allowed;
+                }
+
+                .tfa-slider {
+                    position: absolute;
+                    inset: 0;
+                    background: #CBD5E1;
+                    border-radius: 26px;
+                    transition: .15s;
+                }
+
+                .tfa-slider::before {
+                    content: "";
+                    position: absolute;
+                    height: 20px;
+                    width: 20px;
+                    left: 3px;
+                    bottom: 3px;
+                    background: #fff;
+                    border-radius: 50%;
+                    transition: .15s;
+                }
+
+                .tfa-switch input:checked+.tfa-slider {
+                    background: #1B5FD1;
+                }
+
+                .tfa-switch input:checked+.tfa-slider::before {
+                    transform: translateX(20px);
+                }
+
+                .tfa-switch input:disabled+.tfa-slider {
+                    opacity: .6;
+                }
+
+                .tfa-switch input:focus-visible+.tfa-slider {
+                    outline: 2px solid #1B5FD1;
+                    outline-offset: 2px;
+                }
+
+                @media (max-width: 600px) {
+                    .tfa-card {
+                        flex-direction: column;
+                        align-items: flex-start;
+                    }
+                }
+            </style>
+
+            {# ---- Card 1: MY account (every role) ---- #}
+            {% set tfa_active = two_factor_enabled or user_two_factor_enabled %}
+            <div class="current-ship-card tfa-card" id="two-factor">
+                <div class="tfa-info">
+                    <div class="tfa-head">
+                        <span class="tfa-title">Two-Factor Authentication (2FA)</span>
+                        <span class="tfa-badge {{ 'on' if tfa_active else 'off' }}">{{ 'Enabled' if tfa_active else
+                            'Disabled' }}</span>
+                    </div>
+                    <p class="tfa-desc">Add an extra layer of security to your account by requiring a 6-digit email OTP
+                        code upon sign-in.</p>
+                    {% if two_factor_enabled %}
+                    <p class="tfa-note">Required for all users by the administrator, so it can't be turned off here.</p>
+                    {% endif %}
+                </div>
+
+                {% if two_factor_enabled %}
+                <label class="tfa-switch" title="Required by the administrator">
+                    <input type="checkbox" checked disabled
+                        aria-label="Two-Factor Authentication (2FA) required by administrator">
+                    <span class="tfa-slider"></span>
+                </label>
+                {% else %}
+                <form method="POST" action="{{ url_for('auth.save_my_two_factor') }}">
+                    <input type="hidden" name="two_factor_enabled" value="0">
+                    <label class="tfa-switch">
+                        <input type="checkbox" name="two_factor_enabled" value="1" {{ 'checked' if
+                            user_two_factor_enabled else '' }} aria-label="Two-Factor Authentication (2FA)"
+                            onchange="this.form.submit()">
+                        <span class="tfa-slider"></span>
+                    </label>
+                    <noscript><button type="submit" class="cta-btn"
+                            style="border:none; cursor:pointer;">Save</button></noscript>
+                </form>
+                {% endif %}
+            </div>
+
+            {# ---- Card 2: EVERYONE (admin only) ---- #}
+            {% if role == 'admin' %}
+            <div class="current-ship-card tfa-card" id="two-factor-global">
+                <div class="tfa-info">
+                    <div class="tfa-head">
+                        <span class="tfa-title">Require 2FA for all users</span>
+                        <span class="tfa-badge {{ 'on' if two_factor_enabled else 'off' }}">{{ 'Enabled' if
+                            two_factor_enabled else 'Disabled' }}</span>
+                    </div>
+                    <p class="tfa-desc">When enabled, every Customer, Delivery Agent, Warehouse Staff and Admin must
+                        enter an email OTP code at sign-in. When disabled, each user can still turn 2FA on for their own
+                        account.</p>
+                </div>
+                <form method="POST" action="{{ url_for('auth.save_two_factor_setting') }}">
+                    <input type="hidden" name="return_to" value="profile">
+                    <input type="hidden" name="two_factor_enabled" value="0">
+                    <label class="tfa-switch">
+                        <input type="checkbox" name="two_factor_enabled" value="1" {{ 'checked' if two_factor_enabled
+                            else '' }} aria-label="Require 2FA for all users" onchange="this.form.submit()">
+                        <span class="tfa-slider"></span>
+                    </label>
+                    <noscript><button type="submit" class="cta-btn"
+                            style="border:none; cursor:pointer;">Save</button></noscript>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+
     </main>
 </div>
 {% endblock %}

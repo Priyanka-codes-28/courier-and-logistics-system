@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, current_app, Response
 from models import Shipment, User, DeliveryAgent, Notification, DeliveryProof, Warehouse, Payment, ShipmentLocation, SystemSettings, get_pagination, FAILED_DELIVERY_REASONS
 import os
 import secrets
 from werkzeug.utils import secure_filename
 import email_utils
+import invoice_pdf
 from timezone_utils import format_ist
 
 #create the shipment blueprint for shipment-related routes
@@ -321,6 +322,44 @@ def my_payments():
         pending_payments=pending, pending_page=pending_page, pending_pages=pending_pages,
         payments=paid, paid_page=paid_page, paid_pages=paid_pages,
     )
+#download a PDF invoice
+@shipments_bp.route("/shipments/<tracking_id>/invoice")
+def download_invoice(tracking_id):
+    if "user_id" not in session:
+        flash("Please log in to download invoices.", "danger")
+        return redirect(url_for("auth.login"))
+
+    role = session.get("user_role")
+    if role not in ("customer", "admin"):
+        flash("You do not have permission to download invoices.", "danger")
+        return redirect(url_for("auth.dashboard"))
+
+    back = url_for("shipments.my_shipments") if role == "customer" else url_for("auth.manage_shipments")
+
+    tracking_id = (tracking_id or "").strip()
+    if not invoice_pdf.is_valid_tracking_id(tracking_id):
+        flash("Invalid tracking ID.", "danger")
+        return redirect(back)
+
+    shipment = Shipment.find_by_tracking_id(tracking_id)
+    if not shipment or (role != "admin" and shipment["sender_id"] != session["user_id"]):
+        flash("Shipment not found.", "danger")
+        return redirect(back)
+
+    try:
+        payment = Payment.find_by_shipment(shipment["id"])
+        sender = User.find_by_id(shipment["sender_id"])
+        pdf_bytes = invoice_pdf.build_invoice_pdf(shipment, payment, sender)
+    except Exception:
+        current_app.logger.exception("Invoice generation failed for %s", tracking_id)
+        flash("We couldn't generate the invoice right now. Please try again.", "danger")
+        return redirect(back)
+
+    response = Response(pdf_bytes, mimetype="application/pdf")
+    response.headers["Content-Disposition"] = f'attachment; filename="{invoice_pdf.invoice_filename(shipment["tracking_id"])}"'
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 #track a shipment using its tracking id
 @shipments_bp.route("/track", methods=["GET", "POST"])
 def track():
@@ -358,6 +397,15 @@ def track():
             flash(f"No shipment found with Tracking ID '{tracking_id}'.", "danger")
 
     progress = Shipment.progress_percent(shipment["status"]) if shipment else 0
+    # Recent Shipments
+    recent_shipments_list = None
+    if "user_id" in session:
+        recent_shipments_list = []
+        for s in Shipment.list_by_sender(session["user_id"], limit=5, offset=0):
+            s = dict(s)
+            s["pickup_agent_name"] = Shipment.get_agent_name_by_role(s["id"], "pickup")
+            s["delivery_agent_name"] = Shipment.get_agent_name_by_role(s["id"], "delivery")
+            recent_shipments_list.append(s)
 
     return render_template(
         "track.html",
@@ -371,6 +419,7 @@ def track():
         delivery_agent_name=delivery_agent_name,
         origin_warehouse_json=origin_warehouse_json,
         last_updated_at=last_updated_at,
+        recent_shipments_list=recent_shipments_list,
     )
 #update shipment status  
 @shipments_bp.route("/shipments/<tracking_id>/update-status", methods=["GET", "POST"])
@@ -594,7 +643,7 @@ def reschedule_shipment(tracking_id):
     if window is None:
         flash("This shipment has already been rescheduled or is no longer awaiting a new delivery date.", "danger")
         return redirect(back)
-    # Confirmation email. Best effort: the reschedule is already saved and is never undone.
+    # Confirmation email.
     email_sent = False
     try:
         customer = User.find_by_id(shipment["sender_id"])

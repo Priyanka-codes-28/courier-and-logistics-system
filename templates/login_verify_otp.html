@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Verify Sign-In{% endblock %}
+{% block container_class %}auth-narrow{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div class="form-icon">🔐</div>
+    <h2>Two-Factor Verification</h2>
+    <p class="form-subtitle">
+        We sent a 6-digit sign-in code to {{ masked_email or 'your registered email' }}.
+        It expires in 5 minutes.
+    </p>
+
+    <form method="POST" action="{{ url_for('auth.login_verify_otp') }}">
+        <label>Verification code</label>
+        <input type="text" name="otp" placeholder="6-digit code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+            autocomplete="one-time-code" required autofocus>
+        <span class="field-hint">This is your sign-in code, not a shipment delivery code. Never share it with
+            anyone.</span>
+
+        <button type="submit">Verify &amp; Sign In</button>
+    </form>
+
+    <form method="POST" action="{{ url_for('auth.login_resend_otp') }}" style="margin-top:12px;">
+        <button type="submit" class="secondary-btn"
+            style="background:none; border:none; color:inherit; text-decoration:underline; cursor:pointer; padding:0;">
+            Resend code{% if cooldown and cooldown > 0 %} (available in {{ cooldown }}s){% endif %}
+        </button>
+    </form>
+
+    <p class="form-footer-link"><a href="{{ url_for('auth.login_cancel_two_factor') }}">← Back to sign in</a></p>
+</div>
+{% endblock %}

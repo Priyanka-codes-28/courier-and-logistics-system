@@ -70,9 +70,54 @@ def _send_otp_email(to_email, otp):
     except requests.RequestException as e:
         current_app.logger.error(f"Failed to reach Brevo API: {e}")
         return False
-    
-    
+TWO_FACTOR_APPLIES_TO_GOOGLE = True   # set False if Google sign-in should skip the OTP
+MAX_TWO_FACTOR_RESENDS = 3
+_PENDING_2FA_KEYS = ("pending_2fa_user_id", "pending_2fa_welcome", "pending_2fa_resends")
 
+
+def _clear_pending_two_factor():
+    for key in _PENDING_2FA_KEYS:
+        session.pop(key, None)
+
+
+def _complete_login(user, welcome_message):
+    _clear_pending_two_factor()
+    session["user_id"] = user["id"]
+    session["user_name"] = user["name"]
+    session["user_email"] = user["email"]
+    session["user_role"] = user["role"]
+    flash(welcome_message, "success")
+    return redirect(url_for("auth.dashboard"))
+
+
+def _mask_email(email):
+    local, _, domain = (email or "").partition("@")
+    return f"{local[:1]}***@{domain}" if domain else ""
+
+
+def _begin_two_factor(user, welcome_message):
+    user_id = user["id"]
+    remaining = User.login_otp_cooldown_remaining(user_id)
+    if remaining > 0 and User.has_active_login_otp(user_id):
+        pass  
+    elif remaining > 0:
+        flash(f"Please wait {remaining} seconds before requesting another verification code.", "danger")
+        return redirect(url_for("auth.login"))
+    else:
+        otp = User.issue_login_otp(user_id)
+        if not email_utils.send_login_otp_email(user["email"], user["name"], otp):
+            User.clear_login_otp(user_id)
+            flash("We couldn't send your verification code right now. Please try again in a moment.", "danger")
+            return redirect(url_for("auth.login"))
+
+    _clear_pending_two_factor()
+    session["pending_2fa_user_id"] = user_id
+    session["pending_2fa_welcome"] = welcome_message
+    session["pending_2fa_resends"] = 0
+    flash("We've emailed a 6-digit verification code to your registered email address.", "success")
+    return redirect(url_for("auth.login_verify_otp"))
+    
+    
 #INPUT VALIDATION
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PHONE_PATTERN = re.compile(r"^[0-9+\-\s()]{7,20}$")
@@ -349,15 +394,95 @@ def login():
             flash("Your account has been deactivated. Please contact an administrator.", "danger")
             return redirect(url_for("auth.login"))
 
-        session["user_id"] = user["id"]
-        session["user_name"] = user["name"]
-        session["user_email"] = user["email"]
-        session["user_role"] = user["role"]
+        welcome = f"Welcome back, {user['name']}!"
+        if User.requires_two_factor(user):
+            return _begin_two_factor(user, welcome)
 
-        flash(f"Welcome back, {user['name']}!", "success")
-        return redirect(url_for("auth.dashboard"))
+        return _complete_login(user, welcome)
 
     return render_template("login.html")
+@auth_bp.route("/login/verify", methods=["GET", "POST"])
+def login_verify_otp():
+    user_id = session.get("pending_2fa_user_id")
+    if not user_id:
+        flash("Please sign in to continue.", "danger")
+        return redirect(url_for("auth.login"))
+
+    user = User.find_by_id(user_id)
+    if not user or user.get("status") == "inactive":
+        _clear_pending_two_factor()
+        flash("Please sign in to continue.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if request.method == "POST":
+        submitted = request.form.get("otp", "").strip()
+        if len(submitted) != 6 or not submitted.isdigit():
+            flash("Please enter the 6-digit verification code.", "danger")
+            return redirect(url_for("auth.login_verify_otp"))
+
+        result = User.verify_login_otp(user_id, submitted)
+        if result == "ok":
+            welcome = session.get("pending_2fa_welcome") or f"Welcome back, {user['name']}!"
+            return _complete_login(user, welcome)
+        if result == "invalid":
+            flash("Incorrect verification code. Please try again.", "danger")
+            return redirect(url_for("auth.login_verify_otp"))
+
+        _clear_pending_two_factor()
+        if result == "locked":
+            flash("Too many incorrect attempts. Please sign in again.", "danger")
+        else:
+            flash("This verification code has expired or is no longer valid. Please sign in again.", "danger")
+        return redirect(url_for("auth.login"))
+
+    return render_template(
+        "login_verify_otp.html",
+        masked_email=_mask_email(user["email"]),
+        cooldown=User.login_otp_cooldown_remaining(user_id),
+    )
+
+
+@auth_bp.route("/login/verify/resend", methods=["POST"])
+def login_resend_otp():
+    user_id = session.get("pending_2fa_user_id")
+    if not user_id:
+        flash("Please sign in to continue.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if session.get("pending_2fa_resends", 0) >= MAX_TWO_FACTOR_RESENDS:
+        User.clear_login_otp(user_id)
+        _clear_pending_two_factor()
+        flash("Too many code requests. Please sign in again.", "danger")
+        return redirect(url_for("auth.login"))
+
+    remaining = User.login_otp_cooldown_remaining(user_id)
+    if remaining > 0:
+        flash(f"Please wait {remaining} seconds before requesting a new code.", "danger")
+        return redirect(url_for("auth.login_verify_otp"))
+
+    user = User.find_by_id(user_id)
+    if not user or user.get("status") == "inactive":
+        _clear_pending_two_factor()
+        return redirect(url_for("auth.login"))
+
+    otp = User.issue_login_otp(user_id)
+    if not email_utils.send_login_otp_email(user["email"], user["name"], otp):
+        User.clear_login_otp(user_id)
+        flash("We couldn't send a new code right now. Please try again in a moment.", "danger")
+        return redirect(url_for("auth.login_verify_otp"))
+
+    session["pending_2fa_resends"] = session.get("pending_2fa_resends", 0) + 1
+    flash("A new verification code has been sent to your email.", "success")
+    return redirect(url_for("auth.login_verify_otp"))
+
+
+@auth_bp.route("/login/verify/cancel")
+def login_cancel_two_factor():
+    user_id = session.get("pending_2fa_user_id")
+    if user_id:
+        User.clear_login_otp(user_id)
+    _clear_pending_two_factor()
+    return redirect(url_for("auth.login"))
 
 # GOOGLE SIGN IN / SIGN UP
 @auth_bp.route("/login/google")
@@ -420,13 +545,11 @@ def google_callback():
         flash("Your account has been deactivated. Please contact an administrator.", "danger")
         return redirect(url_for("auth.login"))
 
-    session["user_id"] = user["id"]
-    session["user_name"] = user["name"]
-    session["user_email"] = user["email"]
-    session["user_role"] = user["role"]
+    welcome = f"Welcome, {user['name']}!"
+    if TWO_FACTOR_APPLIES_TO_GOOGLE and User.requires_two_factor(user):
+        return _begin_two_factor(user, welcome)
 
-    flash(f"Welcome, {user['name']}!", "success")
-    return redirect(url_for("auth.dashboard"))
+    return _complete_login(user, welcome)
 
 #LOGOUT
 @auth_bp.route("/logout")
@@ -595,7 +718,11 @@ def profile():
             session["user_email"] = email
         return redirect(url_for("auth.profile"))
 
-    return render_template("profile.html", user=user, role=session.get("user_role"))
+    return render_template(
+        "profile.html", user=user, role=session.get("user_role"),
+        two_factor_enabled=SystemSettings.is_two_factor_enabled(),
+        user_two_factor_enabled=bool(user and user.get("two_factor_enabled")),
+    )
 
 #DASHBOARD ROUTE
 @auth_bp.route("/dashboard")
@@ -1342,6 +1469,34 @@ def save_system_settings():
 
     flash("System settings saved successfully.", "success")
     return redirect(request.form.get("next") or (url_for("auth.dashboard") + "#system-settings"))
+@auth_bp.route("/admin/two-factor", methods=["POST"])
+@role_required("admin")
+def save_two_factor_setting():
+    enabled = "1" in request.form.getlist("two_factor_enabled")
+    SystemSettings.update({"two_factor_enabled": enabled})
+    flash(
+        "Two-factor authentication is now enabled for all users." if enabled
+        else "Two-factor authentication is now disabled.",
+        "success",
+    )
+    if request.form.get("return_to") == "profile":
+        return redirect(url_for("auth.profile"))
+    return redirect(url_for("auth.admin_system_settings"))
+@auth_bp.route("/profile/two-factor", methods=["POST"])
+@role_required("customer", "delivery_agent", "warehouse_staff", "admin")
+def save_my_two_factor():
+    if SystemSettings.is_two_factor_enabled():
+        flash("Two-factor authentication is required for all users by the administrator.", "danger")
+        return redirect(url_for("auth.profile"))
+
+    enabled = "1" in request.form.getlist("two_factor_enabled")
+    User.set_two_factor(session["user_id"], enabled)
+    flash(
+        "Two-factor authentication is now enabled for your account." if enabled
+        else "Two-factor authentication is now disabled for your account.",
+        "success",
+    )
+    return redirect(url_for("auth.profile"))
 #DEMO LOGIN
 DEMO_ROLES = ["customer", "delivery_agent", "warehouse_staff", "admin"]
 

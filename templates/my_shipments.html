@@ -121,6 +121,7 @@
                                     <th>
                                         Action
                                     </th>
+                                    <th>Invoice</th>
 
                                 </tr>
                             </thead>
@@ -206,6 +207,9 @@
 
                                         </a>
 
+                                    </td>
+                                    <td><a class="inv-link"
+                                            href="{{ url_for('shipments.download_invoice', tracking_id=s.tracking_id) }}">Invoice</a>
                                     </td>
 
                                 </tr>

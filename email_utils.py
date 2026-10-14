@@ -292,3 +292,26 @@ def send_rescheduled_delivery_email(to_email, to_name, tracking_id,
         "rescheduled_delivery.html", to_email, to_name, subject, text_content=text,
         tracking_id=tracking_id, delivery_date=delivery_date, delivery_slot=delivery_slot,
     )
+def send_login_otp_email(to_email, to_name, otp):
+    import html as _html
+    subject = "Your CourierOS sign-in verification code"
+    text = (
+        f"CourierOS\n\n"
+        f"Your sign-in verification code is: {otp}\n\n"
+        f"This code expires in 5 minutes. If you did not try to sign in, you can ignore "
+        f"this email and consider changing your password.\n\n"
+        f"Never share this code with anyone. CourierOS staff will never ask for it."
+    )
+    html_body = (
+        '<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;'
+        'padding:24px;color:#0B1F3A;">'
+        '<h2 style="margin:0 0 12px;">CourierOS sign-in verification</h2>'
+        f'<p>Hi {_html.escape(to_name or "there")}, use this code to finish signing in:</p>'
+        '<div style="font-size:32px;letter-spacing:8px;font-weight:700;background:#E8F0FE;'
+        f'border-radius:10px;padding:14px 18px;text-align:center;">{_html.escape(str(otp))}</div>'
+        '<p style="margin-top:16px;">This code expires in 5 minutes.</p>'
+        '<p style="font-size:13px;color:#5C6B7A;">If you did not try to sign in, ignore this email '
+        'and consider changing your password. Never share this code with anyone.</p>'
+        '</div>'
+    )
+    return send_email(to_email, to_name, subject, html_body, text_content=text)

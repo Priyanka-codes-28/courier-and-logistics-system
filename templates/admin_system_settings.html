@@ -255,6 +255,33 @@
 
             }
         </style>
+        <div class="section-block" id="security-settings">
+            <div class="section-title">Security</div>
+            <div class="current-ship-card"
+                style="display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap;">
+                <div style="min-width:0; max-width:560px;">
+                    <div style="font-weight:700; font-size:16px;">Two-Factor Authentication (2FA)
+                        <span
+                            style="margin-left:8px; font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px; background:{{ '#E3F6EA' if settings.two_factor_enabled else '#EEF2F7' }}; color:{{ '#15803D' if settings.two_factor_enabled else '#64748B' }};">{{
+                            'Enabled' if settings.two_factor_enabled else 'Disabled' }}</span>
+                    </div>
+                    <p style="margin:8px 0 0; font-size:13.5px; opacity:.85;">When enabled, every user must enter a
+                        6-digit code emailed to them after a correct password. Applies to all roles.</p>
+                </div>
+                <form method="POST" action="{{ url_for('auth.save_two_factor_setting') }}">
+                    <input type="hidden" name="return_to" value="settings">
+                    <input type="hidden" name="two_factor_enabled" value="0">
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="two_factor_enabled" value="1" {{ 'checked' if
+                            settings.two_factor_enabled else '' }} aria-label="Two-Factor Authentication (2FA)"
+                            onchange="this.form.submit()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <noscript><button type="submit" class="cta-btn"
+                            style="border:none; cursor:pointer;">Save</button></noscript>
+                </form>
+            </div>
+        </div>
 
         <div class="section-block" id="system-settings">
 
@@ -274,7 +301,7 @@
 
                     <div class="current-ship-card">
 
-                        <div class="settings-card-title">📦 Shipment Settings</div>
+                        <div class="settings-card-title"> Shipment Settings</div>
 
 
 
@@ -312,7 +339,7 @@
 
                     <div class="current-ship-card">
 
-                        <div class="settings-card-title">🚚 Automatic Agent Assignment</div>
+                        <div class="settings-card-title"> Automatic Agent Assignment</div>
 
 
 
@@ -375,7 +402,7 @@
 
                     <div class="current-ship-card">
 
-                        <div class="settings-card-title">🔔 Notification Settings</div>
+                        <div class="settings-card-title"> Notification Settings</div>
 
 
 

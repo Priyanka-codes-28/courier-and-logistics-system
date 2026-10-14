@@ -4,6 +4,113 @@
 {% block title %}Track Shipment{% endblock %}
 {% block container_class %}dash-wide{% endblock %}
 
+{% macro icon(key, size=18) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    {%- if key == 'package' -%}
+    <path d="M21 8l-9-5-9 5v8l9 5 9-5V8z" />
+    <path d="M3.3 7.5L12 12.5l8.7-5M12 22V12.5" />
+    {%- elif key == 'pin' -%}
+    <path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z" />
+    <circle cx="12" cy="9.5" r="2.5" />
+    {%- elif key == 'check' -%}
+    <path d="M20 6L9 17l-5-5" />
+    {%- elif key == 'truck' -%}
+    <path d="M1 6h13v10H1zM14 10h4l3 3v3h-7" />
+    <circle cx="6" cy="18" r="2" />
+    <circle cx="17" cy="18" r="2" />
+    {%- elif key == 'warehouse' -%}
+    <path d="M3 21V9l9-5 9 5v12" />
+    <path d="M7 21v-8h10v8M7 17h10" />
+    {%- elif key == 'cog' -%}
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />
+    {%- elif key == 'user' -%}
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+    {%- elif key == 'warn' -%}
+    <path d="M12 3L2 20h20L12 3z" />
+    <path d="M12 10v4M12 17.5v.01" />
+    {%- elif key == 'calendar' -%}
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+    {%- elif key == 'clock' -%}
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+    {%- elif key == 'chevron' -%}
+    <path d="M6 9l6 6 6-6" />
+    {%- elif key == 'search' -%}
+    <circle cx="11" cy="11" r="7" />
+    <path d="M21 21l-4.3-4.3" />
+    {%- else -%}
+    <circle cx="12" cy="12" r="4" />
+    {%- endif -%}
+</svg>
+{%- endmacro %}
+
+{% macro recent_shipments(items, current_id, is_open) -%}
+{% if items is not none %}
+{% set RSK = {
+'Created': 'created', 'Awaiting Pickup': 'awaiting', 'Picked Up': 'picked',
+'In Transit': 'transit', 'Arrived at Warehouse': 'warehouse', 'Processing': 'processing',
+'Ready for Dispatch': 'ready', 'Agent Assigned': 'agent', 'Out for Delivery': 'ofd',
+'Delivered': 'delivered', 'Failed Delivery': 'failed', 'RTO': 'failed', 'Rescheduled': 'resched'
+} %}
+<details class="trk-card trk-recent" id="recent-shipments" {% if is_open %} open{% endif %}>
+    <summary>
+        <div>
+            <h3 class="trk-section-title"><span class="ico">{{ icon('package', 18) }}</span>Recent Shipments</h3>
+            <p class="trk-section-sub">Quickly access and track your recent shipments.</p>
+        </div>
+        <span class="chev" aria-hidden="true">{{ icon('chevron', 20) }}</span>
+    </summary>
+
+    {% if items %}
+    <div class="trk-rs-grid">
+        {% for r in items %}
+        {% set rk = RSK.get(r.status, 'default') %}
+        <article class="trk-rs{% if current_id and r.tracking_id == current_id %} current{% endif %}">
+            <div class="rs-top">
+                <span class="rs-tid">{{ r.tracking_id }}</span>
+                <span class="trk-badge k-{{ rk }}">{{ r.status }}</span>
+            </div>
+            <div class="rs-row">
+                <span class="trk-label">Destination</span>
+                <span class="rs-val">{{ r.receiver_address or 'Not available' }}</span>
+            </div>
+            <div class="rs-row">
+                <span class="trk-label">Scheduled Delivery</span>
+                <span class="rs-val">{{ schedule_text(r) or 'Not scheduled' }}</span>
+            </div>
+            <div class="rs-agents">
+                <div class="rs-agent">
+                    <span class="ai">{{ icon('user', 15) }}</span>
+                    <div>
+                        <span class="trk-label">Pickup Agent</span>
+                        <span class="rs-val">{{ r.pickup_agent_name or 'Not Assigned' }}</span>
+                    </div>
+                </div>
+                <div class="rs-agent">
+                    <span class="ai">{{ icon('user', 15) }}</span>
+                    <div>
+                        <span class="trk-label">Delivery Agent</span>
+                        <span class="rs-val">{{ r.delivery_agent_name or 'Not Assigned' }}</span>
+                    </div>
+                </div>
+            </div>
+            <a class="rs-btn" href="{{ url_for('shipments.track', tracking_id=r.tracking_id) }}">
+                {{ icon('search', 15) }} Track Shipment
+            </a>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="trk-empty">You haven't created any shipments yet.</div>
+    {% endif %}
+</details>
+{% endif %}
+{%- endmacro %}
+
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 
@@ -15,302 +122,1050 @@
 <!-- SIDEBAR OVERLAY -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<div class="grad-shell">
+<div class="grad-shell trk-shell">
 
     <!-- LEFT SIDEBAR -->
     {{ customer_sidebar('track') }}
 
     <!-- MAIN CONTENT -->
-    <main class="grad-main">
+    <main class="grad-main trk-main">
         {% if shipment %}
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         {% endif %}
+
         <style>
-            /* ===== Live Tracking Map ===== */
+            .trk-shell {
+                background: #F1F5FB;
+            }
+
+            .trk-page {
+                --t-bg: #F1F5FB;
+                --t-card: #FFFFFF;
+                --t-line: #DCE5F2;
+                --t-ink: #0B1F3A;
+                --t-dim: #5C6B7A;
+                --t-blue: #1B5FD1;
+                --t-blue-bg: #E8F0FE;
+                --t-green: #15803D;
+                --t-green-bg: #E3F6EA;
+                --t-orange: #C2570C;
+                --t-orange-bg: #FFF0E0;
+                --t-red: #B91C1C;
+                --t-red-bg: #FDE8E8;
+                --t-purple: #6D3BD2;
+                --t-purple-bg: #EFE8FD;
+                --t-teal: #0F766E;
+                --t-teal-bg: #DDF4F1;
+                --t-gray: #64748B;
+                --t-gray-bg: #EEF2F7;
+                --t-shadow: 0 10px 30px -18px rgba(11, 31, 58, .28);
+
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 12px 0 40px;
+                color: var(--t-ink);
+            }
+
+            [data-theme="dark"] .trk-shell {
+                background: #121826;
+            }
+
+            [data-theme="dark"] .trk-page {
+                --t-card: #1c2434;
+                --t-line: #3a4358;
+                --t-ink: #E7EBF2;
+                --t-dim: #a8b2c4;
+                --t-blue: #7FB0FF;
+                --t-blue-bg: rgba(79, 142, 247, .16);
+                --t-green: #6EE7A0;
+                --t-green-bg: rgba(34, 197, 94, .15);
+                --t-orange: #FDBA74;
+                --t-orange-bg: rgba(249, 115, 22, .15);
+                --t-red: #FCA5A5;
+                --t-red-bg: rgba(239, 68, 68, .16);
+                --t-purple: #C4B5FD;
+                --t-purple-bg: rgba(139, 92, 246, .16);
+                --t-teal: #5EEAD4;
+                --t-teal-bg: rgba(20, 184, 166, .15);
+                --t-gray: #CBD5E1;
+                --t-gray-bg: rgba(148, 163, 184, .15);
+            }
+
+            .trk-card {
+                background: var(--t-card);
+                border: 1px solid var(--t-line);
+                border-radius: 16px;
+                padding: 24px 26px;
+                box-shadow: var(--t-shadow);
+                margin-bottom: 20px;
+                box-sizing: border-box;
+            }
+
+            .trk-section-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin: 0;
+                font-size: 17px;
+                font-weight: 700;
+                color: var(--t-ink);
+            }
+
+            .trk-section-title .ico {
+                width: 34px;
+                height: 34px;
+                border-radius: 10px;
+                background: var(--t-blue-bg);
+                color: var(--t-blue);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .trk-section-sub {
+                margin: 6px 0 0 44px;
+                color: var(--t-dim);
+                font-size: 13px;
+            }
+
+            /* ---------- Search ---------- */
+            .trk-search h2 {
+                margin: 0;
+                font-size: 22px;
+                color: var(--t-ink);
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .trk-search h2 .ico {
+                width: 40px;
+                height: 40px;
+                border-radius: 12px;
+                background: var(--t-blue);
+                color: #fff;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .trk-search p {
+                margin: 8px 0 18px 52px;
+                color: var(--t-dim);
+                font-size: 13.5px;
+            }
+
+            .trk-form {
+                display: flex;
+                gap: 10px;
+            }
+
+            .trk-input-wrap {
+                position: relative;
+                flex: 1;
+                min-width: 0;
+            }
+
+            .trk-input-wrap svg {
+                position: absolute;
+                left: 14px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: var(--t-dim);
+                pointer-events: none;
+            }
+
+            .trk-input-wrap input {
+                width: 100%;
+                margin: 0;
+                box-sizing: border-box;
+                padding: 13px 14px 13px 44px;
+                border: 1px solid var(--t-line);
+                border-radius: 12px;
+                font-family: 'Courier New', monospace;
+                font-size: 14.5px;
+                color: var(--t-ink);
+                background: var(--t-card);
+                box-shadow: inset 0 1px 2px rgba(11, 31, 58, .05);
+            }
+
+            .trk-input-wrap input:focus {
+                outline: none;
+                border-color: var(--t-blue);
+                box-shadow: 0 0 0 3px var(--t-blue-bg);
+            }
+
+            .trk-form button {
+                width: auto;
+                margin: 0;
+                box-sizing: border-box;
+                background: var(--t-blue);
+                color: #fff;
+                border: none;
+                padding: 0 28px;
+                border-radius: 12px;
+                font-weight: 600;
+                font-size: 14.5px;
+                cursor: pointer;
+            }
+
+            .trk-form button:hover {
+                filter: brightness(1.08);
+            }
+
+            /* ---------- Status badges ---------- */
+            .trk-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 5px 12px;
+                border-radius: 999px;
+                font-size: 12.5px;
+                font-weight: 700;
+                white-space: nowrap;
+                background: var(--t-gray-bg);
+                color: var(--t-gray);
+            }
+
+            .trk-badge.k-delivered {
+                background: var(--t-green-bg);
+                color: var(--t-green);
+            }
+
+            .trk-badge.k-picked {
+                background: var(--t-green-bg);
+                color: var(--t-green);
+            }
+
+            .trk-badge.k-created,
+            .trk-badge.k-awaiting {
+                background: var(--t-gray-bg);
+                color: var(--t-gray);
+            }
+
+            .trk-badge.k-transit,
+            .trk-badge.k-agent {
+                background: var(--t-blue-bg);
+                color: var(--t-blue);
+            }
+
+            .trk-badge.k-ofd {
+                background: var(--t-orange-bg);
+                color: var(--t-orange);
+            }
+
+            .trk-badge.k-warehouse,
+            .trk-badge.k-ready {
+                background: var(--t-teal-bg);
+                color: var(--t-teal);
+            }
+
+            .trk-badge.k-processing {
+                background: var(--t-purple-bg);
+                color: var(--t-purple);
+            }
+
+            .trk-badge.k-failed {
+                background: var(--t-red-bg);
+                color: var(--t-red);
+            }
+
+            .trk-badge.k-resched {
+                background: var(--t-orange-bg);
+                color: var(--t-orange);
+            }
+
+            /* ---------- Shipment details ---------- */
+            .trk-details-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 14px;
+                flex-wrap: wrap;
+            }
+
+            .trk-label {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: .05em;
+                text-transform: uppercase;
+                color: var(--t-dim);
+            }
+
+            .trk-tid {
+                font-family: 'Courier New', monospace;
+                font-size: 22px;
+                font-weight: 700;
+                margin-top: 4px;
+                word-break: break-all;
+            }
+
+            .trk-details-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 18px;
+                margin-top: 20px;
+                padding-top: 18px;
+                border-top: 1px solid var(--t-line);
+            }
+
+            .trk-details-grid .v {
+                margin-top: 4px;
+                font-size: 14.5px;
+                font-weight: 600;
+                overflow-wrap: anywhere;
+            }
+
+            /* ---------- Summary cards ---------- */
             .live-info-grid {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(4, minmax(0, 1fr));
                 gap: 14px;
-                margin: 20px 0;
+                margin: 0 0 20px;
             }
 
             .live-info-cell {
-                background: #F7F5EE;
-                border: 1px solid #E2DFD3;
-                border-radius: 8px;
-                padding: 12px 14px;
+                border-radius: 14px;
+                padding: 16px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+                min-height: 92px;
+                box-sizing: border-box;
+                border: 1px solid transparent;
+            }
+
+            .live-info-cell .ci {
+                width: 38px;
+                height: 38px;
+                border-radius: 10px;
+                background: var(--t-card);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
             }
 
             .live-info-cell .li-k {
                 font-size: 11px;
-                color: #5C6B7A;
+                color: var(--t-dim);
                 text-transform: uppercase;
-                letter-spacing: 0.03em;
-                font-weight: 600;
+                letter-spacing: .05em;
+                font-weight: 700;
             }
 
             .live-info-cell .li-v {
-                font-size: 14px;
-                color: #0B1F3A;
+                font-size: 14.5px;
+                color: var(--t-ink);
                 font-weight: 700;
                 margin-top: 4px;
+                overflow-wrap: anywhere;
             }
 
+            .live-info-cell.c-loc {
+                background: var(--t-blue-bg);
+            }
+
+            .live-info-cell.c-loc .ci {
+                color: var(--t-blue);
+            }
+
+            .live-info-cell.c-eta {
+                background: var(--t-green-bg);
+            }
+
+            .live-info-cell.c-eta .ci {
+                color: var(--t-green);
+            }
+
+            .live-info-cell.c-upd {
+                background: var(--t-purple-bg);
+            }
+
+            .live-info-cell.c-upd .ci {
+                color: var(--t-purple);
+            }
+
+            .live-info-cell.c-agt {
+                background: var(--t-gray-bg);
+            }
+
+            .live-info-cell.c-agt .ci {
+                color: var(--t-blue);
+            }
+
+            /* ---------- Progress stepper (summary only) ---------- */
+            .trk-progress-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 22px;
+            }
+
+            .trk-pct {
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--t-blue);
+                background: var(--t-blue-bg);
+                padding: 4px 10px;
+                border-radius: 999px;
+            }
+
+            .trk-steps {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: flex;
+            }
+
+            .trk-step {
+                flex: 1;
+                position: relative;
+                text-align: center;
+                padding: 0 6px;
+                min-width: 0;
+            }
+
+            .trk-step::before {
+                content: '';
+                position: absolute;
+                top: 21px;
+                right: 50%;
+                width: 100%;
+                height: 3px;
+                background: var(--t-line);
+                z-index: 0;
+            }
+
+            .trk-step:first-child::before {
+                display: none;
+            }
+
+            .trk-step.done::before,
+            .trk-step.active::before,
+            .trk-step.alert::before {
+                background: var(--t-green);
+            }
+
+            .trk-step .dot {
+                position: relative;
+                z-index: 1;
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
+                margin: 0 auto;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: var(--t-gray-bg);
+                color: var(--t-gray);
+                border: 2px solid var(--t-line);
+                box-sizing: border-box;
+            }
+
+            .trk-step.done .dot {
+                background: var(--t-green);
+                border-color: var(--t-green);
+                color: #fff;
+            }
+
+            .trk-step.active .dot {
+                background: var(--t-blue);
+                border-color: var(--t-blue);
+                color: #fff;
+                box-shadow: 0 0 0 5px var(--t-blue-bg);
+            }
+
+            .trk-step.alert .dot {
+                background: var(--t-red);
+                border-color: var(--t-red);
+                color: #fff;
+                box-shadow: 0 0 0 5px var(--t-red-bg);
+            }
+
+            .trk-step .name {
+                margin-top: 10px;
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            .trk-step.pending .name {
+                color: var(--t-dim);
+            }
+
+            .trk-step .when {
+                margin-top: 3px;
+                font-size: 11.5px;
+                color: var(--t-dim);
+            }
+
+            /* ---------- Map ---------- */
             #tracking-map {
-                height: 340px;
-                border-radius: 10px;
-                margin: 16px 0 22px;
-                border: 1px solid #E2DFD3;
+                height: clamp(280px, 45vw, 420px);
+                width: 100%;
+                border-radius: 14px;
+                margin: 14px 0 0;
+                border: 1px solid var(--t-line);
+                box-sizing: border-box;
+                z-index: 0;
             }
 
             .route-legend {
                 display: flex;
                 flex-wrap: wrap;
-                gap: 16px;
+                gap: 8px 16px;
                 font-size: 12.5px;
-                color: #5C6B7A;
-                margin-bottom: 10px;
+                color: var(--t-dim);
+                margin: 14px 0 0 44px;
             }
 
-            @media (max-width: 700px) {
-                .live-info-grid {
-                    grid-template-columns: repeat(2, 1fr);
-                }
-            }
-        </style>
-        <style>
-            .track-page {
-                max-width: 800px;
-                margin: 0 auto;
-                padding: 40px 5%;
+            .trk-note {
+                font-size: 12px;
+                color: var(--t-dim);
+                margin: 8px 0 0 44px;
             }
 
-            .track-search-card {
-                background: #fff;
-                border: 1px solid var(--d-line, #E2DFD3);
-                border-radius: 14px;
-                padding: 26px 28px;
-                box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
-                margin-bottom: 24px;
+            /* ---------- Tracking history ---------- */
+            .trk-history {
+                list-style: none;
+                margin: 22px 0 0;
+                padding: 0;
             }
 
-            .track-search-card h2 {
-                margin: 0 0 4px;
-                color: #0B1F3A;
-            }
-
-            .track-search-card p {
-                color: #5C6B7A;
-                font-size: 13.5px;
-                margin: 0 0 18px;
-            }
-
-            .track-search-form {
+            .trk-ev {
+                position: relative;
                 display: flex;
-                gap: 10px;
+                gap: 16px;
+                padding-bottom: 22px;
             }
 
-            .track-search-form input {
+            .trk-ev:last-child {
+                padding-bottom: 0;
+            }
+
+            .trk-ev:not(:last-child)::before {
+                content: '';
+                position: absolute;
+                left: 19px;
+                top: 40px;
+                bottom: 0;
+                width: 2px;
+                background: var(--t-line);
+            }
+
+            .trk-ev .mk {
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: var(--t-gray-bg);
+                color: var(--t-gray);
+                position: relative;
+                z-index: 1;
+            }
+
+            .trk-ev .body {
                 flex: 1;
-                width: auto;
-                margin-top: 0;
-                box-sizing: border-box;
-                padding: 11px 14px;
-                border: 1px solid #E2DFD3;
-                border-radius: 7px;
-                font-family: 'Courier New', monospace;
-                font-size: 14px;
-                color: #0B1F3A;
+                min-width: 0;
+                padding: 2px 4px 0;
             }
 
-            .track-search-form button {
-                width: auto;
-                margin-top: 0;
-                box-sizing: border-box;
-                background: #0B1F3A;
-                color: white;
-                border: none;
-                padding: 0 22px;
-                border-radius: 7px;
-                font-weight: 600;
-                cursor: pointer;
-                font-size: 14px;
+            .trk-ev.latest .body {
+                background: var(--t-blue-bg);
+                border: 1px solid var(--t-line);
+                border-radius: 12px;
+                padding: 12px 14px;
+                margin-top: -4px;
             }
 
-            .track-result-card {
-                background: #fff;
-                border: 1px solid var(--d-line, #E2DFD3);
-                border-radius: 14px;
-                padding: 28px;
-                box-shadow: 0 20px 45px -20px rgba(11, 31, 58, 0.18);
-            }
-
-            .track-result-head {
+            .trk-ev .row {
                 display: flex;
                 justify-content: space-between;
                 align-items: flex-start;
-                margin-bottom: 22px;
+                gap: 10px;
+                flex-wrap: wrap;
             }
 
-            .track-result-head .tid {
-                font-family: 'Courier New', monospace;
-                font-size: 18px;
+            .trk-ev .title {
+                font-size: 15px;
                 font-weight: 700;
-                color: #0B1F3A;
+                color: var(--t-ink);
             }
 
-            .progress-track {
-                position: relative;
-                height: 6px;
-                background: #E2DFD3;
-                border-radius: 4px;
-                margin: 30px 0 34px;
+            .trk-ev .desc {
+                margin-top: 4px;
+                font-size: 13.5px;
+                color: var(--t-dim);
+                overflow-wrap: anywhere;
+                white-space: normal;
             }
 
-            .progress-fill {
-                position: absolute;
-                left: 0;
-                top: 0;
-                height: 100%;
-                background: #F5A623;
-                border-radius: 4px;
+            .trk-ev .ts {
+                margin-top: 6px;
+                font-size: 12.5px;
+                color: var(--t-dim);
+                font-weight: 600;
             }
 
-            .progress-marker {
-                position: absolute;
-                top: 50%;
-                width: 18px;
-                height: 18px;
-                background: #0B1F3A;
-                border: 3px solid #F5A623;
-                border-radius: 50%;
-                transform: translate(-50%, -50%);
+            .trk-ev.k-delivered .mk,
+            .trk-ev.k-picked .mk {
+                background: var(--t-green-bg);
+                color: var(--t-green);
             }
 
-            .timeline {
-                list-style: none;
-                padding: 0;
-                margin: 0;
+            .trk-ev.k-created .mk,
+            .trk-ev.k-awaiting .mk {
+                background: var(--t-gray-bg);
+                color: var(--t-gray);
             }
 
-            .timeline li {
-                display: flex;
-                gap: 14px;
-                padding-bottom: 20px;
-                position: relative;
+            .trk-ev.k-awaiting .mk,
+            .trk-ev.k-transit .mk,
+            .trk-ev.k-agent .mk {
+                background: var(--t-blue-bg);
+                color: var(--t-blue);
             }
 
-            .timeline li:not(:last-child)::before {
-                content: '';
-                position: absolute;
-                left: 7px;
-                top: 22px;
-                bottom: 0;
-                width: 2px;
-                background: #E2DFD3;
+            .trk-ev.k-ofd .mk,
+            .trk-ev.k-resched .mk {
+                background: var(--t-orange-bg);
+                color: var(--t-orange);
             }
 
-            .timeline .tdot {
-                width: 16px;
-                height: 16px;
-                border-radius: 50%;
-                background: #1B6B6B;
-                flex-shrink: 0;
-                margin-top: 2px;
+            .trk-ev.k-warehouse .mk,
+            .trk-ev.k-ready .mk {
+                background: var(--t-teal-bg);
+                color: var(--t-teal);
             }
 
-            .timeline .tbody b {
-                display: block;
-                color: #0B1F3A;
+            .trk-ev.k-processing .mk {
+                background: var(--t-purple-bg);
+                color: var(--t-purple);
+            }
+
+            .trk-ev.k-failed .mk {
+                background: var(--t-red-bg);
+                color: var(--t-red);
+            }
+
+            .trk-empty {
+                text-align: center;
+                color: var(--t-dim);
+                padding: 26px 10px 6px;
                 font-size: 14px;
             }
 
-            .timeline .tbody span {
-                color: #5C6B7A;
-                font-size: 12.5px;
+            .trk-notfound {
+                text-align: center;
+                color: var(--t-dim);
+            }
+
+            /* ---------- Recent shipments ---------- */
+            .trk-recent summary {
+                list-style: none;
+                cursor: pointer;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .trk-recent summary::-webkit-details-marker {
+                display: none;
+            }
+
+            .trk-recent summary:focus-visible {
+                outline: 2px solid var(--t-blue);
+                outline-offset: 4px;
+                border-radius: 8px;
+            }
+
+            .trk-recent .chev {
+                color: var(--t-dim);
+                transition: transform .15s ease;
+                flex-shrink: 0;
+                margin-top: 6px;
+            }
+
+            .trk-recent[open] .chev {
+                transform: rotate(180deg);
+            }
+
+            .trk-rs-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+                gap: 14px;
+                margin-top: 20px;
+            }
+
+            .trk-rs {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                border: 1px solid var(--t-line);
+                border-radius: 14px;
+                padding: 16px;
+                background: var(--t-card);
+                min-width: 0;
+                box-sizing: border-box;
+            }
+
+            .trk-rs.current {
+                border-color: var(--t-blue);
+                box-shadow: 0 0 0 3px var(--t-blue-bg);
+            }
+
+            .trk-rs .rs-top {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .trk-rs .rs-tid {
+                font-family: 'Courier New', monospace;
+                font-weight: 700;
+                font-size: 14.5px;
+                overflow-wrap: anywhere;
+            }
+
+            .trk-rs .rs-row,
+            .trk-rs .rs-agent>div {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                min-width: 0;
+            }
+
+            .trk-rs .rs-val {
+                font-size: 13.5px;
+                font-weight: 600;
+                color: var(--t-ink);
+                overflow-wrap: anywhere;
+            }
+
+            .trk-rs .rs-agents {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+                padding-top: 12px;
+                border-top: 1px solid var(--t-line);
+            }
+
+            .trk-rs .rs-agent {
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+                min-width: 0;
+            }
+
+            .trk-rs .rs-agent .ai {
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background: var(--t-blue-bg);
+                color: var(--t-blue);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .trk-rs .rs-btn {
+                margin-top: auto;
+                display: inline-flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 14px;
+                border-radius: 10px;
+                background: var(--t-blue);
+                color: #fff;
+                font-weight: 600;
+                font-size: 13.5px;
+                text-decoration: none;
+            }
+
+            .trk-rs .rs-btn:hover {
+                filter: brightness(1.08);
+            }
+
+            /* ---------- Responsive ---------- */
+            @media (max-width: 1000px) {
+                .live-info-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 700px) {
+                .trk-card {
+                    padding: 18px;
+                }
+
+                .trk-form {
+                    flex-direction: column;
+                }
+
+                .trk-form button {
+                    padding: 13px;
+                }
+
+                .trk-search p {
+                    margin-left: 0;
+                }
+
+                .trk-section-sub,
+                .route-legend,
+                .trk-note {
+                    margin-left: 0;
+                }
+
+                .trk-details-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .live-info-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .trk-rs .rs-agents {
+                    grid-template-columns: 1fr;
+                }
+
+                /* vertical stepper */
+                .trk-steps {
+                    flex-direction: column;
+                }
+
+                .trk-step {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 14px;
+                    text-align: left;
+                    padding: 0 0 20px;
+                }
+
+                .trk-step:last-child {
+                    padding-bottom: 0;
+                }
+
+                .trk-step::before {
+                    top: -20px;
+                    right: auto;
+                    left: 21px;
+                    width: 3px;
+                    height: 20px;
+                }
+
+                .trk-step .dot {
+                    margin: 0;
+                    flex-shrink: 0;
+                }
+
+                .trk-step .name {
+                    margin-top: 2px;
+                }
             }
         </style>
 
-        <div class="track-page">
+        <div class="trk-page">
 
-            <div class="track-search-card">
-                <h2>Track Your Shipment</h2>
+            <!-- 1. SEARCH -->
+            <div class="trk-card trk-search">
+                <h2>
+                    <span class="ico">{{ icon('package', 22) }}</span>
+                    Track Your Shipment
+                </h2>
                 <p>Enter your Tracking ID to see live status and delivery history.</p>
-                <form class="track-search-form" method="GET" action="{{ url_for('shipments.track') }}">
-                    <input type="text" name="tracking_id" placeholder="e.g. CL20260830X7F2"
-                        value="{{ tracking_id or '' }}">
+                <form class="trk-form" method="GET" action="{{ url_for('shipments.track') }}">
+                    <div class="trk-input-wrap">
+                        {{ icon('search', 18) }}
+                        <input type="text" name="tracking_id" placeholder="e.g. CL20260830X7F2"
+                            value="{{ tracking_id or '' }}" autocomplete="off">
+                    </div>
                     <button type="submit">Track</button>
                 </form>
             </div>
 
+            {% if not shipment %}
+            {% if tracking_id %}
+            <div class="trk-card trk-notfound">
+                No shipment found with that Tracking ID. Double-check and try again.
+            </div>
+            {% endif %}
+            {# initial load / invalid ID: Recent Shipments directly below the search card #}
+            {{ recent_shipments(recent_shipments_list|default(none), tracking_id, true) }}
+            {% endif %}
+
             {% if shipment %}
-            <div class="track-result-card">
-                <div class="track-result-head">
+            {# ---- presentation-only status → style key mapping ---- #}
+            {% set SK = {
+            'Created': 'created', 'Awaiting Pickup': 'awaiting', 'Picked Up': 'picked',
+            'In Transit': 'transit', 'Arrived at Warehouse': 'warehouse', 'Processing': 'processing',
+            'Ready for Dispatch': 'ready', 'Agent Assigned': 'agent', 'Out for Delivery': 'ofd',
+            'Delivered': 'delivered', 'Failed Delivery': 'failed', 'RTO': 'failed', 'Rescheduled': 'resched'
+            } %}
+            {% set IK = {
+            'created': 'package', 'awaiting': 'pin', 'picked': 'check', 'transit': 'truck',
+            'warehouse': 'warehouse', 'processing': 'cog', 'ready': 'check', 'agent': 'user',
+            'ofd': 'truck', 'delivered': 'check', 'failed': 'warn', 'resched': 'calendar'
+            } %}
+            {% set skey = SK.get(shipment.status, 'default') %}
+
+            <!-- 2. SHIPMENT DETAILS -->
+            <div class="trk-card">
+                <div class="trk-details-head">
                     <div>
-                        <div class="tid">{{ shipment.tracking_id }}</div>
-                        <div style="color:#5C6B7A; font-size:13px; margin-top:4px;">To: {{ shipment.receiver_name }}, {{
-                            shipment.receiver_address }}</div>
-                        <div style="color:#5C6B7A; font-size:13px; margin-top:4px;">Scheduled Delivery: {{
-                            schedule_text(shipment) }}</div>
+                        <div class="trk-label">Shipment Details</div>
+                        <div class="trk-tid">{{ shipment.tracking_id }}</div>
                     </div>
-                    <span
-                        class="pill {{ 'delivered' if shipment.status == 'Delivered' else ('failed' if shipment.status in ['Failed Delivery','RTO'] else 'transit') }}">{{
-                        shipment.status }}</span>
+                    <span class="trk-badge k-{{ skey }}">{{ icon(IK.get(skey, 'default'), 14) }}{{ shipment.status
+                        }}</span>
                 </div>
-
-                <div class="progress-track">
-                    <div class="progress-fill" style="width: {{ progress }}%;"></div>
-                    <div class="progress-marker" style="left: {{ progress }}%;"></div>
+                <div class="trk-details-grid">
+                    <div>
+                        <div class="trk-label">Destination</div>
+                        <div class="v">{{ shipment.receiver_name }}{% if shipment.receiver_name and
+                            shipment.receiver_address %}, {% endif %}{{ shipment.receiver_address }}</div>
+                    </div>
+                    <div>
+                        <div class="trk-label">Scheduled Delivery</div>
+                        <div class="v">{{ schedule_text(shipment) }}</div>
+                    </div>
                 </div>
+            </div>
 
-                <!-- LIVE TRACKING (additive) -->
-                <div class="live-info-grid">
-                    <div class="live-info-cell">
+            <!-- 3. SUMMARY CARDS (ids used by the live-polling script) -->
+            <div class="live-info-grid">
+                <div class="live-info-cell c-loc">
+                    <span class="ci">{{ icon('pin', 20) }}</span>
+                    <div>
                         <div class="li-k">Current Location</div>
                         <div class="li-v" id="live-current-location">{{ live_location_text or 'Not available yet' }}
                         </div>
                     </div>
-                    <div class="live-info-cell">
-                        <div class="li-k">ETA</div>
-                        <div class="li-v" id="live-eta">{{ eta_label }}</div>
-                    </div>
-                    <div class="live-info-cell">
-                        <div class="li-k">Last Updated</div>
-                        <div class="li-v" id="live-updated">{{ (last_updated_at | ist('%b %d, %Y %I:%M %p')) if
-                            last_updated_at
-                            else 'Not available' }}</div>
-                    </div>
-                    <div class="live-info-cell">
-                        <div class="li-k">Assigned Agent</div>
-                        <div class="li-v" id="live-agent">{{ delivery_agent_name or pickup_agent_name or 'Not yet
-                            assigned' }}
-                        </div>
+                </div>
+                <div class="live-info-cell c-eta">
+                    <span class="ci">{{ icon('calendar', 20) }}</span>
+                    <div>
+                        <div class="li-k">Estimated Delivery</div>
+                        <div class="li-v" id="live-eta">{{ eta_label or 'Not available' }}</div>
                     </div>
                 </div>
+                <div class="live-info-cell c-upd">
+                    <span class="ci">{{ icon('clock', 20) }}</span>
+                    <div>
+                        <div class="li-k">Last Updated</div>
+                        <div class="li-v" id="live-updated">{{ (last_updated_at | ist('%b %d, %Y %I:%M %p')) if
+                            last_updated_at else 'Not available' }}</div>
+                    </div>
+                </div>
+                <div class="live-info-cell c-agt">
+                    <span class="ci">{{ icon('user', 20) }}</span>
+                    <div>
+                        <div class="li-k">Assigned Agent</div>
+                        <div class="li-v" id="live-agent">{{ delivery_agent_name or pickup_agent_name or 'Not yet
+                            assigned' }}</div>
+                    </div>
+                </div>
+            </div>
 
-                <div class="route-legend">📍 Pickup &nbsp;→&nbsp; 🏭 Warehouse &nbsp;→&nbsp; 🚚 Delivery Agent
-                    &nbsp;→&nbsp; 📍
-                    Destination</div>
+            <!-- 4. SHIPMENT PROGRESS -->
+            {# Presentation-only mapping of the existing status to the 5 milestones.
+            Index of the "current" milestone; 5 = all done; -1 = unknown status. #}
+            {% set CUR = {
+            'Created': 0, 'Awaiting Pickup': 0,
+            'Picked Up': 1, 'In Transit': 1, 'Arrived at Warehouse': 1, 'Processing': 1,
+            'Ready for Dispatch': 2, 'Agent Assigned': 2,
+            'Out for Delivery': 3, 'Failed Delivery': 3, 'Rescheduled': 3, 'RTO': 3
+            } %}
+            {% if shipment.status == 'Delivered' %}{% set cur = 5 %}
+            {% else %}{% set cur = CUR.get(shipment.status, -1) %}{% endif %}
+            {% set is_alert = shipment.status in ['Failed Delivery', 'Rescheduled', 'RTO'] %}
+            {% set steps = [
+            ('Pickup', 'package', ['Picked Up']),
+            ('Warehouse', 'warehouse', ['Arrived at Warehouse']),
+            ('In Transit', 'truck', ['In Transit']),
+            ('Out for Delivery', 'truck', ['Out for Delivery']),
+            ('Delivered', 'check', ['Delivered'])
+            ] %}
+            <div class="trk-card">
+                <div class="trk-progress-head">
+                    <h3 class="trk-section-title"><span class="ico">{{ icon('truck', 18) }}</span>Shipment Progress</h3>
+                    {% if not is_alert %}<span class="trk-pct">{{ progress }}% complete</span>{% endif %}
+                </div>
+                <ol class="trk-steps">
+                    {% for label, ik, matches in steps %}
+                    {% set idx = loop.index0 %}
+                    {% if idx < cur %}{% set sc='done' %} {% elif idx==cur %}{% set sc='alert' if is_alert else 'active'
+                        %} {% else %}{% set sc='pending' %}{% endif %} {% set ns=namespace(ts=none) %} {% if sc in
+                        ['done', 'active' ] %} {% for h in history %}{% if h.status in matches and h.timestamp %}{% set
+                        ns.ts=h.timestamp %}{% endif %}{% endfor %} {% endif %} <li class="trk-step {{ sc }}">
+                        <div class="dot">{{ icon('warn' if sc == 'alert' else ik, 20) }}</div>
+                        <div>
+                            <div class="name">{{ label }}</div>
+                            {% if ns.ts %}<div class="when">{{ ns.ts | ist('%b %d, %I:%M %p') }}</div>{% endif %}
+                            {% if sc == 'alert' %}<div class="when">{{ shipment.status }}</div>{% endif %}
+                        </div>
+                        </li>
+                        {% endfor %}
+                </ol>
+            </div>
+
+            <!-- 5. MAP -->
+            <div class="trk-card">
+                <h3 class="trk-section-title"><span class="ico">{{ icon('pin', 18) }}</span>Shipment Map</h3>
+                <div class="route-legend">
+                    <span> Pickup</span><span> Warehouse</span><span> Delivery Agent</span><span>
+                        Destination</span>
+                </div>
                 <div id="tracking-map"></div>
+                <p class="trk-note">The agent marker appears only when the delivery agent has shared a location.</p>
+            </div>
 
-                <h4 style="color:#0B1F3A; margin-bottom:14px;">Tracking History</h4>
-                <ul class="timeline">
+            <!-- 6. TRACKING HISTORY: every record supplied by the route is rendered -->
+            <div class="trk-card">
+                <h3 class="trk-section-title"><span class="ico">{{ icon('clock', 18) }}</span>Tracking History</h3>
+                <p class="trk-section-sub">Complete timeline of your shipment status.</p>
+
+                {% if history %}
+                <ul class="trk-history">
+                    {# same order as before: |reverse (newest first); no slicing, no dedupe #}
                     {% for h in history|reverse %}
-                    <li>
-                        <div class="tdot"></div>
-                        <div class="tbody">
-                            <b>{{ h.status }}</b>
-                            <span>{{ h.location or '' }}{% if h.remarks %} — {{ h.remarks }}{% endif %}</span><br>
-                            <span>{{ (h.timestamp | ist('%b %d, %Y %I:%M %p')) if h.timestamp else '' }}</span>
+                    {% set hk = SK.get(h.status, 'default') %}
+                    <li class="trk-ev k-{{ hk }}{% if loop.first %} latest{% endif %}">
+                        <div class="mk">{{ icon(IK.get(hk, 'default'), 18) }}</div>
+                        <div class="body">
+                            <div class="row">
+                                <span class="title">{{ h.status }}</span>
+                                {% if loop.first %}<span class="trk-badge k-{{ hk }}">Latest</span>{% endif %}
+                            </div>
+                            {% if h.location or h.remarks %}
+                            <div class="desc">{{ h.location or '' }}{% if h.location and h.remarks %} — {% endif %}{{
+                                h.remarks or '' }}</div>
+                            {% endif %}
+                            {% if h.timestamp %}
+                            <div class="ts">{{ h.timestamp | ist('%b %d, %Y') }} · {{ h.timestamp | ist('%I:%M %p') }}
+                            </div>
+                            {% endif %}
                         </div>
                     </li>
                     {% endfor %}
                 </ul>
+                {% else %}
+                <div class="trk-empty">No tracking history is available for this shipment yet.</div>
+                {% endif %}
             </div>
-            {% elif tracking_id %}
-            <div class="track-result-card" style="text-align:center; color:#5C6B7A;">
-                No shipment found with that Tracking ID. Double-check and try again.
-            </div>
+
+            <!-- 7. RECENT SHIPMENTS (collapsed after a successful search; never removed) -->
+            {{ recent_shipments(recent_shipments_list|default(none), shipment.tracking_id, false) }}
+
             {% endif %}
 
         </div>
@@ -331,6 +1186,11 @@
                 attribution: '&copy; OpenStreetMap contributors',
                 maxZoom: 18,
             }).addTo(map);
+
+            // Presentation fix: make sure Leaflet measures the container after layout settles / resizes
+            setTimeout(() => map.invalidateSize(), 150);
+            window.addEventListener('load', () => map.invalidateSize());
+            window.addEventListener('resize', () => map.invalidateSize());
 
             let pickupMarker = null, warehouseMarker = null, agentMarker = null, destMarker = null;
             let routeLine = null;
@@ -415,7 +1275,7 @@
 
                         if (window.__destLatLng) {
                             if (routeLine) map.removeLayer(routeLine);
-                            routeLine = L.polyline([agentLatLng, window.__destLatLng], { color: '#F5A623', dashArray: '6 6', weight: 3 }).addTo(map);
+                            routeLine = L.polyline([agentLatLng, window.__destLatLng], { color: '#1B5FD1', dashArray: '6 6', weight: 3 }).addTo(map);
                         }
                     }
                 } catch (e) { /* polling failure is non-fatal; try again next interval */ }
@@ -427,7 +1287,7 @@
                     setInterval(pollLocation, 15000); // poll every 15s until delivered
                 }
             });
-}) ();
+            }) ();
         </script>
         {% endif %}
     </main>
